@@ -1,0 +1,902 @@
+﻿<app-page-title [title]="getTitle()" [description]="getDescription()"
+  [actionLabel]="onboardingFlow() ? getSaveActionLabel() : ''" (action)="onboardingFlow() ? saveSettings() : null" />
+
+<section class="grid gap-8"
+  [ngClass]="settingView() === 'profile' && !onboardingFlow() ? 'lg:grid-cols-[1.2fr_1fr]' : 'lg:grid-cols-1'">
+  <!-- PROFILE VIEW -->
+  @if (settingView() === 'profile') {
+  <app-ui-card>
+    <div class="flex flex-col gap-6">
+      <!-- Avatar Section -->
+      <div class="flex items-center gap-5">
+        <div
+          class="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+          @if (logoUrl()) {
+          <img [src]="logoUrl()" alt="Shop Avatar" class="h-full w-full object-cover" />
+          } @else {
+          <div class="flex h-full w-full items-center justify-center text-2xl">🏪</div>
+          }
+          <label
+            class="absolute inset-0 flex cursor-pointer items-center justify-center bg-black/40 opacity-0 transition-opacity hover:opacity-100">
+            <span class="text-[10px] font-bold text-white uppercase">Sửa</span>
+            <input type="file" class="hidden" accept="image/*" (change)="onAvatarSelected($event)" />
+          </label>
+        </div>
+        <div>
+          <h3 class="m-0 text-base font-bold text-[var(--color-text-primary)]">Ảnh đại diện shop</h3>
+          <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">JPG, PNG hoặc SVG. Tối đa 2MB.</p>
+        </div>
+      </div>
+
+      <div class="h-px bg-[var(--color-border)]"></div>
+
+      <!-- Basic Info -->
+      <div class="grid gap-4">
+        <div class="flex items-center justify-between">
+          <h3 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin cơ
+            bản</h3>
+          @if (!onboardingFlow()) {
+          <button class="text-xs font-bold text-[var(--color-accent)] hover:underline" (click)="saveBasicInfo()">Cập
+            nhật</button>
+          }
+        </div>
+        <app-ui-input label="Tên shop" [value]="shopName()" placeholder="Nhập tên shop của bạn"
+          (valueChange)="updateShopName($event)" [errorText]="errorShopName()" />
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-ui-input label="Email liên hệ của shop" [value]="shopEmail()" placeholder="VD: contact@shop.vn"
+            (valueChange)="updateShopEmail($event)" [errorText]="errorShopEmail()" />
+          <app-international-phone-input
+            label="Hotline chính của shop"
+            [value]="shopPhone()"
+            [showError]="!!errorShopPhone()"
+            [errorText]="errorShopPhone()"
+            (valueChange)="updateShopPhone($event)"
+          />
+        </div>
+      </div>
+
+      <div class="h-px bg-[var(--color-border)]"></div>
+
+      <!-- Support Info -->
+      <div class="grid gap-4">
+        <div class="flex items-center justify-between">
+          <h3 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin hỗ
+            trợ khách hàng</h3>
+          @if (!onboardingFlow()) {
+          <button class="text-xs font-bold text-[var(--color-accent)] hover:underline" (click)="saveSupportInfo()">Cập
+            nhật</button>
+          }
+        </div>
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Thông tin này sẽ hiển thị cho khách hàng trên các đơn
+          hàng và website.</p>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <app-ui-input label="Email hỗ trợ" [value]="supportEmail()" placeholder="VD: support@shop.vn"
+            (valueChange)="updateSupportEmail($event)" [errorText]="errorSupportEmail()" />
+          <app-international-phone-input
+            label="Hotline hỗ trợ"
+            [value]="supportPhone()"
+            [showError]="!!errorSupportPhone()"
+            [errorText]="errorSupportPhone()"
+            (valueChange)="updateSupportPhone($event)"
+          />
+        </div>
+      </div>
+
+      <div class="h-px bg-[var(--color-border)]"></div>
+
+      @if (!onboardingFlow()) {
+      <!-- Addresses Section -->
+      <div class="grid gap-4">
+        <div class="flex items-center justify-between">
+          <h3 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Địa chỉ shop
+          </h3>
+          <button class="text-xs font-bold text-[var(--color-accent)] hover:underline"
+            (click)="openAddAddressModal()">+ Thêm địa chỉ</button>
+        </div>
+
+        <div class="grid gap-3">
+          @for (addr of shopAddresses(); track addr.id) {
+          <div
+            class="flex items-start justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 transition hover:border-[var(--color-accent)]/30">
+            <div class="flex gap-3 flex-1">
+              <div class="mt-0.5 text-lg text-[var(--color-text-tertiary)]">📍</div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2">
+                  <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ addr.label }}</p>
+                  @if (addr.isDefault) {
+                  <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[9px] font-bold text-emerald-600 uppercase">Mặc
+                    định</span>
+                  }
+                </div>
+                <p class="m-0 mt-1 text-xs text-[var(--color-text-secondary)]">
+                  {{ addr.addressLine }}, {{ addr.ward }}, {{ addr.district }}, {{ addr.province }}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              @if (!addr.isDefault) {
+              <button [disabled]="submittingAddress()" class="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] disabled:opacity-50"
+                (click)="setAddressAsDefault($index)" title="Đặt làm mặc định">Mặc định</button>
+              }
+              <button [disabled]="submittingAddress()" class="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-accent)] disabled:opacity-50"
+                (click)="editAddress($index)">Sửa</button>
+              <button [disabled]="submittingAddress()" class="text-xs text-red-400 hover:text-red-600 disabled:opacity-50" (click)="removeAddress($index)">Xóa</button>
+            </div>
+          </div>
+          }
+        </div>
+      </div>
+      }
+    </div>
+  </app-ui-card>
+  }
+
+  <!-- CATEGORY VIEW -->
+  @if (settingView() === 'category') {
+  <app-ui-card>
+    <div class="flex items-center justify-between">
+      <h3 class="m-0 text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">Danh mục sản phẩm
+      </h3>
+    </div>
+    <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">Tạo các danh mục để phân loại sản phẩm trong shop của
+      bạn.</p>
+
+    <div class="mt-5 flex gap-2">
+      <input type="text" [value]="newCategoryName" (input)="newCategoryName = $any($event.target).value"
+        (keyup.enter)="addCategory()" placeholder="Tên danh mục mới"
+        class="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--color-accent)]" />
+      <button (click)="addCategory()"
+        class="flex h-[38px] shrink-0 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
+        Thêm
+      </button>
+    </div>
+
+    @if (categories().length > 0) {
+    <div class="mt-5 grid gap-1.5">
+      @for (cat of categories(); track $index) {
+      <div
+        class="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+        @if (editingCategoryIndex === $index) {
+        <input type="text" [value]="editingCategoryName" (input)="editingCategoryName = $any($event.target).value"
+          (keyup.enter)="confirmEditCategory($index)" (keyup.escape)="cancelEditCategory()"
+          class="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-accent)] bg-white px-2 py-1 text-sm outline-none" />
+        <button (click)="confirmEditCategory($index)"
+          class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent-hover)] transition" title="Xác nhận">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </button>
+        <button (click)="cancelEditCategory()"
+          class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)] transition" title="Hủy">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+        } @else {
+        <span class="flex-1 text-sm font-medium text-[var(--color-text-primary)]">{{ cat }}</span>
+        <button (click)="startEditCategory($index, cat)"
+          class="text-xs font-medium text-[var(--color-text-tertiary)] transition hover:text-[var(--color-accent)]">Sửa</button>
+        <button (click)="removeCategory($index)"
+          class="text-xs font-medium text-[var(--color-text-tertiary)] transition hover:text-red-500">Xóa</button>
+        }
+      </div>
+      }
+    </div>
+    } @else {
+    <div class="mt-5 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] py-8 text-center">
+      <p class="m-0 text-sm text-[var(--color-text-tertiary)]">Chưa có danh mục nào. Hãy thêm danh mục đầu tiên.</p>
+    </div>
+    }
+  </app-ui-card>
+  }
+
+  <!-- STAFF VIEW -->
+  @if (settingView() === 'staff') {
+  <app-ui-card>
+    <div class="flex items-center justify-between gap-3">
+      <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Quản lý nhân viên</h3>
+      @if (staffSubView() === 'management') {
+      <button
+        class="flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--color-accent-hover)]"
+        (click)="openAddEmployeeModal()">
+        + Thêm NV
+      </button>
+      }
+    </div>
+
+    <div class="mt-3 flex flex-wrap gap-1.5">
+      @for (tab of staffSubViewTabs; track tab.value) {
+      <button
+        class="inline-flex h-8 items-center rounded-[var(--radius-md)] px-3 text-xs font-semibold transition-all duration-150"
+        [ngClass]="{
+          'bg-[var(--color-accent)] text-white shadow-sm': staffSubView() === tab.value,
+          'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]': staffSubView() !== tab.value
+        }" (click)="setStaffSubView(tab.value)">
+        {{ tab.label }}
+      </button>
+      }
+    </div>
+
+    @if (staffSubView() === 'management') {
+    <!-- Employee list -->
+    <div class="mt-3 grid gap-2">
+      @for (emp of employees; track emp.id) {
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-accent)]/30"
+        (dblclick)="openEmployeeDetail(emp, $event)">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+              [class]="emp.active ? 'bg-emerald-500' : 'bg-gray-400'">
+              {{ emp.name.charAt(0) }}
+            </div>
+            <div>
+              <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ emp.name }}</p>
+              <div class="mt-0.5 flex items-center gap-2">
+                <span class="text-[10px] text-[var(--color-text-tertiary)]">{{ emp.role }}</span>
+                <span class="h-1 w-1 rounded-full bg-[var(--color-border)]"></span>
+                <span class="text-[10px] font-medium text-[var(--color-accent)]">{{ emp.username }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <!-- Quick copy password button -->
+            <button
+              class="flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-[var(--color-warning-soft)] bg-[var(--color-warning-soft)] px-2 text-[10px] font-bold text-[var(--color-warning-text)] transition hover:bg-[var(--color-warning-soft)]/80"
+              title="Sao chép mật khẩu" (click)="copyEmployeeField(emp.password, 'Mật khẩu')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+              <span>Sao chép</span>
+            </button>
+
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+              title="Xem chi tiết nhân viên"
+              aria-label="Xem chi tiết nhân viên"
+              (click)="openEmployeeDetail(emp, $event)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+              [attr.aria-label]="isEmployeeExpanded(emp.id) ? 'Thu gọn' : 'Mở rộng'"
+              (click)="$event.stopPropagation(); toggleEmployeeExpand(emp.id)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                [style.transform]="isEmployeeExpanded(emp.id) ? 'rotate(180deg)' : 'rotate(0deg)'"
+                style="transition: transform .15s ease;">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        @if (isEmployeeExpanded(emp.id)) {
+        <div class="mt-2 grid gap-2 border-t border-[var(--color-border)] pt-2">
+          <div
+            class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] px-2.5 py-2">
+            <div>
+              <p class="m-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tên
+                đăng nhập</p>
+              <p class="m-0 mt-1 text-xs font-semibold text-[var(--color-text-primary)]">{{ emp.username || '--' }}</p>
+            </div>
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white"
+              aria-label="Sao chép tên đăng nhập" (click)="copyEmployeeField(emp.username, 'Tên đăng nhập')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+            </button>
+          </div>
+
+          <div
+            class="flex items-center justify-between rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] px-2.5 py-2">
+            <div>
+              <p class="m-0 text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Mật
+                khẩu tạm thời</p>
+              <p class="m-0 mt-1 text-xs font-semibold text-[var(--color-warning-text)]">{{ emp.password || 'Đã đổi' }}
+              </p>
+            </div>
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-white"
+              aria-label="Sao chép mật khẩu" (click)="copyEmployeeField(emp.password, 'Mật khẩu')">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        }
+      </div>
+      }
+    </div>
+    }
+
+    @if (staffSubView() === 'schedule') {
+    <div class="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h4 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Lịch phân ca
+          </h4>
+          <p class="m-0 mt-1 text-xs text-[var(--color-text-secondary)]">Chuyển giữa chế độ ngày/tháng để theo dõi
+            nhân sự.</p>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          @for (mode of scheduleModeTabs; track mode.value) {
+          <button
+            class="inline-flex h-8 items-center rounded-[var(--radius-md)] px-3 text-xs font-semibold transition-all duration-150"
+            [ngClass]="{
+              'bg-[var(--color-accent)] text-white shadow-sm': scheduleViewMode() === mode.value,
+              'border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]': scheduleViewMode() !== mode.value
+            }" (click)="setScheduleViewMode(mode.value)">
+            {{ mode.label }}
+          </button>
+          }
+        </div>
+      </div>
+
+      <div
+        class="mt-3 flex flex-wrap items-end gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white p-2.5">
+        <div class="grid gap-1">
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngày
+            xem</label>
+          <input #dayPicker type="date" [value]="selectedDateValue" (change)="onDatePickerChange(dayPicker.value)"
+            class="h-8 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 text-xs outline-none focus:border-[var(--color-accent)]" />
+        </div>
+
+        <button
+          class="inline-flex h-8 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent-soft)] px-3 text-xs font-semibold text-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]/70"
+          (click)="jumpToToday()">
+          Về hôm nay
+        </button>
+
+        <div class="grid gap-1">
+          <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tháng
+            xem</label>
+          <input #monthPicker type="month" [value]="selectedMonthValue"
+            (change)="onMonthPickerChange(monthPicker.value)"
+            class="h-8 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-2 text-xs outline-none focus:border-[var(--color-accent)]" />
+        </div>
+      </div>
+
+      @if (scheduleViewMode() === 'day') {
+      <div #dayScroller class="mt-3 overflow-x-auto pb-1">
+        <div class="flex min-w-max gap-2">
+          @for (day of dayStaffBuckets; track day.key) {
+          <div #dayCard
+            class="flex w-56 shrink-0 flex-col rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white p-2.5 transition"
+            [ngClass]="{
+              'ring-2 ring-[var(--color-accent)]/40 shadow-md': day.isFocused,
+              'hover:border-[var(--color-accent)]/30': !day.isFocused
+            }">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1">
+                <p class="m-0 text-xs font-semibold text-[var(--color-text-secondary)]">{{ day.label }}</p>
+                <p class="m-0 text-xs font-bold"
+                  [class]="day.isToday ? 'text-[var(--color-accent)]' : 'text-[var(--color-text-primary)]'">{{
+                  day.dateLabel }}</p>
+              </div>
+              <button
+                class="flex h-5 w-5 items-center justify-center rounded bg-[var(--color-accent-soft)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white transition-colors"
+                title="Thêm ca cho ngày này" (click)="openShiftModal(day.key, $event)">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+
+            @if (day.isToday) {
+            <span
+              class="mt-1 inline-flex w-fit rounded bg-[var(--color-accent-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--color-accent)]">Hôm
+              nay</span>
+            }
+
+            <div class="mt-2 grid gap-1.5">
+              @for (shift of getShiftsForDate(day.key); track shift.id) {
+              <div class="rounded-md bg-[var(--color-accent-soft)] px-2 py-1.5 border border-[var(--color-accent)]/20">
+                <div class="flex items-center justify-between">
+                  <p class="m-0 text-[10px] font-bold text-[var(--color-accent)]">{{ shift.startTime }} - {{
+                    shift.endTime }}</p>
+                  @if (shift.name) {
+                  <span class="text-[9px] font-semibold text-[var(--color-accent)]/70">{{ shift.name }}</span>
+                  }
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  @if (shift.assignedStaff.length === 0) {
+                  <span class="text-[9px] text-[var(--color-text-tertiary)] italic">Chưa có NV</span>
+                  }
+                  @for (member of shift.assignedStaff; track member.id) {
+                  <span
+                    class="inline-flex h-4 items-center rounded-full bg-white/80 px-1.5 text-[9px] font-semibold text-[var(--color-text-primary)]">{{
+                    member.fullName }}</span>
+                  }
+                </div>
+              </div>
+              } @empty {
+              <div class="rounded bg-slate-50 px-2 py-1.5 text-[11px] text-slate-400 italic">Chưa có ca làm</div>
+              }
+            </div>
+          </div>
+          }
+        </div>
+      </div>
+      }
+
+      @if (scheduleViewMode() === 'month') {
+      <div class="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 sm:p-3">
+        <div class="mb-2 flex items-center justify-between">
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ monthTitle }}</p>
+          <p class="m-0 text-[11px] text-[var(--color-text-tertiary)]">Lịch tổng quan nhân sự</p>
+        </div>
+
+        <div class="grid grid-cols-7 gap-1.5">
+          @for (label of monthWeekLabels; track label) {
+          <div class="text-center text-[10px] font-semibold uppercase text-[var(--color-text-tertiary)]">{{ label }}
+          </div>
+          }
+        </div>
+
+        <div class="mt-1 grid grid-cols-7 gap-1.5">
+          @for (day of monthCalendarDays; track day.isoDate) {
+          <div
+            class="relative flex min-h-[130px] flex-col rounded-[var(--radius-md)] border px-2 py-2 cursor-pointer transition hover:shadow-sm group"
+            [ngClass]="{
+              'border-[var(--color-border)] bg-[var(--color-surface)]': day.isCurrentMonth,
+              'border-[var(--color-border)]/60 bg-[var(--color-surface-hover)] opacity-60': !day.isCurrentMonth,
+              '!border-[var(--color-accent)] bg-[var(--color-accent-soft)]': day.isToday,
+              'ring-1 ring-[var(--color-accent)]/35': day.isoDate === selectedDateValue
+            }" (click)="pickDateFromMonth(day.isoDate)">
+            <div class="flex items-start justify-between">
+              <span class="text-[11px] font-semibold" [class]="day.isToday ? 'text-[var(--color-accent)]' : ''">{{
+                day.dayNumber }}</span>
+              <button
+                class="flex h-5 w-5 items-center justify-center rounded bg-[var(--color-accent-soft)] text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white transition-colors opacity-0 group-hover:opacity-100"
+                title="Thêm ca" (click)="openShiftModal(day.isoDate, $event)">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+            <div class="mt-1 grid gap-1 overflow-y-auto">
+              @for (shift of getShiftsForDate(day.isoDate); track shift.id) {
+              <div class="rounded bg-[var(--color-accent-soft)] px-1.5 py-1 border border-[var(--color-accent)]/20">
+                <p class="m-0 text-[9px] font-bold text-[var(--color-accent)]">{{ shift.startTime }}-{{ shift.endTime }}
+                </p>
+                @if (shift.name) {<p class="m-0 truncate text-[9px] text-[var(--color-text-secondary)]">{{ shift.name }}
+                </p>}
+                <p class="m-0 text-[9px] text-[var(--color-text-tertiary)]">{{ shift.assignedStaff.length }} NV</p>
+              </div>
+              } @empty {
+              <span class="text-[9px] text-[var(--color-text-tertiary)]">Trống ca</span>
+              }
+            </div>
+          </div>
+          }
+        </div>
+      </div>
+      }
+    </div>
+    }
+  </app-ui-card>
+  }
+
+  @if (showShiftModal) {
+  <app-multi-shift-modal [shiftDate]="shiftModalDate" [availableStaff]="usersStore.users()" [saving]="savingShifts"
+    (closed)="closeShiftModal()" (saved)="saveShifts($event)" />
+  }
+
+  <!-- BUSINESS TYPE VIEW -->
+  @if (settingView() === 'business-type') {
+  <app-ui-card>
+    <div class="flex items-center justify-between">
+      <h3 class="m-0 text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wide">Mô hình kinh
+        doanh</h3>
+      @if (!onboardingFlow()) {
+      <button class="text-xs font-bold text-[var(--color-accent)] hover:underline" (click)="saveBusinessType()">Cập
+        nhật</button>
+      }
+    </div>
+    <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">Chọn loại hình kinh doanh phù hợp với shop của bạn.
+      Cần bật ít nhất một chế độ.</p>
+    <div class="mt-5 grid gap-3">
+      <div class="flex items-center justify-between rounded-[var(--radius-md)] border px-4 py-3.5 transition"
+        [ngClass]="enableSell() ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent)]/3' : 'border-[var(--color-border)]'">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Bán hàng</p>
+          <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">Khách đặt đơn mua sản phẩm trực tiếp.</p>
+        </div>
+        <app-ui-toggle [checked]="enableSell()" ariaLabel="Bật chế độ bán hàng"
+          (toggled)="toggleSellCapability($event)" />
+      </div>
+      <div class="flex items-center justify-between rounded-[var(--radius-md)] border px-4 py-3.5 transition"
+        [ngClass]="enableRent() ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent)]/3' : 'border-[var(--color-border)]'">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Cho thuê</p>
+          <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">Khách đặt đơn thuê sản phẩm theo thời gian.
+          </p>
+        </div>
+        <app-ui-toggle [checked]="enableRent()" ariaLabel="Bật chế độ cho thuê"
+          (toggled)="toggleRentCapability($event)" />
+      </div>
+    </div>
+  </app-ui-card>
+  }
+
+  <!-- FORM SETUP VIEW -->
+  @if (settingView() === 'form-setup') {
+  <app-ui-card>
+    <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Cấu hình form nhận đơn</h3>
+    <div class="mt-4 grid gap-4">
+      <p class="m-0 text-sm text-[var(--color-text-secondary)]">
+        Chọn form mặc định để nhận đơn từ khách hàng hoặc tạo form mới theo nhu cầu của bạn.
+      </p>
+
+      <!-- Form templates list -->
+      <div class="mt-2">
+        <h4 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Form mẫu có sẵn
+        </h4>
+        <div class="mt-2 grid gap-2">
+          @for (form of forms; track form) {
+          <div
+            class="flex items-center justify-between rounded-[var(--radius-md)] border px-3 py-3 transition cursor-pointer"
+            [ngClass]="{
+              'border-[var(--color-accent)] bg-[var(--color-accent)]/5': selectedFormTemplate === form,
+              'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]/50': selectedFormTemplate !== form
+            }" (click)="selectForm(form)">
+            <div>
+              <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ form }}</p>
+              <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Form mặc định cho {{ enableSell() ? 'bán' :
+                'thuê' }} hàng</p>
+            </div>
+            @if (selectedFormTemplate === form) {
+            <svg class="h-5 w-5 text-[var(--color-accent)]" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                clip-rule="evenodd" />
+            </svg>
+            }
+          </div>
+          }
+        </div>
+      </div>
+
+      <!-- Create custom form -->
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+        <h4 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tạo form mới
+        </h4>
+        <div class="mt-3 flex gap-2">
+          <input type="text" [value]="newFormName" (input)="newFormName = $any($event.target).value"
+            placeholder="Nhập tên form mới"
+            class="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]" />
+          <button (click)="createCustomForm()"
+            class="flex h-10 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
+            Tạo
+          </button>
+        </div>
+      </div>
+    </div>
+  </app-ui-card>
+  }
+
+  <!-- FIRST PRODUCT VIEW -->
+  @if (settingView() === 'first-product') {
+  <app-ui-card>
+    <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Sản phẩm đầu tiên</h3>
+    <div class="mt-4 grid gap-4">
+      <p class="m-0 text-sm text-[var(--color-text-secondary)]">
+        Thêm sản phẩm đầu tiên để bắt đầu kinh doanh. Bạn có thể thêm nhiều sản phẩm sau khi hoàn tất setup.
+      </p>
+
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-6">
+        <div class="flex items-center justify-center gap-4">
+          <div
+            class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)]/10 text-3xl">
+            📦
+          </div>
+          <div>
+            <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Tính năng thêm sản phẩm</p>
+            <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Sẽ được triển khai trong bước tiếp theo</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3">
+        <p class="m-0 text-sm text-emerald-800">
+          💡 Mẹo: Bạn có thể bỏ qua bước này và thêm sản phẩm sau khi vào trang quản trị.
+        </p>
+      </div>
+    </div>
+  </app-ui-card>
+  }
+
+  <!-- Right column: operational settings -->
+  @if (settingView() === 'profile' && !onboardingFlow()) {
+  <app-ui-card>
+    <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Cài đặt vận hành</h3>
+    <div class="mt-4 grid gap-3">
+      <div
+        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Tự động nhận đơn</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Đơn mới sẽ tự chuyển sang trạng thái "Đang xử lý".</p>
+        </div>
+        <app-ui-toggle [checked]="autoAcceptOrders()" ariaLabel="Bật tắt tự động nhận đơn"
+          (toggled)="toggleAutoAcceptOrders($event)" />
+      </div>
+      <div
+        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Bảo trì storefront</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Ẩn tạm trang public trong thời gian bảo trì.</p>
+        </div>
+        <app-ui-toggle [checked]="maintenanceMode()" ariaLabel="Bật tắt chế độ bảo trì"
+          (toggled)="toggleMaintenanceMode($event)" />
+      </div>
+      <div
+        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Hiển thị tồn kho</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Cho phép khách thấy số lượng tồn trên trang public.
+          </p>
+        </div>
+        <app-ui-toggle [checked]="showInventoryOnStorefront()" ariaLabel="Bật tắt hiển thị tồn kho"
+          (toggled)="toggleShowInventoryOnStorefront($event)" />
+      </div>
+      <div
+        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Nhận thông báo</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Gửi thông báo khi có đơn mới.</p>
+        </div>
+        <app-ui-toggle [checked]="notificationsEnabled()" ariaLabel="Bật tắt thông báo"
+          (toggled)="toggleNotifications($event)" />
+      </div>
+      @if (authStore.currentShop()?.enableRent) {
+      <div
+        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        <div>
+          <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Xác thực giấy tờ đơn thuê</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Hiển thị cố định 2 ô upload giấy tờ tùy thân trên form đơn thuê.</p>
+        </div>
+        <app-ui-toggle [checked]="rentalIdentityVerificationEnabled()" ariaLabel="Bật tắt xác thực giấy tờ đơn thuê"
+          (toggled)="toggleRentalIdentityVerification($event)" />
+      </div>
+      }
+    </div>
+  </app-ui-card>
+  }
+</section>
+
+@if (showAddEmployee) {
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4"
+  (click)="closeAddEmployeeModal()">
+  <div
+    class="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xl)]"
+    (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+      <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Bạn muốn tạo thêm nhân viên</h3>
+      <button class="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+        (click)="closeAddEmployeeModal()">Đóng</button>
+    </div>
+
+    @if (!createdEmployeeAccount) {
+    <div class="grid gap-3 px-4 py-4">
+      <app-ui-input label="Họ tên" [value]="newEmployeeName" placeholder="Nhập họ tên đầy đủ"
+        (valueChange)="newEmployeeName = $event" [errorText]="errorNewEmployeeName()" />
+
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Chức vụ mặc định</p>
+        <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">Nhân viên</p>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button
+          class="flex h-8 items-center rounded-[var(--radius-sm)] px-3 text-xs font-semibold text-[var(--color-text-tertiary)]"
+          (click)="closeAddEmployeeModal()">Hủy</button>
+        <button
+          class="flex h-8 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 text-xs font-semibold text-white disabled:opacity-50"
+          [disabled]="submittingStaff()" (click)="addEmployee()">
+          {{ submittingStaff() ? 'Đang tạo...' : 'Tạo' }}
+        </button>
+      </div>
+    </div>
+    } @else {
+    <div class="grid gap-3 px-4 py-4">
+      <p class="m-0 text-sm text-[var(--color-text-secondary)]">Đã tạo tài khoản cho <strong>{{
+          createdEmployeeAccount.employeeName }}</strong>.</p>
+
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Tên đăng nhập</p>
+        <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ createdEmployeeAccount.username }}
+        </p>
+      </div>
+
+      <div
+        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Mật khẩu</p>
+        <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ createdEmployeeAccount.password }}
+        </p>
+      </div>
+
+      <div class="flex justify-end gap-2">
+        <button
+          class="flex h-8 items-center rounded-[var(--radius-sm)] px-3 text-xs font-semibold text-[var(--color-text-tertiary)]"
+          (click)="createAnotherEmployee()">Tạo thêm</button>
+        <button
+          class="flex h-8 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 text-xs font-semibold text-white"
+          (click)="closeAddEmployeeModal()">Xong</button>
+      </div>
+    </div>
+    }
+  </div>
+</div>
+}
+
+@if (showEmployeeDetailModal) {
+@if (usersStore.selectedUser(); as selectedUser) {
+<app-ui-modal title="Chi tiết nhân viên" description="Thông tin cá nhân và tài khoản của nhân viên đã chọn."
+  maxWidthClass="max-w-5xl" (closed)="closeEmployeeDetailModal()">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="flex items-center gap-2">
+      <span
+        class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+        [ngClass]="selectedUser.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'">
+        {{ selectedUser.active ? 'Đang hoạt động' : 'Tạm khóa' }}
+      </span>
+      <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+        {{ getUserRoleLabel(selectedUser.role) }}
+      </span>
+    </div>
+
+    @if (usersStore.selectedUserLoading()) {
+    <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
+      Đang tải chi tiết...
+    </span>
+    }
+  </div>
+
+  <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+    <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+      <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin cá nhân</h4>
+
+      <div class="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Họ tên</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.fullName }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Số điện thoại</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.phone || 'Chưa cập nhật' }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Email</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.email || 'Chưa cập nhật' }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngày tạo tài khoản</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+            {{ selectedUser.createdAt ? (selectedUser.createdAt | date: 'dd/MM/yyyy HH:mm') : 'Chưa có dữ liệu' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+      <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin tài khoản</h4>
+
+      <div class="mt-3 grid gap-3 md:grid-cols-2">
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Username</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.username }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Vai trò</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ getUserRoleLabel(selectedUser.role) }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trạng thái</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.active ? 'Đang hoạt động' : 'Tạm khóa' }}</p>
+        </div>
+        <div>
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Lần đăng nhập gần nhất</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+            {{ selectedUser.lastLogin ? (selectedUser.lastLogin | date: 'dd/MM/yyyy HH:mm') : 'Chưa đăng nhập' }}
+          </p>
+        </div>
+        <div class="md:col-span-2">
+          <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Mật khẩu</p>
+          <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+            {{ selectedUser.forceChangePassword ? 'Đang dùng mật khẩu tạm, cần đổi ở lần đăng nhập đầu' : 'Đã cập nhật mật khẩu cá nhân' }}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+      <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn hôm nay</p>
+      <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersToday }}</p>
+    </div>
+    <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+      <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn tháng này</p>
+      <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersThisMonth }}</p>
+    </div>
+  </div>
+</app-ui-modal>
+}
+}
+
+@if (showAddAddress()) {
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4"
+  (click)="closeAddressModal()">
+  <div
+    class="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xl)]"
+    (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
+      <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">
+        {{ editingAddressId ? 'Sửa địa chỉ' : 'Thêm địa chỉ mới' }}
+      </h3>
+      <button class="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+        (click)="closeAddressModal()">Đóng</button>
+    </div>
+
+    <div class="grid gap-4 px-4 py-4">
+      <app-ui-input label="Tên gợi nhớ (VD: Trụ sở chính)" [value]="newAddressLabel()" placeholder="Nhập tên gợi nhớ"
+        (valueChange)="newAddressLabel.set($event)" [errorText]="errorAddressLabel()" [disabled]="submittingAddress()" />
+
+      <app-ui-input label="Địa chỉ chi tiết" [value]="newAddressLine()" placeholder="Số nhà, tên đường..."
+        (valueChange)="newAddressLine.set($event)" [errorText]="errorAddressLine()" [disabled]="submittingAddress()" />
+
+      <div class="grid grid-cols-2 gap-3">
+        <app-ui-select label="Tỉnh/Thành phố" [value]="newAddressProvince()" [options]="provinceOptions()"
+          placeholder="Chọn tỉnh/thành" (valueChange)="handleProvinceChange($event)" [errorText]="errorAddressProvince()" [disabled]="submittingAddress()" />
+        <app-ui-select label="Quận/Huyện" [value]="newAddressDistrict()" [options]="districtOptions()"
+          placeholder="Chọn quận/huyện" (valueChange)="handleDistrictChange($event)" [errorText]="errorAddressDistrict()" [disabled]="submittingAddress()" />
+      </div>
+
+      <app-ui-select label="Phường/Xã" [value]="newAddressWard()" [options]="wardOptions()" placeholder="Chọn phường/xã"
+        (valueChange)="newAddressWard.set($event)" [errorText]="errorAddressWard()" [disabled]="submittingAddress()" />
+
+      <div class="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2">
+        <app-ui-toggle [checked]="newAddressIsDefault()" [disabled]="submittingAddress()" (toggled)="newAddressIsDefault.set($event)" />
+        <div>
+          <p class="m-0 text-xs font-semibold text-[var(--color-text-primary)]">Đặt làm địa chỉ mặc định</p>
+          <p class="m-0 text-[10px] text-[var(--color-text-tertiary)]">Dùng cho giao dịch và liên hệ chính.</p>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-2">
+        <button
+          class="flex h-9 items-center rounded-[var(--radius-md)] px-4 text-sm font-semibold text-[var(--color-text-tertiary)] disabled:opacity-50"
+          [disabled]="submittingAddress()"
+          (click)="closeAddressModal()">Hủy</button>
+        <button
+          class="flex h-9 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-6 text-sm font-semibold text-white disabled:opacity-50"
+          [disabled]="submittingAddress()"
+          (click)="editingAddressId ? saveEditedAddress() : addAddress()">
+          {{ submittingAddress() ? 'Đang lưu...' : (editingAddressId ? 'Cập nhật' : 'Thêm') }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+}
+
+
+

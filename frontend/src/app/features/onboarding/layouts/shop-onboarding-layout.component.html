@@ -1,0 +1,69 @@
+<div class="relative min-h-screen flex flex-col px-4 py-6">
+  <div class="mx-auto w-full max-w-4xl">
+    <div class="mb-8 border border-[#E5E5E5] bg-white p-5 sm:p-6">
+      <div class="text-center sm:text-left mb-6">
+        <h1 class="m-0 text-xl font-medium text-[#111111] sm:text-2xl">
+          Thiết lập <span class="font-bold">{{ shopName() }}</span>
+        </h1>
+        <p class="mt-1 text-sm text-[#707072]">
+          Hoàn thiện các bước dưới đây để bắt đầu kinh doanh
+        </p>
+      </div>
+
+      <!-- Stepper Header -->
+      <div class="flex items-center justify-center gap-0 w-full overflow-x-auto pb-2 scrollbar-hide">
+        @for (step of setupSteps; track step.key; let i = $index) {
+          <!-- Step button -->
+          <div class="flex flex-col items-center gap-2 min-w-[70px]">
+            <button
+              type="button"
+              class="relative z-10 h-10 w-10 flex shrink-0 items-center justify-center rounded-full text-sm font-medium transition-all duration-200"
+              [ngClass]="{
+                'bg-[#111111] text-white ring-4 ring-[#111111]/10 cursor-pointer': getStepStatus(i) === 'current',
+                'bg-[#111111] text-white cursor-pointer hover:opacity-80': getStepStatus(i) === 'done',
+                'bg-[#F5F5F5] text-[#9E9EA0] cursor-not-allowed': getStepStatus(i) === 'upcoming'
+              }"
+              [routerLink]="getStepStatus(i) === 'current' ? step.route : null"
+              [disabled]="getStepStatus(i) !== 'current'">
+              @if (getStepStatus(i) === 'done') {
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+              } @else if (getStepStatus(i) === 'upcoming') {
+                <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 00-5.25 5.25v3a3 3 0 00-3 3v6.75a3 3 0 003 3h10.5a3 3 0 003-3v-6.75a3 3 0 00-3-3v-3c0-2.9-2.35-5.25-5.25-5.25zm3.75 8.25v-3a3.75 3.75 0 10-7.5 0v3h7.5z" clip-rule="evenodd" />
+                </svg>
+              } @else {
+                {{ i + 1 }}
+              }
+            </button>
+            <span class="text-xs font-medium whitespace-nowrap text-center max-w-[80px] truncate"
+                  [ngClass]="{
+                    'text-[#111111] font-medium': getStepStatus(i) === 'current',
+                    'text-[#111111]': getStepStatus(i) === 'done',
+                    'text-[#9E9EA0]': getStepStatus(i) === 'upcoming'
+                  }"
+                  [title]="step.title">
+              {{ step.title }}
+            </span>
+          </div>
+
+          <!-- Connection line -->
+          @if (i < setupSteps.length - 1) {
+            <div class="relative h-[2px] w-full mx-2 -translate-y-3 overflow-hidden shrink-0 min-w-[20px] max-w-[60px] sm:max-w-[100px]"
+              [ngClass]="{
+                'bg-[#111111]': getStepStatus(i) === 'done',
+                'bg-[#E5E5E5]': getStepStatus(i) !== 'done'
+              }">
+            </div>
+          }
+        }
+      </div>
+    </div>
+
+    <!-- Child Routes Outlet -->
+    <div class="animate-fade-in-up pb-10 max-w-2xl mx-auto">
+      <router-outlet></router-outlet>
+    </div>
+  </div>
+</div>

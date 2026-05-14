@@ -1,0 +1,99 @@
+<ng-container *ngIf="!loading; else loadingState">
+  <app-ui-table minWidthClass="min-w-[900px]">
+    <thead>
+      <tr>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Nhân viên</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tài khoản</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Mật khẩu</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Vai trò</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn hôm nay</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn tháng</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn đang xử lý</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trạng thái</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr
+        *ngFor="let user of users"
+        class="cursor-pointer transition-colors hover:bg-[var(--color-surface-secondary)]"
+        [ngClass]="{ 'bg-[var(--color-accent-soft)]': selectedUserId === user.id }"
+        (click)="select.emit(user)"
+      >
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5">
+          <div class="flex items-center gap-2.5">
+            <app-ui-avatar [name]="user.fullName" size="sm" />
+            <div>
+              <p class="m-0 text-sm font-medium text-[var(--color-text-primary)]">{{ user.fullName }}</p>
+              <p class="m-0 text-xs text-[var(--color-text-tertiary)]">{{ user.email }}</p>
+            </div>
+          </div>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
+          {{ user.username }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <div class="flex items-center gap-2">
+            @if (user.temporaryPassword) {
+              <span class="font-semibold text-[var(--color-warning-text)]">{{ user.temporaryPassword }}</span>
+              <button 
+                class="flex h-6 w-6 items-center justify-center rounded bg-[var(--color-warning-soft)] text-[var(--color-warning-text)] hover:bg-[var(--color-warning-soft)]/80 transition-colors"
+                title="Sao chép mật khẩu"
+                (click)="$event.stopPropagation(); copyPassword.emit(user.temporaryPassword)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <rect x="9" y="9" width="13" height="13" rx="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              </button>
+            } @else {
+              <span class="text-[var(--color-text-tertiary)] italic">Đã đổi</span>
+            }
+          </div>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <app-ui-badge variant="default">{{ user.role }}</app-ui-badge>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-primary)]">
+          {{ user.ordersToday }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-primary)]">
+          {{ user.ordersThisMonth }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <div class="flex max-w-60 flex-wrap gap-1">
+            <app-ui-badge variant="default" *ngFor="let order of (user.handledOrders || []) | slice: 0 : 3">
+              {{ order.orderCode }}
+            </app-ui-badge>
+            <app-ui-badge variant="warning" *ngIf="(user.handledOrders?.length ?? 0) > 3">
+              +{{ (user.handledOrders?.length ?? 0) - 3 }}
+            </app-ui-badge>
+          </div>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <app-ui-badge [variant]="user.active ? 'success' : 'danger'">
+            {{ user.active ? 'Hoạt động' : 'Tạm ngưng' }}
+          </app-ui-badge>
+        </td>
+      </tr>
+
+      <tr *ngIf="users.length === 0">
+        <td colspan="8" class="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+          Chưa có tài khoản nhân viên nào.
+        </td>
+      </tr>
+    </tbody>
+  </app-ui-table>
+</ng-container>
+
+<ng-template #loadingState>
+  <app-ui-card className="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+    Đang tải danh sách nhân viên...
+  </app-ui-card>
+</ng-template>

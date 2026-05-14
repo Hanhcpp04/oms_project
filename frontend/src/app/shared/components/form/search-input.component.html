@@ -1,0 +1,13 @@
+<label
+  class="grid h-10 grid-cols-[1fr_auto] items-center overflow-hidden rounded-xl border border-slate-300 bg-white"
+  [attr.aria-label]="label"
+>
+  <input
+    [placeholder]="placeholder"
+    [value]="value"
+    (input)="onInput($event)"
+    type="search"
+    class="h-full bg-transparent px-3 text-sm text-slate-700 outline-none"
+  />
+  <span class="pr-3 text-xs font-semibold text-slate-500">Search</span>
+</label>

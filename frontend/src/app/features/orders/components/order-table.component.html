@@ -1,0 +1,48 @@
+<ng-container *ngIf="!loading; else loadingState">
+  <app-ui-table minWidthClass="min-w-[760px]">
+    <thead>
+      <tr>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Mã đơn</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Khách hàng</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trạng thái</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Kênh</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tổng tiền</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngày tạo</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr
+        *ngFor="let order of orders"
+        class="cursor-pointer transition-colors hover:bg-[var(--color-surface-secondary)]"
+        [ngClass]="{ 'bg-[var(--color-accent-soft)]': selectedOrderId === order.id }"
+        (click)="select.emit(order)"
+      >
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)]">{{ order.orderNumber }}</td>
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">{{ order.customerName }}</td>
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <app-ui-badge [variant]="statusVariant(order.status)">{{ statusLabel(order.status) }}</app-ui-badge>
+        </td>
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">{{ order.sourceChannel }}</td>
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
+          {{ order.totalAmount | currency: 'VND' : 'symbol' : '1.0-0' }}
+        </td>
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-tertiary)]">
+          {{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+        </td>
+      </tr>
+
+      <tr *ngIf="orders.length === 0">
+        <td colspan="6" class="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+          Không tìm thấy đơn hàng nào.
+        </td>
+      </tr>
+    </tbody>
+  </app-ui-table>
+</ng-container>
+
+<ng-template #loadingState>
+  <app-ui-card className="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+    Đang tải đơn hàng...
+  </app-ui-card>
+</ng-template>

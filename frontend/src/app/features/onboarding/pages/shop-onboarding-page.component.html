@@ -1,0 +1,104 @@
+<div class="mx-auto w-full max-w-2xl animate-fade-in-up">
+  @if (showRegisteredBanner()) {
+    <div class="mb-4 flex items-center gap-3 border border-[#E5E5E5] bg-[#FAFAFA] px-5 py-3">
+      <svg class="h-5 w-5 shrink-0 text-[#007D48]" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <p class="m-0 text-sm font-medium text-[#111111]">Đăng ký thành công! Hoàn tất 3 bước setup bên dưới để vào trang quản trị.</p>
+    </div>
+  }
+
+  <section class="border border-[#E5E5E5] bg-white p-5 sm:p-6 text-center">
+    <div class="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-[#F5F5F5] text-[#111111]">
+      <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />
+      </svg>
+    </div>
+
+    <h2 class="m-0 mb-3 text-2xl font-medium text-[#111111]">
+      Chào mừng đến với hệ thống quản lý!
+    </h2>
+    
+    <p class="mx-auto mb-8 max-w-lg text-[#707072]" style="line-height: 1.75;">
+      Chúng tôi rất vui được đồng hành cùng bạn. Để bắt đầu, bạn cần hoàn thiện một số thông tin cơ bản cho <strong class="text-[#111111]">{{ shopName() }}</strong>. Luồng thiết lập này chỉ gồm 3 bước và mất vài phút.
+    </p>
+
+    <!-- Step List -->
+    <div class="mt-4 mb-8 grid gap-3 text-left sm:grid-cols-1">
+      @for (step of setupSteps; track step.key; let i = $index) {
+        <div
+          class="group relative flex items-start gap-4 border px-5 py-4 transition-colors duration-200"
+          [ngClass]="{
+            'border-[#111111] bg-white': getStepStatus(i) === 'done',
+            'border-[#111111] bg-[#FAFAFA]': getStepStatus(i) === 'current',
+            'border-[#E5E5E5] bg-white opacity-60': getStepStatus(i) === 'upcoming'
+          }">
+          <div
+            class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-all duration-200"
+            [ngClass]="{
+              'bg-[#111111] text-white': getStepStatus(i) === 'done' || getStepStatus(i) === 'current',
+              'bg-[#F5F5F5] text-[#9E9EA0]': getStepStatus(i) === 'upcoming'
+            }">
+            @if (getStepStatus(i) === 'done') {
+              <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+              </svg>
+            } @else {
+              {{ i + 1 }}
+            }
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="m-0 text-base font-medium" [ngClass]="{
+                'text-[#111111]': getStepStatus(i) !== 'upcoming',
+                'text-[#9E9EA0]': getStepStatus(i) === 'upcoming'
+              }">{{ step.title }}</p>
+              <span
+                class="inline-flex items-center gap-1.5 rounded-[30px] px-2.5 py-1 text-xs font-medium"
+                [ngClass]="{
+                  'bg-[#F5F5F5] text-[#111111]': getStepStatus(i) === 'done',
+                  'bg-[#111111] text-white': getStepStatus(i) === 'current',
+                  'bg-[#F5F5F5] text-[#9E9EA0]': getStepStatus(i) === 'upcoming'
+                }">
+                @if (getStepStatus(i) === 'done') {
+                  <svg class="h-3.5 w-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                  </svg>
+                }
+                {{ getStepStatusLabel(i) }}
+              </span>
+            </div>
+            <p class="m-0 mt-1.5 text-sm leading-relaxed" [ngClass]="{
+                'text-[#707072]': getStepStatus(i) !== 'upcoming',
+                'text-[#9E9EA0]': getStepStatus(i) === 'upcoming'
+              }">{{ step.description }}</p>
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="flex justify-center">
+      @if (onboarding()?.completed) {
+        <a
+          routerLink="/app"
+          class="inline-flex items-center gap-2 rounded-[30px] bg-[#111111] px-8 py-3.5 text-base font-medium text-white no-underline transition-all duration-200 hover:bg-[#707072]">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Vào trang quản trị
+        </a>
+      } @else {
+        <a
+          [routerLink]="nextStep().route"
+          class="inline-flex items-center gap-2 rounded-[30px] bg-[#111111] px-8 py-3.5 text-base font-medium text-white no-underline transition-all duration-200 hover:bg-[#707072]">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+          </svg>
+          Bắt đầu thiết lập
+        </a>
+      }
+    </div>
+  </section>
+</div>

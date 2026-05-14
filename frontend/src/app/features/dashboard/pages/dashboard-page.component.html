@@ -1,0 +1,23 @@
+<app-page-title [title]="getTitle()" [description]="getDescription()" />
+
+<div class="space-y-4">
+  @if (period() === 'all') {
+  <app-dashboard-all-view />
+  }
+
+  @if (period() === 'day') {
+  <app-dashboard-day-view />
+  }
+
+  @if (period() === 'month') {
+  <app-dashboard-month-view />
+  }
+
+  @if (period() === 'year') {
+  <app-dashboard-year-view />
+  }
+
+  @if (period() === 'range') {
+  <app-dashboard-range-view />
+  }
+</div>

@@ -1,0 +1,26 @@
+<div class="relative min-h-screen bg-white">
+  <header class="sticky top-0 z-20 bg-white" style="box-shadow: 0px -1px 0px 0px #E5E5E5 inset;">
+    <div class="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3 md:px-8" style="height: 60px;">
+      <a routerLink="/" class="flex items-center gap-2.5 no-underline">
+        <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-[#111111] text-xs font-bold text-white">
+          O
+        </span>
+        <span class="text-sm font-medium text-[#111111]">OMS Platform</span>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <app-ui-button variant="ghost" size="sm" (clicked)="goToLogin()">
+          Đăng nhập
+        </app-ui-button>
+        <app-ui-button variant="primary" size="sm" (clicked)="goToRegister()">
+          Đăng ký
+        </app-ui-button>
+      </div>
+    </div>
+  </header>
+
+  <main class="relative mx-auto w-full max-w-5xl px-4 pb-14 pt-7 md:px-8 md:pt-10">
+    <app-breadcrumb></app-breadcrumb>
+    <router-outlet />
+  </main>
+</div>

@@ -1,0 +1,35 @@
+<app-ui-modal [title]="existingShift ? 'Cập nhật khung giờ' : 'Thêm khung giờ làm việc'" (closed)="closed.emit()">
+  <div class="grid gap-4">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <app-ui-input label="Ngày làm việc *" type="date" [value]="shiftDate" (valueChange)="shiftDate = $event" />
+      <app-ui-input label="Tên ca (không bắt buộc)" placeholder="VD: Ca sáng, Ca chiều..." [value]="name"
+        (valueChange)="name = $event" />
+    </div>
+
+    <div class="grid gap-4 sm:grid-cols-2">
+      <app-ui-input label="Giờ bắt đầu *" type="time" [value]="startTime" (valueChange)="startTime = $event" />
+      <app-ui-input label="Giờ kết thúc *" type="time" [value]="endTime" (valueChange)="endTime = $event" />
+    </div>
+
+    <div>
+      <p class="mb-2 text-sm font-semibold text-[var(--color-text-primary)]">Chọn nhân viên</p>
+      <div class="max-h-48 overflow-y-auto rounded border border-[var(--color-border)] p-2">
+        <label *ngFor="let staff of availableStaff"
+          class="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-[var(--color-surface-hover)]">
+          <input type="checkbox" [checked]="selectedStaffIds.has(staff.id)" (change)="toggleStaff(staff.id)"
+            class="h-4 w-4 rounded border-[var(--color-border)] text-[var(--color-primary)] focus:ring-[var(--color-primary)]" />
+          <span class="text-sm text-[var(--color-text-primary)]">{{ staff.fullName }} ({{ staff.username }})</span>
+        </label>
+
+        <p *ngIf="availableStaff.length === 0" class="text-xs text-[var(--color-text-tertiary)] p-2 text-center">
+          Không có nhân viên nào.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-6 flex justify-end gap-3 border-t border-[var(--color-border)] pt-4">
+    <app-ui-button variant="ghost" (clicked)="closed.emit()">Hủy</app-ui-button>
+    <app-ui-button variant="primary" (clicked)="submit()">Lưu lại</app-ui-button>
+  </div>
+</app-ui-modal>

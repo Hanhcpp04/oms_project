@@ -1,0 +1,271 @@
+@if (loading()) {
+<app-ui-card className="py-10 text-center text-sm text-[var(--color-text-tertiary)]">
+  Đang tải chi tiết đơn hàng...
+</app-ui-card>
+} @else if (notFound()) {
+<app-ui-card className="py-10 text-center">
+  <p class="m-0 text-sm text-[var(--color-text-secondary)]">Không tìm thấy đơn hàng này hoặc dữ liệu chưa sẵn sàng.</p>
+  <div class="mt-3 flex justify-center">
+    <app-ui-button variant="primary" size="sm" (clicked)="goBack()">Quay lại danh sách</app-ui-button>
+  </div>
+</app-ui-card>
+} @else if (order(); as detailOrder) {
+<app-ui-card>
+  <!-- Header -->
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <div class="flex items-center gap-2.5">
+        <h2 class="m-0 text-lg font-bold text-[var(--color-text-primary)]">{{ detailOrder.orderNumber }}</h2>
+        <app-ui-badge [variant]="detailOrder.orderType === 'RENT' ? 'info' : 'primary'">
+          {{ detailOrder.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}
+        </app-ui-badge>
+        @if (detailOrder.sourceMethod === 'AI_PARSE') {
+        <span class="inline-flex h-5 items-center rounded bg-violet-100 px-2 text-[10px] font-bold text-violet-600">AI Parse</span>
+        } @else if (detailOrder.sourceMethod === 'PUBLIC_FORM') {
+        <span class="inline-flex h-5 items-center rounded bg-cyan-100 px-2 text-[10px] font-bold text-cyan-600">Public Form</span>
+        }
+      </div>
+      <div class="mt-1 flex items-center gap-3 text-xs text-[var(--color-text-tertiary)]">
+        <span>Tạo: {{ formatDate(detailOrder.createdAt) }}</span>
+        @if (detailOrder.updatedAt && detailOrder.updatedAt !== detailOrder.createdAt) {
+        <span>· Cập nhật: {{ formatDate(detailOrder.updatedAt) }}</span>
+        }
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <select (change)="updateStatus($any($event.target).value)"
+        class="h-7 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0 text-xs font-semibold text-[var(--color-text-primary)] outline-none cursor-pointer focus:border-[var(--color-border-focus)] focus:ring-1 focus:ring-[var(--color-accent-soft)] transition-colors appearance-none min-w-[120px]">
+        @for (opt of statusOptions; track opt.value) {
+        <option [value]="opt.value" [selected]="opt.value === detailOrder.status">{{ opt.label }}</option>
+        }
+      </select>
+      <app-ui-button variant="primary" size="sm" (clicked)="openPrintModal()">In đơn</app-ui-button>
+    </div>
+  </div>
+
+  <!-- Content Grid -->
+  <div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <!-- Left: Customer info + Summary -->
+    <div class="flex flex-col gap-5">
+      <!-- Thông tin khách hàng -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+        <div class="border-b border-[var(--color-border)] px-4 py-2.5">
+          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin khách hàng</p>
+        </div>
+        <div class="grid gap-3 p-4 sm:grid-cols-2">
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Họ tên</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.customerName || '—' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Điện thoại</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ formatPhone(detailOrder.customerPhone) }}</p>
+          </div>
+          <div class="sm:col-span-2">
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Địa chỉ</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.customerAddress || '—' }}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thông tin đơn hàng -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+        <div class="border-b border-[var(--color-border)] px-4 py-2.5">
+          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Chi tiết đơn hàng</p>
+        </div>
+        <div class="grid gap-3 p-4 sm:grid-cols-3">
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Loại đơn</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Trạng thái</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ getStatusLabel(detailOrder.status) }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Người tạo</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.createdByFullName || detailOrder.createdByUsername || 'Hệ thống' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Thanh toán</p>
+            <div class="mt-0.5 flex items-center gap-1.5">
+              <span class="h-2 w-2 rounded-full" [class]="getPaymentStatusDotClass(detailOrder.paymentStatus)"></span>
+              <span class="text-sm font-semibold" [class]="getPaymentStatusTextClass(detailOrder.paymentStatus)">
+                {{ getPaymentStatusLabel(detailOrder.paymentStatus) }}
+              </span>
+            </div>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Phương thức TT</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-accent)]">{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</p>
+          </div>
+          @if (detailOrder.sourceChannel) {
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Kênh bán</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.sourceChannel }}</p>
+          </div>
+          }
+          @if (detailOrder.shippingMethod) {
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Vận chuyển</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.shippingMethod }}</p>
+          </div>
+          }
+
+          @if (detailOrder.orderType === 'RENT') {
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Ngày bắt đầu thuê</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ formatDate(detailOrder.rentFrom) || '—' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Ngày kết thúc thuê</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ formatDate(detailOrder.rentTo) || '—' }}</p>
+          </div>
+          @if (detailOrder.returnStatus) {
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Trạng thái trả hàng</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ detailOrder.returnStatus }}</p>
+          </div>
+          }
+          @if (detailOrder.returnedAt) {
+          <div>
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">Ngày trả hàng</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold">{{ formatDate(detailOrder.returnedAt) }}</p>
+          </div>
+          }
+          }
+        </div>
+      </div>
+
+      <!-- Ghi chú -->
+      <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ghi chú</p>
+        <p class="m-0 mt-1 text-sm">{{ detailOrder.customerNote || 'Không có ghi chú.' }}</p>
+      </div>
+
+      <!-- Custom fields -->
+      @if (hasCustomFields(detailOrder)) {
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+        <div class="border-b border-[var(--color-border)] px-4 py-2.5">
+          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trường theo cấu hình form</p>
+        </div>
+        <div class="grid gap-3 p-4 sm:grid-cols-2">
+          @for (field of getCustomFieldEntries(detailOrder); track field.key) {
+          <article class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <p class="m-0 text-[10px] font-semibold text-[var(--color-text-tertiary)] uppercase">{{ field.label }}</p>
+            @if (field.type === 'image') {
+            <div class="mt-1.5 h-32 w-full overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-hover)]">
+              <img [src]="field.value" class="h-full w-full object-cover" [alt]="field.label" />
+            </div>
+            } @else {
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ field.value }}</p>
+            }
+          </article>
+          }
+        </div>
+      </div>
+      }
+    </div>
+
+    <!-- Right: Products + Total -->
+    <div class="flex flex-col gap-5">
+      <!-- Sản phẩm -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+        <!-- Product header image -->
+        <div class="flex h-48 items-center justify-center rounded-t-[var(--radius-lg)] bg-[var(--color-surface-hover)] overflow-hidden">
+          @if (detailOrder.products && detailOrder.products.length > 0 && detailOrder.products[0].productImageSnapshot) {
+          <img [src]="detailOrder.products[0].productImageSnapshot"
+            class="h-full w-full object-cover opacity-90 transition-transform hover:scale-105"
+            [alt]="detailOrder.orderNumber" />
+          } @else {
+          <span class="text-5xl">{{ detailOrder.orderType === 'RENT' ? '👗' : '📦' }}</span>
+          }
+        </div>
+        <div class="border-t border-[var(--color-border)] px-4 py-2.5">
+          <p class="m-0 text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Sản phẩm trong đơn ({{ detailOrder.products.length }})</p>
+        </div>
+        <div class="p-3 grid gap-2">
+          @for (p of detailOrder.products; track $index) {
+          <div class="flex gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] bg-[var(--color-surface-hover)] border border-[var(--color-border)]">
+              @if (p.productImageSnapshot) {
+              <img [src]="p.productImageSnapshot" class="h-full w-full object-cover" [alt]="p.name" />
+              } @else {
+              <span class="text-xl">📦</span>
+              }
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-start justify-between gap-2">
+                <p class="m-0 truncate text-sm font-semibold text-[var(--color-text-primary)]">{{ p.name }}</p>
+              </div>
+              @if (p.categoryNameSnapshot) {
+              <p class="m-0 mt-0.5 text-[10px] text-[var(--color-text-tertiary)]">{{ p.categoryNameSnapshot }}</p>
+              }
+              <div class="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                @if (p.size || p.variantSizeSnapshot) {
+                <span class="inline-flex h-5 items-center rounded bg-[var(--color-surface-hover)] px-1.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                  Size: {{ p.size || p.variantSizeSnapshot }}
+                </span>
+                }
+                @if (p.variantColorSnapshot) {
+                <span class="inline-flex h-5 items-center rounded bg-[var(--color-surface-hover)] px-1.5 text-[10px] font-semibold text-[var(--color-text-secondary)]">
+                  {{ p.variantColorSnapshot }}
+                </span>
+                }
+                @if (p.skuSnapshot) {
+                <span class="inline-flex h-5 items-center rounded bg-[var(--color-surface-hover)] px-1.5 text-[10px] font-medium text-[var(--color-text-tertiary)]">
+                  SKU: {{ p.skuSnapshot }}
+                </span>
+                }
+                <span class="text-[var(--color-text-tertiary)]">× {{ p.quantity }}</span>
+              </div>
+              <div class="mt-1.5 flex items-center justify-between">
+                <span class="text-xs font-bold text-[var(--color-accent)]">{{ formatCurrency(p.unitPrice) }}</span>
+                @if (p.lineTotal && p.lineTotal > 0) {
+                <span class="text-[10px] text-[var(--color-text-tertiary)]">Tổng: {{ formatCurrency(p.lineTotal) }}</span>
+                }
+              </div>
+              <div class="mt-1 flex justify-end">
+                <button 
+                  (click)="goToQrHistory(p.productId)"
+                  class="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--color-surface-hover)] text-[var(--color-text-tertiary)] hover:bg-[var(--color-accent-soft)] hover:text-[var(--color-accent)] transition-colors"
+                  title="Xem lịch sử QR Thanh toán"
+                >
+                  <i class="ri-history-line text-sm"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          } @empty {
+          <p class="m-0 p-3 text-sm text-[var(--color-text-tertiary)]">Không có sản phẩm.</p>
+          }
+        </div>
+      </div>
+
+      <!-- Tổng tiền -->
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <div class="flex flex-col gap-2">
+          @if (detailOrder.shippingFee && detailOrder.shippingFee > 0) {
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-[var(--color-text-tertiary)]">Phí vận chuyển</span>
+            <span class="font-medium">{{ formatCurrency(detailOrder.shippingFee) }}</span>
+          </div>
+          }
+          @if (detailOrder.orderType === 'RENT' && detailOrder.depositPaid) {
+          <div class="flex items-center justify-between text-xs">
+            <span class="text-[var(--color-text-tertiary)]">Tiền cọc đã trả</span>
+            <span class="font-medium">{{ formatCurrency(detailOrder.depositPaid) }}</span>
+          </div>
+          }
+          <div class="flex items-center justify-between border-t border-[var(--color-border)] pt-2 mt-1">
+            <span class="text-xs font-bold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tổng tiền</span>
+            <span class="text-base font-bold text-[var(--color-accent)]">{{ formatCurrency(detailOrder.totalAmount) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</app-ui-card>
+
+<app-order-print-modal [open]="isPrintModalOpen()" [order]="detailOrder" (closed)="closePrintModal()" />
+}

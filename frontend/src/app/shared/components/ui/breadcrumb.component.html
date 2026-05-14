@@ -1,0 +1,22 @@
+@if (breadcrumbs().length > 0) {
+<nav aria-label="Breadcrumb" class="mb-4">
+  <ol class="flex flex-wrap items-center gap-1.5 text-sm">
+    @for (item of breadcrumbs(); track item.url; let isLast = $last) {
+    <li class="inline-flex items-center gap-1.5">
+      @if (!isLast) {
+      <a [routerLink]="item.url"
+        class="rounded px-1.5 py-0.5 text-[var(--color-text-secondary)] no-underline transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]">
+        {{ item.label }}
+      </a>
+      } @else {
+      <span class="px-1.5 py-0.5 font-medium text-[var(--color-text-primary)]">{{ item.label }}</span>
+      }
+
+      @if (!isLast) {
+      <span class="text-[var(--color-text-tertiary)]">/</span>
+      }
+    </li>
+    }
+  </ol>
+</nav>
+}

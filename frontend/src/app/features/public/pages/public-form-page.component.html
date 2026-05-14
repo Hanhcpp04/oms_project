@@ -1,0 +1,124 @@
+<app-ui-card *ngIf="template() as template; else notFoundTemplate" className="mx-auto max-w-3xl">
+  <div class="mb-4 border-b border-[var(--color-border)] pb-4">
+    <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-accent)]">Public Form</p>
+    <h1 class="m-0 mt-2 text-xl font-bold text-[var(--color-text-primary)]">{{ template.name }}</h1>
+    <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">{{ template.description }}</p>
+    <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">{{ fieldCount() }} truong duoc cau hinh boi shop.</p>
+  </div>
+
+  <div
+    class="mb-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4"
+    *ngIf="productContext() as productContext">
+    <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-accent)]">San pham da duoc gan
+      san</p>
+    <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ productContext.productName }}</p>
+    <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">
+      Ma: {{ productContext.productId || '--' }}
+      · Size: {{ productContext.productSize }}
+      · So luong: {{ productContext.quantity }}
+      · Don gia: {{ formatCurrency(productContext.unitPrice) }}
+    </p>
+  </div>
+
+  <form class="grid gap-3" (submit)="$event.preventDefault(); submitForm()">
+    <article
+      class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4"
+      *ngFor="let field of template.fields">
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <label class="text-sm font-semibold text-[var(--color-text-primary)]">
+          {{ field.label }}
+          <span class="text-[var(--color-danger)]" *ngIf="field.required">*</span>
+        </label>
+        <span
+          class="rounded-full bg-[var(--color-surface-inset)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--color-text-tertiary)]">
+          {{ field.type }}
+        </span>
+      </div>
+
+      <input
+        *ngIf="!isImageField(field) && !isTextAreaField(field) && !isSingleChoiceField(field) && !isMultiChoiceField(field) && !isDropdownField(field)"
+        [type]="resolveInputType(field)" [attr.inputmode]="field.type === 'phone' ? 'numeric' : null"
+        [placeholder]="field.placeholder || 'Nhap thong tin'" [value]="getFieldDisplayValue(field)"
+        class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-3 text-sm text-[var(--color-input-text)] outline-none transition focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
+        (input)="onFieldInput(field, $event)" />
+
+      <textarea *ngIf="isTextAreaField(field)" rows="3" [placeholder]="field.placeholder || 'Nhap ghi chu'"
+        [value]="getFieldValue(field.id)"
+        class="w-full rounded-[var(--radius-md)] border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-3 py-2 text-sm text-[var(--color-input-text)] outline-none transition focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-accent-soft)]"
+        (input)="updateFieldValue(field.id, $any($event.target).value)"></textarea>
+
+      <div class="grid gap-2" *ngIf="isSingleChoiceField(field)">
+        <label class="inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)]"
+          *ngFor="let option of field.options">
+          <input type="radio" [name]="field.id" class="h-4 w-4 rounded border-[var(--color-border)]"
+            [checked]="getFieldValue(field.id) === option.value"
+            (change)="setSingleChoiceValue(field.id, option.value)" />
+          {{ option.label }}
+        </label>
+      </div>
+
+      <div class="grid gap-2" *ngIf="isMultiChoiceField(field)">
+        <label class="inline-flex items-center gap-2 text-sm text-[var(--color-text-secondary)]"
+          *ngFor="let option of field.options">
+          <input type="checkbox" class="h-4 w-4 rounded border-[var(--color-border)]"
+            [checked]="isMultiChoiceSelected(field.id, option.value)"
+            (change)="toggleMultiChoiceValue(field.id, option.value, $any($event.target).checked)" />
+          {{ option.label }}
+        </label>
+      </div>
+
+      <select *ngIf="isDropdownField(field)"
+        class="h-9 w-full rounded-[var(--radius-md)] border border-[var(--color-input-border)] bg-[var(--color-input-bg)] px-3 text-sm text-[var(--color-input-text)] outline-none transition focus:border-[var(--color-border-focus)]"
+        [value]="getFieldValue(field.id)" (change)="updateFieldValue(field.id, $any($event.target).value)">
+        <option value="">{{ field.placeholder || 'Chon mot gia tri' }}</option>
+        <option *ngFor="let option of field.options" [value]="option.value">{{ option.label }}</option>
+      </select>
+
+      <label *ngIf="isImageField(field)"
+        class="grid min-h-24 cursor-pointer place-items-center rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-5 text-center text-sm text-[var(--color-text-tertiary)] hover:border-[var(--color-border-hover)]">
+        <input type="file" accept="image/*" class="hidden" (change)="onImageSelected(field.id, $event)" />
+        <span *ngIf="!getSelectedImageName(field.id)">Click de chon anh (jpg/png/webp)</span>
+        <span class="font-semibold text-[var(--color-text-primary)]" *ngIf="getSelectedImageName(field.id)">
+          {{ getSelectedImageName(field.id) }}
+        </span>
+      </label>
+
+      <p class="m-0 mt-2 text-xs text-[var(--color-text-tertiary)]" *ngIf="field.helperText">{{ field.helperText }}</p>
+      <p class="m-0 mt-2 text-xs font-medium text-[var(--color-danger-text)]" *ngIf="getFieldError(field.id)">
+        {{ getFieldError(field.id) }}
+      </p>
+    </article>
+
+    <div class="mt-1 flex flex-wrap items-center gap-3">
+      <app-ui-button type="submit" variant="primary" size="md">
+        Gui form
+      </app-ui-button>
+      <a routerLink="/"
+        class="text-sm font-medium text-[var(--color-text-secondary)] no-underline hover:text-[var(--color-text-primary)]">
+        Quay ve trang gioi thieu
+      </a>
+    </div>
+  </form>
+
+  <app-ui-card className="mt-4 border-[var(--color-success)]! bg-[var(--color-success-soft)]"
+    *ngIf="submittedPayload() as submittedPayload">
+    <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-success-text)]">Da gui thanh cong
+    </p>
+    <pre class="m-0 mt-2 overflow-x-auto text-xs text-[var(--color-text-secondary)]">{{ submittedPayload | json }}</pre>
+  </app-ui-card>
+</app-ui-card>
+
+<ng-template #notFoundTemplate>
+  <app-ui-card className="mx-auto grid min-h-60 max-w-2xl place-items-center text-center">
+    <div>
+      <h2 class="m-0 text-xl font-bold text-[var(--color-text-primary)]">Khong tim thay mau form</h2>
+      <p class="m-0 mt-2 text-sm text-[var(--color-text-secondary)]">
+        Mau form co the da bi xoa hoac chua duoc xuat ban boi quan tri vien.
+      </p>
+      <a routerLink="/"
+        class="mt-3 inline-flex text-sm font-semibold text-[var(--color-accent)] no-underline hover:underline">
+        Ve trang chu
+      </a>
+    </div>
+  </app-ui-card>
+</ng-template>

@@ -1,0 +1,265 @@
+:host {
+  display: block;
+}
+
+.print-modal-panel {
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px;
+  background: #f3f4f6;
+  box-shadow: 0 24px 60px rgba(17, 24, 39, 0.25);
+  padding: 14px;
+}
+
+.print-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+.action-button {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  background: #111827;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action-button--ghost {
+  background: #ffffff;
+  color: #111827;
+}
+
+.print-sheet {
+  max-width: 840px;
+  margin: 0 auto;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 20px;
+}
+
+.sheet-header {
+  text-align: center;
+  border-bottom: 1px solid #111827;
+  padding-bottom: 10px;
+}
+
+.shop-title {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 0.08em;
+}
+
+.sheet-subtitle {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.sheet-meta p {
+  margin: 0;
+}
+
+.sheet-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 12px;
+}
+
+.sheet-card {
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 12px;
+}
+
+.sheet-card h2 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sheet-card p {
+  margin: 6px 0 0;
+  line-height: 1.5;
+}
+
+.thanks {
+  margin-top: 10px;
+  font-style: italic;
+}
+
+.sheet-products {
+  margin-top: 12px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.sheet-custom-fields {
+  margin-top: 12px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.sheet-custom-fields h2 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.custom-field-grid {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.custom-field-item {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.custom-field-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.custom-field-value {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.sheet-products h2 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sheet-products table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.sheet-products th,
+.sheet-products td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 4px;
+  text-align: left;
+}
+
+.sheet-products th {
+  font-weight: 700;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.sheet-footer {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.total-box {
+  min-width: 220px;
+  border: 1px solid #111827;
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: right;
+}
+
+.total-box .label {
+  margin: 0;
+  font-size: 12px;
+}
+
+.total-box .amount {
+  margin: 6px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .sheet-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .custom-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .print-modal-panel {
+    padding: 10px;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+
+  .print-modal-panel {
+    max-height: none;
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+    background: #ffffff;
+    padding: 0;
+  }
+
+  .print-actions {
+    display: none;
+  }
+
+  .print-sheet {
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+  }
+
+  .sheet-card,
+  .sheet-custom-fields,
+  .sheet-products,
+  .total-box,
+  .sheet-header {
+    border-color: #000000;
+  }
+}

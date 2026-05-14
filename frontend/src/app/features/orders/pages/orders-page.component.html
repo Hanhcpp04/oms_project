@@ -1,0 +1,119 @@
+
+<!-- Filters + Order list -->
+<app-ui-card padding="none" [rounded]="false" className="overflow-hidden">
+  <div class="border-b border-[var(--color-border)] p-4">
+    <div class="grid items-end gap-6 lg:grid-cols-[1fr_180px_160px_160px]">
+      <app-ui-input variant="underlined" placeholder="Nhập mã đơn, tên hoặc SĐT khách hàng" [value]="searchTerm"
+        (valueChange)="onSearchChange($event)" />
+      <app-ui-select variant="underlined" placeholder="Trạng thái" [value]="selectedStatus" [options]="statusOptions"
+        (valueChange)="onStatusChange($event)" />
+      <app-ui-input variant="underlined"  type="date" [value]="fromDate" (valueChange)="onFromDateChange($event)" />
+      <app-ui-input variant="underlined"  type="date" [value]="toDate" (valueChange)="onToDateChange($event)" />
+    </div>
+  </div>
+
+  <div class="overflow-x-auto">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Mã đơn</th>
+          <th>Khách hàng</th>
+          <th>Sản phẩm</th>
+          <th>Loại</th>
+          <th>Trạng thái</th>
+          <th>Thanh toán</th>
+          <th class="text-right">Tổng tiền</th>
+          <th>Ngày tạo</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (order of store.orders(); track order.id) {
+        <tr class="cursor-pointer" [class.row-selected]="store.selectedOrder()?.id === order.id"
+          (dblclick)="openDetail(order)">
+          <!-- Mã đơn -->
+          <td>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-[var(--color-accent)]">{{ order.orderNumber }}</span>
+              @if (order.sourceMethod === 'AI_PARSE') {
+              <span class="inline-flex h-4 items-center rounded bg-violet-100 px-1.5 text-[9px] font-bold text-violet-600" title="Tạo bằng AI">AI</span>
+              } @else if (order.sourceMethod === 'PUBLIC_FORM') {
+              <span class="inline-flex h-4 items-center rounded bg-cyan-100 px-1.5 text-[9px] font-bold text-cyan-600" title="Từ form công khai">Form</span>
+              }
+            </div>
+          </td>
+          <!-- Khách hàng -->
+          <td>
+            <p class="m-0 text-sm font-medium">{{ order.customerName || '—' }}</p>
+            <p class="m-0 text-xs text-[var(--color-text-tertiary)]">{{ order.customerPhone || '—' }}</p>
+          </td>
+          <!-- Số SP -->
+          <td>
+            <div class="flex items-center gap-1.5">
+              @if (order.products.length > 0 && order.products[0].productImageSnapshot) {
+              <div class="h-8 w-8 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-hover)]">
+                <img [src]="order.products[0].productImageSnapshot" class="h-full w-full object-cover" alt="">
+              </div>
+              }
+              <span class="text-xs text-[var(--color-text-secondary)]">
+                {{ order.products.length }} sản phẩm
+              </span>
+            </div>
+          </td>
+          <!-- Loại đơn -->
+          <td>
+            <app-ui-badge [variant]="order.orderType === 'RENT' ? 'info' : 'primary'">
+              {{ order.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}
+            </app-ui-badge>
+          </td>
+          <!-- Trạng thái đơn -->
+          <td (click)="$event.stopPropagation()">
+            <select (change)="updateOrderStatus(order, $any($event.target).value, $event)" 
+                    class="h-7 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0 text-xs font-semibold text-[var(--color-text-primary)] outline-none cursor-pointer focus:border-[var(--color-border-focus)] focus:ring-1 focus:ring-[var(--color-accent-soft)] transition-colors appearance-none min-w-[110px]">
+              @for (opt of statusOptions; track opt.value) {
+                <option [value]="opt.value" [selected]="opt.value === order.status">{{ opt.label }}</option>
+              }
+            </select>
+          </td>
+          <!-- TT Thanh toán -->
+          <td>
+            <div class="flex flex-col gap-0.5">
+              <span class="inline-flex items-center gap-1 text-xs font-medium" [class]="getPaymentStatusClass(order.paymentStatus)">
+                <span class="h-1.5 w-1.5 rounded-full" [class]="getPaymentStatusDotClass(order.paymentStatus)"></span>
+                {{ getPaymentStatusLabel(order.paymentStatus) }}
+              </span>
+              <span class="text-[10px] text-[var(--color-text-tertiary)]">
+                {{ getPaymentMethodLabel(order.paymentMethod) }}
+              </span>
+            </div>
+          </td>
+          <!-- Tổng tiền -->
+          <td class="text-right">
+            <p class="m-0 text-sm font-bold">{{ formatCurrency(order.totalAmount) }}</p>
+            @if (order.shippingFee && order.shippingFee > 0) {
+            <p class="m-0 text-[10px] text-[var(--color-text-tertiary)]">Ship: {{ formatCurrency(order.shippingFee) }}</p>
+            }
+          </td>
+          <!-- Ngày tạo -->
+          <td class="text-xs text-[var(--color-text-tertiary)]">{{ formatDate(order.createdAt) }}</td>
+          <!-- Actions -->
+          <td>
+            <button
+              class="flex h-7 w-7 items-center justify-center rounded-[var(--radius-sm)] text-[var(--color-text-tertiary)] transition hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]"
+              (click)="openDetail(order); $event.stopPropagation()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="9" class="py-8 text-center text-sm text-[var(--color-text-tertiary)]">Không có đơn hàng nào.</td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</app-ui-card>

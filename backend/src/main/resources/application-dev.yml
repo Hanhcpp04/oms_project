@@ -1,0 +1,39 @@
+# ==================== DEV Profile ====================
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  devtools:
+    restart:
+      enabled: false
+  datasource:
+    url: jdbc:mysql://localhost:3306/oms_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: root
+    password: "123456"
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+# ==================== JWT ====================
+app:
+  jwt:
+    secret: bXlTdXBlclNlY3JldEtleUZvckRldmVsb3BtZW50T25seURvTm90VXNlSW5Qcm9kdWN0aW9u
+    access-token-expiration: 86400000
+    refresh-token-expiration: 604800000
+  ai:
+    gemini:
+      api-key: ${GEMINI_API_KEY:}
+      model: ${GEMINI_MODEL:gemini-2.5-flash}
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+  cors:
+    allowed-origins: http://localhost:4200
+
+# ==================== Logging ====================
+logging:
+  level:
+    com.oms: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE

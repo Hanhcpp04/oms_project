@@ -1,0 +1,261 @@
+<aside
+  class="fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-[#E5E5E5] bg-white transition-all duration-300 lg:static lg:z-auto"
+  [ngClass]="{
+    '-translate-x-full lg:translate-x-0': !mobileOpen,
+    'translate-x-0': mobileOpen,
+    'w-[80vw] max-w-[260px] lg:w-[240px] lg:max-w-none': !collapsed,
+    'w-[80vw] max-w-[260px] lg:w-[72px] lg:max-w-none': collapsed
+  }">
+  <!-- Logo -->
+  <a routerLink="/app" (click)="onLogoClick()"
+    class="flex h-[60px] shrink-0 items-center gap-2.5 overflow-hidden border-b border-[#E5E5E5] px-4 no-underline">
+    <div
+      class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#111111] text-white">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+      </svg>
+    </div>
+    <div class="grid gap-0 transition-opacity duration-200" [ngClass]="{ 'lg:hidden': collapsed }">
+      <span class="text-sm font-medium text-[#111111] tracking-wide">OMS Panel</span>
+      <span class="text-[10px] text-[#9E9EA0] font-medium">Order Management</span>
+    </div>
+  </a>
+
+  <!-- Navigation -->
+  <nav class="flex-1 overflow-y-auto px-2.5 py-3">
+    <div class="grid gap-0.5">
+      @for (item of menuItems; track item.label) {
+      <div class="grid gap-0.5">
+        <!-- Group with children -->
+        @if (hasChildren(item)) {
+        <button type="button"
+          class="group flex h-9 w-full items-center gap-2.5 rounded-[8px] px-2.5 text-left text-[13px] font-medium transition-all duration-150"
+          [attr.title]="setupTitle(item)" [disabled]="isLocked(item)" [ngClass]="{
+                'bg-[#F5F5F5] text-[#111111] font-medium': isParentRouteActive(item) && !isLocked(item),
+                'text-[#707072] hover:bg-[#F5F5F5] hover:text-[#111111]': !isParentRouteActive(item) && !isLocked(item),
+                'opacity-50 cursor-not-allowed': isLocked(item),
+                'lg:justify-center lg:px-0': collapsed
+              }" (click)="!isLocked(item) && toggleGroup(item)">
+          <span class="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
+            <ng-container *ngTemplateOutlet="iconTpl; context: { $implicit: item.icon }" />
+            @if (setupVisualState(item) === 'missing') {
+            <span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-[#FEDF35]"></span>
+            }
+          </span>
+
+          <span class="flex min-w-0 flex-1 items-center justify-between" [ngClass]="{ 'lg:hidden': collapsed }">
+            <span class="truncate">{{ item.label }}</span>
+            <div class="flex items-center gap-1">
+              @if (setupVisualState(item) === 'missing') {
+              <span
+                class="inline-flex h-5 min-w-5 items-center justify-center rounded-[30px] bg-[#fef3c7] px-1.5 text-[10px] font-semibold leading-none text-[#92400e]">
+                {{ setupBadgeLabel(item) || '!' }}
+              </span>
+              }
+              @if (isLocked(item)) {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                class="shrink-0 text-[#707072] opacity-50" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              } @else {
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform duration-200"
+                [class.rotate-180]="isExpanded(item)" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+              }
+            </div>
+          </span>
+        </button>
+
+        @if (isExpanded(item) && !collapsed) {
+        <div class="ml-[18px] grid gap-0.5 border-l-2 border-[#111111]/20 pl-3 animate-fade-in-up">
+          @for (child of item.children; track child.route) {
+          <a class="flex h-8 items-center justify-between rounded-[8px] px-2.5 text-xs font-medium transition-all duration-150"
+            [ngClass]="{
+                      'bg-[#F5F5F5] text-[#111111] font-medium': isChildRouteActive(child) && !isLocked(child),
+                      'text-[#707072] hover:bg-[#F5F5F5] hover:text-[#111111]': !isChildRouteActive(child) && !isLocked(child),
+                      'opacity-50 pointer-events-none': isLocked(child)
+                    }" [attr.title]="setupTitle(child)" [routerLink]="isLocked(child) ? null : child.route" (click)="onNavigate()">
+            <span>{{ child.label }}</span>
+            @if (setupVisualState(child) === 'missing') {
+            <span
+              class="inline-flex h-5 min-w-5 items-center justify-center rounded-[30px] bg-[#fef3c7] px-1.5 text-[10px] font-semibold leading-none text-[#92400e]">
+              {{ setupBadgeLabel(child) || '!' }}
+            </span>
+            }
+            @if (isLocked(child)) {
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" class="shrink-0 opacity-50"
+              stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            }
+          </a>
+          }
+        </div>
+        }
+        }
+
+        <!-- Simple link (no children) -->
+        @if (!hasChildren(item)) {
+        <a class="group flex h-9 items-center justify-between rounded-[8px] px-2.5 text-[13px] font-medium transition-all duration-150"
+          [routerLink]="isLocked(item) ? null : item.route"
+          routerLinkActive="bg-[#F5F5F5] !text-[#111111] font-medium"
+          [routerLinkActiveOptions]="{ exact: item.route === '/app/dashboard' }" [ngClass]="{ 
+            'text-[#707072] hover:bg-[#F5F5F5] hover:text-[#111111]': !isLocked(item),
+            'opacity-50 pointer-events-none': isLocked(item),
+            'lg:justify-center lg:px-0': collapsed 
+          }" (click)="onNavigate()">
+          <div class="flex items-center gap-2.5">
+            <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center">
+              <ng-container *ngTemplateOutlet="iconTpl; context: { $implicit: item.icon }" />
+            </span>
+            <span [ngClass]="{ 'lg:hidden': collapsed }">{{ item.label }}</span>
+          </div>
+          @if (isLocked(item) && !collapsed) {
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="shrink-0 opacity-50" stroke="currentColor"
+            stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+          }
+        </a>
+        }
+      </div>
+      }
+    </div>
+
+    @if (setupReminderCards().length > 0) {
+    @if (!collapsed) {
+    <section class="mt-4 border-t border-[#E5E5E5] pt-3">
+      <div class="flex items-center justify-between px-1">
+        <div class="flex min-w-0 items-center gap-2">
+          <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-[#FFF7CC] text-[#6B4E00]">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 22V4" />
+              <path d="M4 4h12l-1.5 4L16 12H4" />
+            </svg>
+          </span>
+          <div class="min-w-0">
+            <p class="m-0 text-xs font-semibold text-[#111111]">Cần thiết lập</p>
+            <p class="m-0 text-[10px] font-medium text-[#707072]">{{ setupProgressLabel() }} bước đã xong</p>
+          </div>
+        </div>
+        <span
+          class="inline-flex h-5 min-w-5 items-center justify-center rounded-[30px] bg-[#fef3c7] px-1.5 text-[10px] font-semibold leading-none text-[#92400e]">
+          {{ missingSetupCount() }}
+        </span>
+      </div>
+
+      <div class="mt-2 grid gap-2">
+        @for (card of setupReminderCards(); track card.key) {
+        <a [routerLink]="card.route" (click)="onNavigate()"
+          class="group block rounded-[8px] border border-[#E5E5E5] bg-[#FAFAFA] p-2.5 text-left no-underline transition-all duration-150 hover:border-[#D4D4D4] hover:bg-[#F5F5F5]">
+          <div class="flex items-start gap-2">
+            <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FEDF35]"></span>
+            <div class="min-w-0">
+              <p class="m-0 text-xs font-semibold leading-4 text-[#111111]">{{ card.title }}</p>
+              <p class="m-0 mt-1 text-[11px] leading-4 text-[#707072]">{{ card.description }}</p>
+            </div>
+          </div>
+        </a>
+        }
+      </div>
+    </section>
+    } @else {
+    <div class="mt-3 flex justify-center">
+      <a [routerLink]="firstSetupReminderRoute()" (click)="onNavigate()"
+        class="relative inline-flex h-10 w-10 items-center justify-center rounded-[8px] bg-[#FFF7CC] text-[#6B4E00] no-underline transition-all duration-150 hover:bg-[#FDE68A]"
+        [attr.title]="'Còn ' + missingSetupCount() + ' mục cần thiết lập'">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 22V4" />
+          <path d="M4 4h12l-1.5 4L16 12H4" />
+        </svg>
+        <span
+          class="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[#FEDF35] px-1 text-[10px] font-bold leading-none text-[#111111]">
+          {{ missingSetupCount() }}
+        </span>
+      </a>
+    </div>
+    }
+    }
+  </nav>
+
+  <!-- Bottom -->
+  <div class="shrink-0 border-t border-[#E5E5E5] px-3 py-3" [ngClass]="{ 'lg:hidden': collapsed }">
+    <div class="flex items-center gap-2 rounded-[8px] bg-[#F5F5F5] px-2.5 py-2">
+      <div class="h-2 w-2 rounded-full bg-[#007D48] animate-pulse-dot"></div>
+      <span class="text-[11px] text-[#707072] font-medium">System Online</span>
+    </div>
+  </div>
+</aside>
+
+<!-- Icon template -->
+<ng-template #iconTpl let-icon>
+  @switch (icon) {
+  @case ('dashboard') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="7" height="7" />
+    <rect x="14" y="3" width="7" height="4" />
+    <rect x="14" y="10" width="7" height="11" />
+    <rect x="3" y="14" width="7" height="7" />
+  </svg>
+  }
+  @case ('orders') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 7l9-4 9 4-9 4-9-4z" />
+    <path d="M3 7v10l9 4 9-4V7" />
+    <path d="M12 11v10" />
+  </svg>
+  }
+  @case ('products') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20.59 13.41L11 23l-9-9L11.59 4.41a2 2 0 0 1 1.41-.59H20a2 2 0 0 1 2 2v6.99a2 2 0 0 1-.59 1.41z" />
+    <circle cx="15.5" cy="8.5" r="1.5" />
+  </svg>
+  }
+  @case ('employees') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+  }
+  @case ('form-config') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <path d="M14 2v6h6" />
+    <line x1="8" y1="13" x2="16" y2="13" />
+    <line x1="8" y1="17" x2="13" y2="17" />
+  </svg>
+  }
+  @case ('shop-settings') {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <path
+      d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+  }
+  @default {
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8" />
+  </svg>
+  }
+  }
+</ng-template>

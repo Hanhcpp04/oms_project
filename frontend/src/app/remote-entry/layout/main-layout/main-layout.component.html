@@ -1,0 +1,26 @@
+<div class="flex h-screen overflow-hidden">
+  <!-- Sidebar -->
+  <app-oms-sidebar [menuItems]="menuItems" [collapsed]="sidebarCollapsed()" [mobileOpen]="mobileSidebarOpen()"
+    (closeMobile)="closeMobileSidebar()" />
+
+  <!-- Main area -->
+  <div class="flex min-w-0 flex-1 flex-col">
+    <!-- Header (sticky) -->
+    <app-oms-header [sidebarCollapsed]="sidebarCollapsed()" [currentUserName]="currentUserName()"
+      [currentShopName]="currentShopName()" (toggleSidebar)="onToggleSidebar()"
+      (toggleMobileSidebar)="onToggleMobileSidebar()" (logout)="onLogout()" />
+
+    <!-- Scrollable content area -->
+    <main class="flex-1 overflow-y-auto bg-[var(--color-bg)] p-4 md:p-6 lg:p-8">
+      <div class="mx-auto max-w-none">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Mobile overlay -->
+@if (mobileSidebarOpen()) {
+<button type="button" class="fixed inset-0 z-30 bg-[var(--color-overlay)] transition-opacity duration-300 lg:hidden"
+  (click)="closeMobileSidebar()" aria-label="Close mobile navigation"></button>
+}

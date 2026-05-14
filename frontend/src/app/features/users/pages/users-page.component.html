@@ -1,0 +1,203 @@
+<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <app-page-title title="Quản lý nhân viên"
+    description="Theo dõi tài khoản nhân viên, khối lượng đơn và danh sách đơn đang phụ trách." class="mb-0" />
+  <app-ui-button *appHasRole="'SHOP_OWNER'" variant="primary" size="md" (clicked)="autoGenerateEmployeeAccount()">
+    Tạo tài khoản
+  </app-ui-button>
+</div>
+
+<!-- Stats -->
+<section class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+  <app-ui-stat-card label="Tổng nhân viên" [value]="store.employeeCount()" trend="neutral" />
+  <app-ui-stat-card label="Đang hoạt động" [value]="store.activeUsers()" trend="up" trendText="Online" />
+  <app-ui-stat-card label="Đơn hôm nay" [value]="store.totalOrdersToday()" trend="neutral" />
+  <app-ui-stat-card label="Đơn tháng này" [value]="store.totalOrdersThisMonth()" trend="up" trendText="+15% so với tháng trước" />
+</section>
+
+<!-- Tabs -->
+<div class="mb-6 flex gap-4 border-b border-[var(--color-border)]">
+  <button class="border-b-2 px-4 py-2 font-medium transition-colors"
+    [class.border-[var(--color-primary)]]="activeTab === 'list'"
+    [class.text-[var(--color-primary)]]="activeTab === 'list'" [class.border-transparent]="activeTab !== 'list'"
+    [class.text-[var(--color-text-secondary)]]="activeTab !== 'list'" (click)="setTab('list')">
+    Danh sách nhân viên
+  </button>
+  <button class="border-b-2 px-4 py-2 font-medium transition-colors"
+    [class.border-[var(--color-primary)]]="activeTab === 'schedule'"
+    [class.text-[var(--color-primary)]]="activeTab === 'schedule'" [class.border-transparent]="activeTab !== 'schedule'"
+    [class.text-[var(--color-text-secondary)]]="activeTab !== 'schedule'" (click)="setTab('schedule')">
+    Lịch làm việc
+  </button>
+</div>
+
+<ng-container *ngIf="activeTab === 'list'">
+
+  <!-- Search -->
+  <app-ui-card tone="soft" className="mb-4">
+    <div class="grid items-end gap-3 sm:grid-cols-[1fr_auto_auto]">
+      <app-ui-input label="Tìm kiếm" [value]="searchTerm" placeholder="Tìm theo tên, email hoặc username"
+        (valueChange)="onSearchChange($event)" (enterPressed)="applySearch()" />
+
+      <app-ui-button variant="primary" size="sm" (clicked)="applySearch()">
+        Tìm kiếm
+      </app-ui-button>
+
+      <app-ui-button variant="ghost" size="sm" (clicked)="resetSearch()">
+        Đặt lại
+      </app-ui-button>
+    </div>
+  </app-ui-card>
+
+  <!-- Generated credential banner -->
+  @if (store.generatedCredential(); as generated) {
+  <app-ui-card className="mb-4 border-[var(--color-warning)]! bg-[var(--color-warning-soft)]">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="grid gap-1">
+        <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-warning-text)]">Tài khoản vừa
+          tạo tự động</p>
+        <p class="m-0 text-base font-bold text-[var(--color-text-primary)]">{{ generated.fullName }}</p>
+        <p class="m-0 text-sm text-[var(--color-text-secondary)]">
+          Username: <span class="font-semibold">{{ generated.username }}</span>
+        </p>
+        <p class="m-0 text-sm text-[var(--color-text-secondary)]">
+          Email: <span class="font-semibold">{{ generated.email }}</span>
+        </p>
+        <p class="m-0 text-sm text-[var(--color-text-secondary)]">
+          Mật khẩu tạm: <span class="font-semibold text-[var(--color-warning-text)]">{{ generated.temporaryPassword
+            }}</span>
+        </p>
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Tạo lúc {{ generated.createdAt | date: 'dd/MM/yyyy
+          HH:mm'
+          }}</p>
+      </div>
+
+      <app-ui-button variant="ghost" size="sm" (clicked)="dismissGeneratedCredential()">
+        Đóng
+      </app-ui-button>
+    </div>
+  </app-ui-card>
+  }
+
+  <!-- User list -->
+  <app-user-list [users]="store.users()" [loading]="store.loading()" [selectedUserId]="store.selectedUser()?.id ?? null"
+    (select)="selectUser($event)" (copyPassword)="copyPasswordToClipboard($event)" />
+
+  <!-- Selected user detail -->
+  @if (store.selectedUser(); as selectedUser) {
+  <app-ui-card className="mt-4">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Chi tiết nhân viên</h3>
+        <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">Thông tin cá nhân và tài khoản của nhân viên đã chọn.</p>
+      </div>
+
+      @if (store.selectedUserLoading()) {
+      <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
+        Đang tải chi tiết...
+      </span>
+      }
+    </div>
+
+    <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+        <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin cá nhân</h4>
+
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Họ tên</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.fullName }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Số điện thoại</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.phone || 'Chưa cập nhật' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Email</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.email || 'Chưa cập nhật' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngày tạo tài khoản</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+              {{ selectedUser.createdAt ? (selectedUser.createdAt | date: 'dd/MM/yyyy HH:mm') : 'Chưa có dữ liệu' }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+        <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin tài khoản</h4>
+
+        <div class="mt-3 grid gap-3 md:grid-cols-2">
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Username</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.username }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Vai trò</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ getUserRoleLabel(selectedUser.role) }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trạng thái</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.active ? 'Đang hoạt động' : 'Tạm khóa' }}</p>
+          </div>
+          <div>
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Lần đăng nhập gần nhất</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+              {{ selectedUser.lastLogin ? (selectedUser.lastLogin | date: 'dd/MM/yyyy HH:mm') : 'Chưa đăng nhập' }}
+            </p>
+          </div>
+          <div class="md:col-span-2">
+            <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Mật khẩu</p>
+            <p class="m-0 mt-0.5 text-sm font-semibold text-[var(--color-text-primary)]">
+              {{ selectedUser.forceChangePassword ? 'Đang dùng mật khẩu tạm, cần đổi ở lần đăng nhập đầu' : 'Đã cập nhật mật khẩu cá nhân' }}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+        <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn hôm nay</p>
+        <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersToday }}</p>
+      </div>
+      <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+        <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn tháng này</p>
+        <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersThisMonth }}</p>
+      </div>
+    </div>
+
+    <!-- Handled orders -->
+    <div class="mt-4">
+      <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Các đơn đã xử lý</h4>
+
+      @if ((selectedUser.handledOrders?.length ?? 0) > 0) {
+      <div class="mt-2 grid gap-2">
+        <div *ngFor="let order of selectedUser.handledOrders"
+          class="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+          <div>
+            <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ order.orderCode }}</p>
+            <p class="m-0 text-xs text-[var(--color-text-tertiary)]">{{ order.customerName }}</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <app-ui-badge [variant]="getStatusVariant(order.status)">{{ getStatusLabel(order.status) }}</app-ui-badge>
+            <span class="text-xs text-[var(--color-text-tertiary)]">{{ order.handledAt | date: 'dd/MM HH:mm' }}</span>
+          </div>
+        </div>
+      </div>
+      } @else {
+      <p class="m-0 mt-2 text-sm text-[var(--color-text-tertiary)]">Nhân viên này chưa xử lý đơn nào.</p>
+      }
+    </div>
+  </app-ui-card>
+  }
+</ng-container>
+
+<ng-container *ngIf="activeTab === 'schedule'">
+  <app-shift-calendar [shifts]="shifts" [loading]="loadingShifts" (createRequested)="openCreateShiftModal($event)"
+    (editRequested)="openEditShiftModal($event)" (deleteRequested)="deleteShift($event)" />
+</ng-container>
+
+<app-shift-form-modal *ngIf="showShiftModal" [existingShift]="editingShift" [availableStaff]="store.users()"
+  [selectedDate]="shiftModalDate" (closed)="closeShiftModal()" (saved)="saveShift($event)" />

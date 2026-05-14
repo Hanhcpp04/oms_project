@@ -1,0 +1,96 @@
+@if (open && order; as detailOrder) {
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 print:bg-white print:p-0" (click)="close()">
+  <div class="print-modal-panel" (click)="$event.stopPropagation()">
+    <div class="print-actions">
+      <button type="button" class="action-button" (click)="printNow()">In đơn</button>
+      <button type="button" class="action-button action-button--ghost" (click)="close()">Đóng</button>
+    </div>
+
+    <article class="print-sheet">
+      <header class="sheet-header">
+        <h1 class="shop-title">OMS SHOP</h1>
+        <p class="sheet-subtitle">PHIẾU THÔNG TIN ĐƠN HÀNG</p>
+      </header>
+
+      <section class="sheet-meta">
+        <p><strong>Mã đơn:</strong> {{ detailOrder.orderNumber }}</p>
+        <p><strong>Ngày tạo:</strong> {{ detailOrder.createdAt }}</p>
+      </section>
+
+      <section class="sheet-grid">
+        <section class="sheet-card">
+          <h2>Thông tin người gửi</h2>
+          <p><strong>Tên shop:</strong> {{ authStore.currentShop()?.name || 'Chưa thiết lập' }}</p>
+          <p><strong>Liên hệ shop:</strong> {{ authStore.currentShop()?.phone || 'Chưa thiết lập' }}</p>
+          <p><strong>Email:</strong> {{ authStore.currentShop()?.email || 'Chưa thiết lập' }}</p>
+          <p><strong>Địa chỉ:</strong> {{ getShopAddress() }}</p>
+          <p class="thanks">Cảm ơn quý khách đã tin tưởng và ủng hộ shop.</p>
+        </section>
+
+        <section class="sheet-card">
+          <h2>Thông tin khác</h2>
+          <p><strong>Khách hàng:</strong> {{ detailOrder.customerName }}</p>
+          <p><strong>Điện thoại:</strong> {{ detailOrder.customerPhone }}</p>
+          <p><strong>Địa chỉ:</strong> {{ detailOrder.customerAddress }}</p>
+          <p><strong>Loại đơn:</strong> {{ detailOrder.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}</p>
+          <p><strong>Trạng thái:</strong> {{ getStatusLabel(detailOrder.status) }}</p>
+          @if (detailOrder.customerNote) {
+          <p><strong>Ghi chú:</strong> {{ detailOrder.customerNote }}</p>
+          }
+        </section>
+      </section>
+
+      @if (hasCustomFields(detailOrder)) {
+      <section class="sheet-custom-fields">
+        <h2>Trường theo cấu hình form</h2>
+        <div class="custom-field-grid">
+          @for (field of getCustomFieldEntries(detailOrder); track field.key) {
+          <article class="custom-field-item">
+            <p class="custom-field-label">{{ field.label }}</p>
+            <p class="custom-field-value">{{ field.value }}</p>
+          </article>
+          }
+        </div>
+      </section>
+      }
+
+      <section class="sheet-products">
+        <h2>Thông tin sản phẩm</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Tên sản phẩm</th>
+              <th>Phân loại</th>
+              <th>Size</th>
+              <th class="text-right">Đơn giá</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of detailOrder.products; track $index) {
+            <tr>
+              <td>{{ $index + 1 }}</td>
+              <td>{{ p.name }}</td>
+              <td>{{ p.categoryNameSnapshot || '-' }}</td>
+              <td>{{ p.size }}</td>
+              <td class="text-right">{{ formatCurrency(p.unitPrice) }}</td>
+            </tr>
+            } @empty {
+            <tr>
+              <td colspan="5" class="text-center">Không có sản phẩm.</td>
+            </tr>
+            }
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="sheet-footer">
+        <div class="total-box">
+          <p class="label">Tổng tiền</p>
+          <p class="amount">{{ formatCurrency(detailOrder.totalAmount) }}</p>
+        </div>
+      </footer>
+    </article>
+  </div>
+</div>
+}

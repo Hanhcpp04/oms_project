@@ -1,0 +1,81 @@
+<div class="space-y-4">
+  <div class="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+    <app-ui-card padding="sm">
+      <div class="mb-3">
+        <h3 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Báo cáo theo khoảng chọn</h3>
+        <p class="m-0 text-xs text-[var(--color-text-tertiary)]">So sánh chỉ số trong giai đoạn tùy chỉnh</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        @for (metric of store.metrics(); track metric.label) {
+        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-3">
+          <p class="m-0 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">{{ metric.label }}</p>
+          <p class="m-0 mt-1 text-xl font-semibold text-[var(--color-text-primary)]">{{ metric.value }}</p>
+          <p class="m-0 mt-1 text-xs font-medium text-[var(--color-text-secondary)]">{{ metric.trend }}</p>
+        </div>
+        }
+      </div>
+
+      <div class="mt-5 space-y-3">
+        <h4 class="m-0 text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Dòng chảy doanh thu</h4>
+        @for (day of store.revenue(); track day.label) {
+        <div>
+          <div class="mb-1.5 flex items-center justify-between text-xs font-semibold">
+            <span class="text-[var(--color-text-primary)]">{{ day.label }}</span>
+            <span class="text-[var(--color-text-tertiary)]">{{ day.orders }} đơn</span>
+          </div>
+          <div class="h-2 w-full overflow-hidden rounded-full bg-[var(--color-bg)]">
+            <div class="h-full rounded-full bg-[var(--color-text-primary)] transition-all duration-500" [style.width.%]="getBarHeight(day.revenue)"></div>
+          </div>
+        </div>
+        }
+      </div>
+    </app-ui-card>
+
+    <app-ui-card padding="sm">
+      <h3 class="m-0 mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Chỉ số nhanh</h3>
+      <div class="space-y-3">
+        @for (metric of store.metrics(); track metric.label; let index = $index) {
+        <div class="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
+          <div class="absolute -right-4 -top-4 select-none text-5xl font-black text-[var(--color-bg)]">{{ index + 1 }}</div>
+          <div class="relative">
+            <p class="m-0 text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Hạng #{{ index + 1 }}</p>
+            <p class="m-0 mt-1 text-sm font-medium text-[var(--color-text-secondary)]">{{ metric.label }}</p>
+            <p class="m-0 mt-2 text-lg font-semibold text-[var(--color-text-primary)]">{{ metric.value }}</p>
+          </div>
+        </div>
+        }
+      </div>
+    </app-ui-card>
+  </div>
+
+  <app-ui-card padding="sm">
+    <div class="mb-3 flex items-center justify-between gap-3">
+      <h3 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Danh sách đơn trong khoảng</h3>
+      <span class="text-[10px] font-medium text-[var(--color-text-tertiary)]">Bảng rút gọn</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[600px] border-collapse">
+        <thead>
+          <tr class="border-b border-[var(--color-border)]">
+            <th class="pb-3 text-left text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Mã đơn</th>
+            <th class="pb-3 text-left text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Khách hàng</th>
+            <th class="pb-3 text-left text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Trạng thái</th>
+            <th class="pb-3 text-right text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Tổng tiền</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[var(--color-border)]/50">
+          @for (order of store.recentOrders(); track order.orderNumber) {
+          <tr class="transition-colors hover:bg-[var(--color-surface-hover)]">
+            <td class="py-3 text-sm font-semibold text-[var(--color-text-primary)]">{{ order.orderNumber }}</td>
+            <td class="py-3 text-sm text-[var(--color-text-secondary)]">{{ order.customerName }}</td>
+            <td class="py-3"><app-ui-badge variant="default">{{ getStatusLabel(order.status) }}</app-ui-badge></td>
+            <td class="py-3 text-right text-sm font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(order.total) }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </app-ui-card>
+</div>

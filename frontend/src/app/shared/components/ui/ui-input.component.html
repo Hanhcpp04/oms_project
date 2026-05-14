@@ -1,0 +1,33 @@
+<div [class]="wrapperClasses">
+  <label
+    *ngIf="label"
+    [for]="resolvedId"
+    class="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]"
+  >
+    {{ label }}
+  </label>
+
+  <div [class]="shellClasses">
+    <input
+      [id]="resolvedId"
+      [name]="name || null"
+      [type]="type"
+      [placeholder]="placeholder"
+      [value]="displayValue"
+      [autocomplete]="autocomplete"
+      [attr.inputmode]="inputModeAttr"
+      [readonly]="readonly"
+      [required]="required"
+      [disabled]="disabled"
+      [class]="inputClasses"
+      (input)="onInput($event)"
+      (keydown)="onKeydown($event)"
+      (blur)="onBlur()"
+    />
+
+    <span *ngIf="suffixText" class="pr-3 text-xs font-medium text-[var(--color-text-tertiary)]">{{ suffixText }}</span>
+  </div>
+
+  <p *ngIf="hasError" class="m-0 text-xs font-medium text-[var(--color-danger-text)]">{{ errorText }}</p>
+  <p *ngIf="!hasError && helperText" class="m-0 text-xs text-[var(--color-text-tertiary)]">{{ helperText }}</p>
+</div>

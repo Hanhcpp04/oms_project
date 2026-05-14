@@ -1,0 +1,91 @@
+<ng-container *ngIf="!loading; else loadingState">
+  <app-ui-table minWidthClass="min-w-[900px]">
+    <thead>
+      <tr>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Sản phẩm</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Loại</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Biến thể</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tồn kho</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Giá tham chiếu</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Trạng thái</th>
+        <th class="border-b border-[var(--color-border)] px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Hành động</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr
+        *ngFor="let product of products"
+        class="cursor-pointer transition-colors hover:bg-[var(--color-surface-secondary)]"
+        [ngClass]="{ 'bg-[var(--color-accent-soft)]': selectedProductId === product.id }"
+        (click)="select.emit(product)"
+      >
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5">
+          <p class="m-0 text-sm font-medium text-[var(--color-text-primary)]">{{ product.name }}</p>
+          <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">{{ product.description || 'Không có mô tả' }}</p>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
+          {{ resolveTypeLabel(product.productType) }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
+          {{ product.variants.length }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm font-semibold text-[var(--color-text-primary)]">
+          {{ resolveTotalStock(product) }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
+          {{ resolvePriceLabel(product) }}
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm">
+          <app-ui-badge [variant]="product.active ? 'success' : 'danger'">
+            {{ product.active ? 'Đang bán' : 'Tạm ẩn' }}
+          </app-ui-badge>
+        </td>
+
+        <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-right flex items-center justify-end gap-2">
+          <app-ui-button
+            variant="ghost"
+            size="sm"
+            [disabled]="!product.active"
+            (clicked)="onQrClick($event, product)"
+            title="Tạo mã QR thanh toán"
+          >
+            <i class="ri-qr-code-line text-lg"></i>
+          </app-ui-button>
+
+          <app-ui-button
+            variant="ghost"
+            size="sm"
+            [disabled]="!product.active"
+            (clicked)="onDeactivateClick($event, product)"
+          >
+            Ngừng bán
+          </app-ui-button>
+        </td>
+      </tr>
+
+      <tr *ngIf="products.length === 0">
+        <td colspan="7" class="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+          Không có sản phẩm phù hợp bộ lọc hiện tại.
+        </td>
+      </tr>
+    </tbody>
+  </app-ui-table>
+</ng-container>
+
+<app-product-qr-code-modal
+  *ngIf="qrProduct()"
+  [isOpen]="!!qrProduct()"
+  [product]="qrProduct()"
+  (close)="qrProduct.set(null)"
+/>
+
+<ng-template #loadingState>
+  <app-ui-card className="px-4 py-8 text-center text-sm text-[var(--color-text-tertiary)]">
+    Đang tải danh sách sản phẩm...
+  </app-ui-card>
+</ng-template>

@@ -1,0 +1,167 @@
+<div class="p-4 md:p-6 pb-24">
+  <app-ui-card [rounded]="false">
+    <!-- Filters -->
+    <div class="mb-6 flex flex-wrap items-end justify-between gap-6">
+      <div class="w-full max-w-[400px]">
+        <app-ui-input [value]="searchTerm()" variant="underlined" placeholder="Nhập tên sản phẩm hoặc mô tả để tìm kiếm"
+          (valueChange)="onSearchChange($event)" />
+      </div>
+
+      <div class="flex flex-wrap items-end gap-6">
+        <div class="w-[180px]">
+          <app-ui-select placeholder="Tất cả" [value]="selectedType()" variant="underlined"
+            [disabled]="isTypeFilterDisabled()" [options]="typeOptions" (valueChange)="onTypeChange($event)" />
+        </div>
+        <app-ui-button variant="underlined" size="sm" (clicked)="openCreateForm()">+ Thêm sản phẩm</app-ui-button>
+      </div>
+    </div>
+    <!-- Faint Category Navbar -->
+    <div class="mb-5 flex items-center gap-6 overflow-x-auto border-b border-[var(--color-border)]/50 scrollbar-hide">
+      @for (cat of categories(); track cat) {
+      <button type="button" class="relative shrink-0 pb-3 text-sm font-semibold transition-all duration-200" [ngClass]="{
+          'text-[var(--color-accent)]': selectedCategory() === cat,
+          'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]': selectedCategory() !== cat
+        }" (click)="selectCategory(cat)">
+        {{ cat }}
+        @if (selectedCategory() === cat) {
+        <div class="absolute bottom-0 left-0 h-0.5 w-full bg-[var(--color-accent)] transition-all duration-300"></div>
+        }
+      </button>
+      }
+    </div>
+    <!-- Product card grid -->
+    <section class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+      @if (store.loading() && filteredProducts().length === 0) {
+        @for (i of [1,2,3,4,5,6,7,8]; track i) {
+          <div class="h-[380px] w-full border border-[var(--color-border)] bg-[var(--color-surface)]">
+            <app-ui-skeleton width="100%" height="240px" />
+            <div class="p-4 space-y-3">
+              <app-ui-skeleton width="70%" height="18px" />
+              <app-ui-skeleton width="40%" height="14px" />
+              <div class="pt-4">
+                <app-ui-skeleton width="100%" height="32px" />
+              </div>
+            </div>
+          </div>
+        }
+      } @else {
+        @for (product of filteredProducts(); track product.id) {
+      <div
+        class="group rounded-none border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)] transition-all duration-200 hover:border-[var(--color-accent)]/30 hover:shadow-[var(--shadow-md)]"
+        (dblclick)="openDetail(product)">
+        <!-- Image section with gallery indicator -->
+        <div class="relative flex aspect-[4/5] w-full items-center justify-center rounded-none bg-[var(--color-surface-secondary)] max-h-60 overflow-hidden">
+          @if (product.images.length > 0) {
+          <img [src]="product.images[0].url" [alt]="product.name" class="h-full w-full rounded-none object-cover transition-transform duration-300 group-hover:scale-105" />
+          <!-- Image count badge -->
+          @if (product.images.length > 1) {
+          <div class="absolute bottom-2 right-2 flex h-6 items-center gap-1 rounded-full bg-black/60 px-2 text-[10px] font-bold text-white backdrop-blur-sm">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <polyline points="21 15 16 10 5 21"/>
+            </svg>
+            {{ product.images.length }}
+          </div>
+          }
+          } @else {
+          <span class="text-4xl">🏷️</span>
+          }
+          <!-- Status overlay for inactive -->
+          @if (!product.active) {
+          <div class="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span class="rounded-full bg-[var(--color-danger)] px-3 py-1 text-[10px] font-bold text-white uppercase tracking-wider">Tạm ẩn</span>
+          </div>
+          }
+        </div>
+
+        <div class="p-4">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <h3 class="m-0 truncate text-sm font-bold text-[var(--color-text-primary)]">{{ product.name }}</h3>
+              <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                @if (product.category) {
+                <span class="inline-flex h-5 items-center rounded bg-[var(--color-surface-secondary)] px-1.5 text-[10px] font-medium text-[var(--color-text-secondary)] border border-[var(--color-border)]">
+                  {{ product.category }}
+                </span>
+                }
+                <span class="text-[10px] text-[var(--color-text-tertiary)]">
+                  {{ product.variants.length }} biến thể · Tồn: {{ store.getTotalStock(product) }}
+                </span>
+              </div>
+            </div>
+            <span
+              class="inline-flex h-5 shrink-0 items-center rounded-full bg-[var(--color-accent-soft)] px-2 text-[10px] font-semibold text-[var(--color-accent)]">
+              {{ getTypeLabel(product.productType) }}
+            </span>
+          </div>
+
+          @if (product.description) {
+          <p class="m-0 mt-2 line-clamp-2 text-xs text-[var(--color-text-secondary)]">{{ product.description }}</p>
+          }
+
+          <!-- Variant colors -->
+          @if (getUniqueColors(product).length > 0) {
+          <div class="mt-2 flex items-center gap-1">
+            <span class="text-[10px] text-[var(--color-text-tertiary)]">Màu:</span>
+            @for (color of getUniqueColors(product).slice(0, 5); track color) {
+            <span class="inline-flex h-4 items-center rounded bg-[var(--color-surface-hover)] px-1.5 text-[9px] font-medium text-[var(--color-text-secondary)]">{{ color }}</span>
+            }
+            @if (getUniqueColors(product).length > 5) {
+            <span class="text-[9px] text-[var(--color-text-tertiary)]">+{{ getUniqueColors(product).length - 5 }}</span>
+            }
+          </div>
+          }
+
+          <!-- Pricing row -->
+          <div class="mt-3 flex flex-wrap items-baseline gap-2">
+            @if (product.variants[0]?.priceSell !== null && product.variants[0]?.priceSell !== undefined) {
+            <span class="text-sm font-bold text-[var(--color-accent)]">{{
+              formatCurrency($any(product.variants[0].priceSell)) }}</span>
+            }
+            @if (product.variants[0]?.priceRentPerDay !== null && product.variants[0]?.priceRentPerDay !== undefined) {
+            <span class="text-xs text-[var(--color-text-tertiary)]">Thuê: {{
+              formatCurrency($any(product.variants[0].priceRentPerDay)) }}/ngày</span>
+            }
+            @if (product.variants[0]?.depositAmount !== null && product.variants[0]?.depositAmount !== undefined && product.variants[0]?.depositAmount! > 0) {
+            <span class="text-[10px] text-[var(--color-text-tertiary)]">Cọc: {{
+              formatCurrency($any(product.variants[0].depositAmount)) }}</span>
+            }
+          </div>
+
+          <!-- Actions -->
+          <div class="mt-3 flex gap-1.5 border-t border-[var(--color-border)] pt-3">
+            <button
+              class="flex h-7 flex-1 items-center justify-center gap-1 rounded-[var(--radius-sm)] text-xs font-medium text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-hover)]"
+              (click)="openDetail(product)" title="Xem chi tiết">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Xem
+            </button>
+            <button
+              class="flex h-7 flex-1 items-center justify-center gap-1 rounded-[var(--radius-sm)] text-xs font-medium text-[var(--color-text-secondary)] transition hover:bg-[var(--color-surface-hover)]"
+              (click)="openOrderCreationFlow(product); $event.stopPropagation()" title="Tạo đơn">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14" />
+                <path d="M5 12h14" />
+              </svg>
+              Tạo đơn
+            </button>
+          </div>
+        </div>
+      </div>
+      } @empty {
+      <div
+        class="col-span-full rounded-[var(--radius-lg)] border-2 border-dashed border-[var(--color-border)] py-10 text-center text-sm text-[var(--color-text-tertiary)]">
+        Không có sản phẩm nào. Nhấn <strong>"Tạo sản phẩm"</strong> để bắt đầu.
+      </div>
+      }
+    }
+    </section>
+  </app-ui-card>
+</div>
+
+<app-create-order-modal [isOpen]="isCreateOrderModalOpen()" [product]="selectedProductForOrder!"
+  (close)="isCreateOrderModalOpen.set(false)" (created)="onOrderCreated($event)" />

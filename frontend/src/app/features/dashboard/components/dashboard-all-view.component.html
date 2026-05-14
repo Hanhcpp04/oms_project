@@ -1,0 +1,19 @@
+<div class="space-y-5">
+  <!-- KPI Cards — from real Order counts & revenue -->
+  <app-dashboard-kpi-section class="block" />
+
+  <!-- Row 1: Growth Chart (2/3) + Order Status Donut (1/3) -->
+  <div class="grid gap-5 xl:grid-cols-[2fr_1fr]">
+    <app-dashboard-revenue-chart class="block" />
+    <app-dashboard-order-status class="block" />
+  </div>
+
+  <!-- Row 2: Recent Orders (full width) -->
+  <app-dashboard-recent-orders class="block" />
+
+  <!-- Row 3: Weekly Revenue (1/2) + Staff Rankings (1/2) -->
+  <div class="grid gap-5 xl:grid-cols-2">
+    <app-dashboard-weekly-revenue class="block" />
+    <app-dashboard-staff-section class="block" />
+  </div>
+</div>
