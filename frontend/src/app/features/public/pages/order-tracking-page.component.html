@@ -45,6 +45,9 @@
         <app-ui-badge [variant]="statusVariant(detailOrder.status)" size="md">
           {{ statusLabel(detailOrder.status) }}
         </app-ui-badge>
+        <app-ui-badge [variant]="paymentStatusVariant(detailOrder.paymentStatus)" size="md">
+          {{ paymentStatusLabel(detailOrder.paymentStatus) }}
+        </app-ui-badge>
       </div>
     </div>
   </header>
@@ -148,6 +151,10 @@
           <div class="flex items-center justify-between gap-3">
             <dt class="text-[var(--color-text-secondary)]">Ngày tạo</dt>
             <dd class="m-0 text-right font-medium">{{ formatDate(detailOrder.createdAt) }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-[var(--color-text-secondary)]">Thanh toán</dt>
+            <dd class="m-0 text-right font-medium">{{ paymentMethodLabel(detailOrder.paymentMethod) }}</dd>
           </div>
           @if (detailOrder.orderType === 'RENT') {
           <div class="flex items-center justify-between gap-3">

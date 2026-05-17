@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { finalize } from 'rxjs';
+import { EMPTY, Subject, catchError, finalize, interval, switchMap, takeUntil } from 'rxjs';
 import { NotificationService } from '../../../core/services/notification.service';
 import { PermissionService } from '../../../core/services/permission.service';
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
@@ -31,7 +31,7 @@ import { OrderPrintModalComponent } from './order-print-modal.component';
   styleUrl: './order-detail-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class OrderDetailPageComponent implements OnInit {
+export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly ordersApiService = inject(OrdersApiService);
@@ -40,6 +40,8 @@ export class OrderDetailPageComponent implements OnInit {
 
   readonly store = inject(OrdersStore);
   readonly statusOptions = ORDER_STATUS_OPTIONS;
+  private readonly destroy$ = new Subject<void>();
+  private readonly paymentRefreshIntervalMs = 10000;
 
   protected readonly order = signal<Order | null>(null);
   protected readonly loading = signal(false);
@@ -111,6 +113,12 @@ export class OrderDetailPageComponent implements OnInit {
     }
 
     this.resolveOrder(orderId);
+    this.startPaymentAutoRefresh(orderId);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   protected goBack(): void {
@@ -151,12 +159,20 @@ export class OrderDetailPageComponent implements OnInit {
 
     try {
       this.saving.set(true);
-      const updatedOrder = await this.store.updateOrder(currentOrder.id, {
-        ...this.editForm(),
-        shippingFee: Number(this.editForm().shippingFee ?? 0)
+      const form = this.editForm();
+      let updatedOrder = await this.store.updateOrder(currentOrder.id, {
+        ...form,
+        shippingFee: Number(form.shippingFee ?? 0)
       });
-      this.order.set(updatedOrder);
-      this.syncEditForm(updatedOrder);
+
+      if (this.hasPaymentChanges(currentOrder, form)) {
+        updatedOrder = await this.store.updatePayment(currentOrder.id, {
+          paymentStatus: form.paymentStatus,
+          paymentMethod: form.paymentMethod
+        });
+      }
+
+      this.applyResolvedOrder(updatedOrder);
       this.editing.set(false);
       this.notificationService.success('Đã cập nhật thông tin đơn hàng');
     } catch {
@@ -359,7 +375,7 @@ export class OrderDetailPageComponent implements OnInit {
     try {
       this.loading.set(true);
       const updatedOrder = await action(currentOrder.id);
-      this.order.set(updatedOrder);
+      this.applyResolvedOrder(updatedOrder);
       this.notificationService.success(successMessage);
     } catch {
       this.notificationService.error('Có lỗi xảy ra khi cập nhật trạng thái');
@@ -398,6 +414,22 @@ export class OrderDetailPageComponent implements OnInit {
       case 'UNPAID': return 'Chưa thanh toán';
       default: return 'Chưa thanh toán';
     }
+  }
+
+  protected getResolvedPaymentStatus(order: Order): PaymentStatus {
+    if (order.paymentStatus === 'PAID' || order.paymentStatus === 'DEPOSITED') {
+      return order.paymentStatus;
+    }
+
+    if (order.status === 'PAID' || order.fulfillmentStatus === 'PAID') {
+      return 'PAID';
+    }
+
+    if (order.status === 'DEPOSITED' || order.fulfillmentStatus === 'DEPOSITED') {
+      return 'DEPOSITED';
+    }
+
+    return 'UNPAID';
   }
 
   protected getPaymentStatusDotClass(status?: string): string {
@@ -535,15 +567,15 @@ export class OrderDetailPageComponent implements OnInit {
   }
 
   protected canSetUnpaid(order: Order): boolean {
-    return this.canEditPayment(order) && order.paymentStatus !== 'UNPAID';
+    return this.canEditPayment(order) && this.getResolvedPaymentStatus(order) !== 'UNPAID';
   }
 
   protected canSetDeposited(order: Order): boolean {
-    return this.canEditPayment(order) && order.paymentStatus !== 'DEPOSITED';
+    return this.canEditPayment(order) && this.getResolvedPaymentStatus(order) !== 'DEPOSITED';
   }
 
   protected canSetPaid(order: Order): boolean {
-    return this.canEditPayment(order) && order.paymentStatus !== 'PAID';
+    return this.canEditPayment(order) && this.getResolvedPaymentStatus(order) !== 'PAID';
   }
 
   protected async setPaymentStatus(paymentStatus: PaymentStatus): Promise<void> {
@@ -561,8 +593,7 @@ export class OrderDetailPageComponent implements OnInit {
         paymentStatus,
         paymentMethod: this.editForm().paymentMethod
       });
-      this.order.set(updatedOrder);
-      this.syncEditForm(updatedOrder);
+      this.applyResolvedOrder(updatedOrder);
       this.notificationService.success('Đã cập nhật thanh toán');
     } catch {
       this.notificationService.error('Có lỗi xảy ra khi cập nhật thanh toán');
@@ -575,29 +606,85 @@ export class OrderDetailPageComponent implements OnInit {
     const cachedOrder = this.findOrderFromStore(orderId);
 
     if (cachedOrder) {
-      this.order.set(cachedOrder);
-      this.syncEditForm(cachedOrder);
-      this.notFound.set(false);
-      this.store.selectOrder(cachedOrder);
+      this.applyResolvedOrder(cachedOrder);
+      this.refreshOrderFromApi(orderId, false);
       return;
     }
 
-    this.loading.set(true);
+    this.refreshOrderFromApi(orderId, true);
+  }
+
+  private refreshOrderFromApi(orderId: string, showLoading: boolean): void {
+    if (showLoading) {
+      this.loading.set(true);
+    }
 
     this.ordersApiService
       .getById(orderId)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => {
+        if (showLoading) {
+          this.loading.set(false);
+        }
+      }))
       .subscribe({
         next: (order) => {
-          this.order.set(order);
-          this.syncEditForm(order);
-          this.notFound.set(false);
-          this.store.selectOrder(order);
+          this.applyResolvedOrder(order);
         },
         error: () => {
-          this.notFound.set(true);
+          if (!this.order()) {
+            this.notFound.set(true);
+          }
         }
       });
+  }
+
+  private startPaymentAutoRefresh(orderId: string): void {
+    interval(this.paymentRefreshIntervalMs)
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(() => {
+          if (!this.shouldRefreshPaymentStatus()) {
+            return EMPTY;
+          }
+
+          return this.ordersApiService.getById(orderId).pipe(catchError(() => EMPTY));
+        })
+      )
+      .subscribe((order) => {
+        this.applyResolvedOrder(order);
+      });
+  }
+
+  private shouldRefreshPaymentStatus(): boolean {
+    const currentOrder = this.order();
+    if (!currentOrder) {
+      return false;
+    }
+
+    if (currentOrder.status === 'CANCELLED' || currentOrder.status === 'RETURNED') {
+      return false;
+    }
+
+    return this.isAsyncPaymentMethod(currentOrder.paymentMethod)
+      && this.getResolvedPaymentStatus(currentOrder) !== 'PAID';
+  }
+
+  private isAsyncPaymentMethod(method: Order['paymentMethod']): boolean {
+    return method === 'BANK_TRANSFER' || method === 'VNPAY';
+  }
+
+  private applyResolvedOrder(order: Order): void {
+    this.order.set(order);
+    if (!this.editing()) {
+      this.syncEditForm(order);
+    }
+    this.notFound.set(false);
+    this.store.selectOrder(order);
+  }
+
+  private hasPaymentChanges(order: Order, form: UpdateOrderInput): boolean {
+    return form.paymentStatus !== this.getResolvedPaymentStatus(order)
+      || form.paymentMethod !== order.paymentMethod;
   }
 
   private findOrderFromStore(orderId: string): Order | null {
@@ -637,7 +724,7 @@ export class OrderDetailPageComponent implements OnInit {
       sourceChannel: order.sourceChannel || '',
       shippingMethod: order.shippingMethod || '',
       shippingFee: order.shippingFee ?? 0,
-      paymentStatus: order.paymentStatus || 'UNPAID',
+      paymentStatus: this.getResolvedPaymentStatus(order),
       paymentMethod: order.paymentMethod
     });
   }

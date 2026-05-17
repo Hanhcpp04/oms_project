@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 public class OrderAiParseService {
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?:\\+84|84|0)(?:[\\s.-]*\\d){8,10}");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:0(?:[\\s.-]*\\d){9}|\\+?84(?:[\\s.-]*\\d){9})(?!\\d)");
     private static final Pattern DATE_ISO_PATTERN = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b");
     private static final Pattern DATE_DDMMYYYY_PATTERN = Pattern.compile("\\b(\\d{1,2})/(\\d{1,2})/(\\d{4})\\b");
     private static final Pattern NUMBER_PATTERN = Pattern.compile("(-?\\d[\\d.,]*)");
@@ -824,8 +824,8 @@ public class OrderAiParseService {
             digits = "0" + digits.substring(2);
         }
 
-        if (digits.length() > 11 && digits.startsWith("0")) {
-            digits = digits.substring(0, 11);
+        if (digits.length() > 10 && digits.startsWith("0")) {
+            digits = digits.substring(0, 10);
         }
 
         return digits;

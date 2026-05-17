@@ -332,6 +332,60 @@ class OrderDraftServiceTest {
     }
 
     @Test
+    void applyCustomerUpdateShouldStripExplicitCustomerNameCommand() {
+        OrderDraftRepository orderDraftRepository = mock(OrderDraftRepository.class);
+        OrderExtractionService orderExtractionService = mock(OrderExtractionService.class);
+        MessengerSendService messengerSendService = mock(MessengerSendService.class);
+        OrderDraftService service = newService(
+                orderDraftRepository,
+                orderExtractionService,
+                messengerSendService,
+                mock(RentalAvailabilityRepository.class)
+        );
+        Conversation conversation = Conversation.builder()
+                .pageId("page-1")
+                .senderId("customer-1")
+                .conversationKey("facebook:page-1:customer-1")
+                .build();
+        conversation.setId(10L);
+        OrderDraft draft = OrderDraft.builder()
+                .conversation(conversation)
+                .pageId("page-1")
+                .customerPsid("customer-1")
+                .status(OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION)
+                .draftCode("DRAFT-000008")
+                .customerName("nguyen van a")
+                .phone("0395253054")
+                .address("12 quang trung ha noi")
+                .productName("Dress")
+                .quantity(1)
+                .orderType(Order.OrderType.RENT)
+                .rentFrom(LocalDate.of(2026, 5, 19))
+                .rentTo(LocalDate.of(2026, 5, 22))
+                .rentalDays(4)
+                .price(new BigDecimal("112"))
+                .build();
+
+        when(orderDraftRepository.findTopByConversationIdAndStatusInOrderByCreatedAtDesc(eq(10L), any()))
+                .thenReturn(Optional.of(draft));
+        when(orderExtractionService.extractOrderInfo(any(), eq(null)))
+                .thenReturn(OrderInfoExtractedDto.builder()
+                        .customerName("khách hàng thành hoàng anh")
+                        .build());
+        when(orderDraftRepository.save(any(OrderDraft.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        Optional<OrderDraft> updated = service.applyCustomerUpdate(
+                conversation,
+                "sửa tên khách hàng thành hoàng anh");
+
+        assertThat(updated).isPresent();
+        assertThat(updated.get().getCustomerName()).isEqualTo("hoàng anh");
+        assertThat(updated.get().getConfirmMessage()).contains("Khách hàng: hoàng anh");
+        assertThat(updated.get().getConfirmMessage()).doesNotContain("khách hàng thành hoàng anh");
+    }
+
+    @Test
     void validateDraftCanCreateOrderShouldReturnPublicRentalFormLinkWhenRentDatesAreUnavailable() {
         RentalAvailabilityRepository availabilityRepository = mock(RentalAvailabilityRepository.class);
         OrderDraftService service = newService(

@@ -1,6 +1,8 @@
 package com.oms.module.messenger.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oms.config.MessengerProperties;
 import com.oms.module.messenger.dto.MessengerSendResult;
 import com.oms.module.messenger.entity.OutboundSystemMessage;
@@ -24,6 +26,7 @@ public class MessengerSendService {
     private final MessengerProperties messengerProperties;
     private final MessengerPageResolver messengerPageResolver;
     private final OutboundSystemMessageRepository outboundSystemMessageRepository;
+    private final ObjectMapper objectMapper;
 
     public boolean sendMessage(String pageId, String recipientId, String text) {
         return sendSystemMessage(pageId, recipientId, text).isSent();
@@ -110,7 +113,7 @@ public class MessengerSendService {
                     .baseUrl(messengerProperties.getGraphApiBaseUrl())
                     .build();
 
-            JsonNode response = client.post()
+            String responseStr = client.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/{pageId}/messages")
                             .queryParam("access_token", pageAccessToken)
@@ -122,7 +125,16 @@ public class MessengerSendService {
                             "message", Map.of("text", text)
                     ))
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+
+            JsonNode response = null;
+            if (responseStr != null) {
+                try {
+                    response = objectMapper.readTree(responseStr);
+                } catch (JsonProcessingException e) {
+                    log.warn("Failed to parse response: {}", responseStr, e);
+                }
+            }
 
             String messageId = response == null ? null : response.path("message_id").asText(null);
             log.info("Sent Messenger system message. pageId={}, recipientId={}, messageId={}",
@@ -144,7 +156,7 @@ public class MessengerSendService {
                     .baseUrl(messengerProperties.getGraphApiBaseUrl())
                     .build();
 
-            JsonNode response = client.post()
+            String responseStr = client.post()
                     .uri(uriBuilder -> uriBuilder
                             .path("/{pageId}/messages")
                             .queryParam("access_token", pageAccessToken)
@@ -164,7 +176,16 @@ public class MessengerSendService {
                             )
                     ))
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
+
+            JsonNode response = null;
+            if (responseStr != null) {
+                try {
+                    response = objectMapper.readTree(responseStr);
+                } catch (JsonProcessingException e) {
+                    log.warn("Failed to parse response: {}", responseStr, e);
+                }
+            }
 
             String messageId = response == null ? null : response.path("message_id").asText(null);
             log.info("Sent Messenger system image. pageId={}, recipientId={}, messageId={}",

@@ -67,7 +67,7 @@
       </div>
       <div class="od-summary-cell">
         <span class="od-label">Thanh toán</span>
-        <strong class="{{ getPaymentStatusTextClass(detailOrder.paymentStatus) }}">{{ getPaymentStatusLabel(detailOrder.paymentStatus) }}</strong>
+        <strong [class]="getPaymentStatusTextClass(getResolvedPaymentStatus(detailOrder))">{{ getPaymentStatusLabel(getResolvedPaymentStatus(detailOrder)) }}</strong>
       </div>
       <div class="od-summary-cell od-summary-total">
         <span class="od-label">Tổng tiền</span>
@@ -118,7 +118,7 @@
                 <div><dt>Người tạo</dt><dd>{{ detailOrder.createdByFullName || detailOrder.createdByUsername || 'Hệ thống' }}</dd></div>
                 <div><dt>Kênh bán</dt><dd>{{ detailOrder.sourceChannel || 'Chưa có' }}</dd></div>
                 <div><dt>Vận chuyển</dt><dd><span>{{ detailOrder.shippingMethod || 'Chưa chọn' }}</span><span class="od-muted-value">{{ formatCurrency(getShippingFee(detailOrder)) }}</span></dd></div>
-                <div><dt>Thanh toán</dt><dd>{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</dd></div>
+                <div><dt>Thanh toán</dt><dd><span>{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</span><span class="od-muted-value" [ngClass]="getPaymentStatusTextClass(getResolvedPaymentStatus(detailOrder))">{{ getPaymentStatusLabel(getResolvedPaymentStatus(detailOrder)) }}</span></dd></div>
                 @if (detailOrder.orderType === 'RENT') {
                 <div><dt>Lịch thuê</dt><dd>{{ formatDate(detailOrder.rentFrom) || 'Chưa có' }} - {{ formatDate(detailOrder.rentTo) || 'Chưa có' }}</dd></div>
                 }

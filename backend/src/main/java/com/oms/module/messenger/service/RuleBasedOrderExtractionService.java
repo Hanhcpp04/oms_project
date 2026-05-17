@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 public class RuleBasedOrderExtractionService implements OrderExtractionService {
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:\\+?84|0)(?:[\\s.\\-]?\\d){8,10}(?!\\d)");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:0(?:[\\s.\\-]?\\d){9}|\\+?84(?:[\\s.\\-]?\\d){9})(?!\\d)");
     private static final Pattern QUANTITY_BY_KEYWORD_PATTERN = Pattern.compile("(?iu)(?:số\\s*lượng|so\\s*luong|\\bsl\\b)\\s*[:\\-]?\\s*(\\d{1,4})");
     private static final Pattern QUANTITY_BY_UNIT_PATTERN = Pattern.compile("(?iu)\\b(\\d{1,4})\\s*(?:cái|cai|chiếc|chiec|sp|sản\\s*phẩm|san\\s*pham|bộ|bo)\\b");
     private static final Pattern RENTAL_DAYS_PATTERN = Pattern.compile("(?iu)\\b(\\d{1,3})\\s*(?:ngay|ngÃ y|day|days)\\b");
@@ -123,7 +123,10 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
         LocalDate rentTo = orderType == Order.OrderType.RENT
                 ? firstNonNull(explicitRentTo, derivedRentTo)
                 : null;
-        rentalDays = firstNonNull(rentalDays, calculateRentalDays(rentFrom, rentTo));
+        Integer dateRangeRentalDays = calculateRentalDays(rentFrom, rentTo);
+        rentalDays = explicitRentTo != null
+                ? firstNonNull(dateRangeRentalDays, rentalDays)
+                : firstNonNull(rentalDays, dateRangeRentalDays);
 
         List<String> missingFields = findMissingFields(productName, quantity, phone, address, orderType, rentalDays, rentFrom, rentTo);
         log.debug("Rule-based order extraction completed. missingFields={}", missingFields);
@@ -362,8 +365,22 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
     }
 
     private Integer findRentalDays(String text) {
-        Matcher matcher = RENTAL_DAYS_PATTERN.matcher(normalize(text));
-        return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
+        String normalized = normalize(text);
+        Matcher matcher = RENTAL_DAYS_PATTERN.matcher(normalized);
+        while (matcher.find()) {
+            if (isQuantityBeforeRentalDatePhrase(normalized, matcher.start(), matcher.end())) {
+                continue;
+            }
+            return Integer.parseInt(matcher.group(1));
+        }
+        return null;
+    }
+
+    private boolean isQuantityBeforeRentalDatePhrase(String normalizedText, int start, int end) {
+        String prefix = normalizedText.substring(Math.max(0, start - 20), start);
+        String suffix = normalizedText.substring(end, Math.min(normalizedText.length(), end + 20));
+        return Pattern.compile("(?:so\\s*luong|\\bsl\\b)\\s*$").matcher(prefix).find()
+                && Pattern.compile("^\\s*(?:thue|nhan|tra|la|tu|den)\\b").matcher(suffix).find();
     }
 
     private String findSize(String text) {
@@ -389,16 +406,41 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
 
         for (String line : lines) {
             String normalized = normalize(line);
-            if (containsAny(normalized, "mua", "dat", "lay", "can")) {
+            if (!isNonProductInfoLine(normalized) && containsAny(normalized, "mua", "dat", "lay", "can")) {
                 return compact(line);
             }
         }
 
         return lines.stream()
                 .filter(StringUtils::hasText)
+                .filter(line -> !isNonProductInfoLine(normalize(line)))
                 .findFirst()
                 .map(this::compact)
                 .orElse(null);
+    }
+
+    private boolean isNonProductInfoLine(String normalizedLine) {
+        if (!StringUtils.hasText(normalizedLine)) {
+            return true;
+        }
+        return normalizedLine.startsWith("so luong")
+                || normalizedLine.startsWith("sl ")
+                || normalizedLine.startsWith("ngay ")
+                || normalizedLine.contains("ngay thue")
+                || normalizedLine.contains("ngay nhan")
+                || normalizedLine.contains("ngay tra")
+                || normalizedLine.startsWith("sdt")
+                || normalizedLine.startsWith("so dien thoai")
+                || normalizedLine.startsWith("dia chi")
+                || normalizedLine.startsWith("khach hang")
+                || normalizedLine.startsWith("ten khach")
+                || normalizedLine.startsWith("variant id")
+                || normalizedLine.startsWith("product id")
+                || normalizedLine.startsWith("sku")
+                || normalizedLine.startsWith("loai don")
+                || normalizedLine.startsWith("tien coc")
+                || normalizedLine.startsWith("tong tien")
+                || normalizedLine.startsWith("gia ");
     }
 
     private String findProductCode(String text) {

@@ -187,4 +187,45 @@ class RuleBasedOrderExtractionServiceTest {
         assertThat(result.getRentTo()).isEqualTo(expectedTo);
         assertThat(result.getRentalDays()).isEqualTo(3);
     }
+
+    @Test
+    void shouldNotTreatQuantityBeforeRentalDateAsRentalDays() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.CUSTOMER)
+                .senderId("customer")
+                .messageTime(LocalDateTime.now())
+                .text("số lượng 1 ngày thuê là 19/5 đến 22/5")
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate expectedFrom = LocalDate.of(today.getYear(), 5, 19);
+        LocalDate expectedTo = LocalDate.of(today.getYear(), 5, 22);
+        if (expectedFrom.isBefore(today.minusDays(1))) {
+            expectedFrom = expectedFrom.plusYears(1);
+            expectedTo = expectedTo.plusYears(1);
+        }
+
+        assertThat(result.getQuantity()).isEqualTo(1);
+        assertThat(result.getRentFrom()).isEqualTo(expectedFrom);
+        assertThat(result.getRentTo()).isEqualTo(expectedTo);
+        assertThat(result.getRentalDays()).isEqualTo(4);
+        assertThat(result.getCustomerName()).isNull();
+        assertThat(result.getAddress()).isNull();
+        assertThat(result.getProductName()).isNull();
+    }
+
+    @Test
+    void shouldNotAppendAddressDigitToPhoneInCustomerContactUpdate() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.CUSTOMER)
+                .senderId("customer")
+                .messageTime(LocalDateTime.now())
+                .text("hà Hoàng anh 0395253054 12 quang trung hà đông hà nội")
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+
+        assertThat(result.getPhone()).isEqualTo("0395253054");
+    }
 }

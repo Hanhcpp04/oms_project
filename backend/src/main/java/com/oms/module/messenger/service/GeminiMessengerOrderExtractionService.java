@@ -13,9 +13,12 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.text.Normalizer;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 @Service
@@ -86,22 +89,30 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
                 : fallback.getPrice();
         LocalDate rentFrom = parseDate(firstNonBlank(aiResponse.getRentFrom(), fallback.getRentFrom() != null ? fallback.getRentFrom().toString() : null));
         LocalDate rentTo = parseDate(firstNonBlank(aiResponse.getRentTo(), fallback.getRentTo() != null ? fallback.getRentTo().toString() : null));
+        Integer calculatedRentalDays = calculateRentalDays(rentFrom, rentTo);
+        Integer rentalDays = calculatedRentalDays != null ? calculatedRentalDays : fallback.getRentalDays();
+        String customerName = firstNonBlank(
+                sanitizeCustomerName(aiResponse.getCustomerName()),
+                sanitizeCustomerName(fallback.getCustomerName()));
+        String customerAddress = firstNonBlank(
+                sanitizeCustomerAddress(aiResponse.getCustomerAddress()),
+                sanitizeCustomerAddress(fallback.getAddress()));
 
         List<String> missingFields = findMissingFields(
                 productName,
                 quantity,
                 firstNonBlank(aiResponse.getCustomerPhone(), fallback.getPhone()),
-                firstNonBlank(aiResponse.getCustomerAddress(), fallback.getAddress()),
+                customerAddress,
                 aiResponse.getOrderType() != null ? aiResponse.getOrderType() : fallback.getOrderType(),
-                fallback.getRentalDays(),
+                rentalDays,
                 rentFrom,
                 rentTo
         );
 
         return OrderInfoExtractedDto.builder()
-                .customerName(firstNonBlank(aiResponse.getCustomerName(), fallback.getCustomerName()))
+                .customerName(customerName)
                 .phone(firstNonBlank(aiResponse.getCustomerPhone(), fallback.getPhone()))
-                .address(firstNonBlank(aiResponse.getCustomerAddress(), fallback.getAddress()))
+                .address(customerAddress)
                 .orderType(aiResponse.getOrderType() != null ? aiResponse.getOrderType() : fallback.getOrderType())
                 .productId(product != null && product.getProductId() != null ? product.getProductId() : fallback.getProductId())
                 .variantId(product != null && product.getVariantId() != null ? product.getVariantId() : fallback.getVariantId())
@@ -113,7 +124,7 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
                 .size(size)
                 .price(price)
                 .depositAmount(aiResponse.getDepositPaid() != null ? aiResponse.getDepositPaid() : fallback.getDepositAmount())
-                .rentalDays(fallback.getRentalDays())
+                .rentalDays(rentalDays)
                 .deliveryDate(rentFrom != null ? rentFrom : fallback.getDeliveryDate())
                 .rentFrom(rentFrom)
                 .rentTo(rentTo)
@@ -233,6 +244,75 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private Integer calculateRentalDays(LocalDate rentFrom, LocalDate rentTo) {
+        if (rentFrom == null || rentTo == null || rentTo.isBefore(rentFrom)) {
+            return null;
+        }
+        long days = ChronoUnit.DAYS.between(rentFrom, rentTo) + 1;
+        return days > 0 && days <= Integer.MAX_VALUE ? (int) days : null;
+    }
+
+    private String sanitizeCustomerName(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null || trimmed.length() > 80 || trimmed.chars().anyMatch(Character::isDigit)) {
+            return null;
+        }
+
+        String normalized = normalizeLookup(trimmed);
+        if (normalized.startsWith("so luong")
+                || normalized.startsWith("ngay ")
+                || normalized.contains("ngay thue")
+                || normalized.contains("ngay nhan")
+                || normalized.contains("ngay tra")
+                || normalized.startsWith("khach hang thanh")
+                || normalized.startsWith("ten khach")
+                || normalized.startsWith("sua ")
+                || normalized.startsWith("cap nhat ")
+                || normalized.startsWith("doi ")) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private String sanitizeCustomerAddress(String value) {
+        String trimmed = trimToNull(value);
+        if (trimmed == null) {
+            return null;
+        }
+
+        String normalized = normalizeLookup(trimmed);
+        if (normalized.startsWith("so luong")
+                || normalized.startsWith("ngay ")
+                || normalized.contains("ngay thue")
+                || normalized.contains("ngay nhan")
+                || normalized.contains("ngay tra")
+                || normalized.contains("lich thue")) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private String normalizeLookup(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "")
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D')
+                .toLowerCase(Locale.ROOT)
+                .trim();
+        return normalized.replaceAll("\\s+", " ");
+    }
+
+    private String trimToNull(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        return value.trim();
     }
 
     private String firstNonBlank(String first, String second) {

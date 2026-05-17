@@ -4,7 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
 import { formatVndCurrency } from '../../../shared/utils/currency.util';
-import { OrderStatus } from '../../orders/data-access/models/order.model';
+import { OrderStatus, OrderType, PaymentStatus } from '../../orders/data-access/models/order.model';
 import { PublicOrderTrackingApiService } from '../data-access/public-order-tracking-api.service';
 import { PublicOrderTrackingItem, PublicOrderTrackingOrder } from '../data-access/public-order-tracking.model';
 
@@ -73,6 +73,24 @@ export class OrderTrackingPageComponent implements OnInit {
     }
   }
 
+  protected paymentStatusLabel(status: PaymentStatus | undefined): string {
+    switch (status) {
+      case 'PAID': return 'Đã thanh toán';
+      case 'DEPOSITED': return 'Đã cọc';
+      case 'UNPAID': return 'Chưa thanh toán';
+      default: return 'Chưa thanh toán';
+    }
+  }
+
+  protected paymentMethodLabel(method: string | undefined): string {
+    switch (method) {
+      case 'COD': return 'Thanh toán khi nhận hàng (COD)';
+      case 'BANK_TRANSFER': return 'Chuyển khoản ngân hàng';
+      case 'VNPAY': return 'Thanh toán qua VNPay';
+      default: return 'Chưa chọn';
+    }
+  }
+
   protected statusVariant(status: OrderStatus): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
     switch (status) {
       case 'PENDING':
@@ -92,6 +110,15 @@ export class OrderTrackingPageComponent implements OnInit {
         return 'info';
       default:
         return 'primary';
+    }
+  }
+
+  protected paymentStatusVariant(status: PaymentStatus | undefined): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    switch (status) {
+      case 'PAID': return 'success';
+      case 'DEPOSITED': return 'warning';
+      case 'UNPAID': return 'warning';
+      default: return 'warning';
     }
   }
 

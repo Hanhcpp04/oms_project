@@ -141,4 +141,19 @@ class OrderAiParseServiceTest {
         assertNull(response.getSourceChannel());
         assertNull(response.getShippingMethod());
     }
+
+    @Test
+    void shouldNotAppendAddressDigitToPhone() {
+        when(shippingMethodRepository.findByShopIdAndIsActiveTrue(1L)).thenReturn(List.of());
+        when(orderSourceRepository.findByShopIdAndIsActiveTrue(1L)).thenReturn(List.of());
+        when(orderFormConfigRepository.findAllByShopIdAndFormType(1L, ProductType.RENT)).thenReturn(List.of());
+
+        AiParseRequest request = new AiParseRequest();
+        request.setRawText("hà Hoàng anh 0395253054 12 quang trung hà đông hà nội");
+        request.setOrderTypeHint(Order.OrderType.RENT);
+
+        AiParseResponse response = service.parse(1L, request);
+
+        assertEquals("0395253054", response.getCustomerPhone());
+    }
 }

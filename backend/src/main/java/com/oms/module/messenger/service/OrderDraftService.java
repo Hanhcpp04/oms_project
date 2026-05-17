@@ -56,7 +56,7 @@ public class OrderDraftService {
 
     private static final int MAX_CONTEXT_MESSAGES = 200;
     private static final Pattern PHONE_FRAGMENT_PATTERN =
-            Pattern.compile("(?<!\\d)(?:\\+?84|0)(?:[\\s.\\-]?\\d){8,10}(?!\\d)");
+            Pattern.compile("(?<!\\d)(?:0(?:[\\s.\\-]?\\d){9}|\\+?84(?:[\\s.\\-]?\\d){9})(?!\\d)");
     public static final EnumSet<OrderDraftStatus> ACTIVE_DRAFT_STATUSES = EnumSet.of(
             OrderDraftStatus.WAITING_CONFIRM,
             OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION,
@@ -159,7 +159,7 @@ public class OrderDraftService {
                 .build());
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public Optional<String> checkRentalAvailabilityFromSellerMessage(
             Conversation conversation,
             Message sourceMessage,
@@ -167,7 +167,7 @@ public class OrderDraftService {
         return checkRentalAvailabilityFromMessage(conversation, sourceMessage, shop, false);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public Optional<String> checkRentalAvailabilityFromCustomerMessage(
             Conversation conversation,
             Message sourceMessage,
@@ -359,12 +359,12 @@ public class OrderDraftService {
                 ACTIVE_DRAFT_STATUSES);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public Optional<OrderDraft> applyCustomerUpdate(Conversation conversation, String updateContent) {
         return applyCustomerUpdate(conversation, updateContent, null);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public Optional<OrderDraft> applyCustomerUpdate(Conversation conversation, String updateContent, Long shopId) {
         Optional<OrderDraft> optionalDraft = findLatestActiveDraft(conversation.getId());
         if (optionalDraft.isEmpty()) {
@@ -1120,8 +1120,11 @@ public class OrderDraftService {
     }
 
     private void refreshAmounts(OrderDraft draft) {
-        if (draft.getOrderType() == Order.OrderType.RENT && draft.getRentalDays() == null) {
-            draft.setRentalDays(calculateRentalDays(draft.getRentFrom(), draft.getRentTo()));
+        if (draft.getOrderType() == Order.OrderType.RENT) {
+            Integer calculatedRentalDays = calculateRentalDays(draft.getRentFrom(), draft.getRentTo());
+            if (calculatedRentalDays != null) {
+                draft.setRentalDays(calculatedRentalDays);
+            }
         }
         addPrimaryItem(draft);
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -1387,6 +1390,7 @@ public class OrderDraftService {
     private void applyContextualCustomerUpdate(OrderDraft draft, String updateContent) {
         parseStandaloneQuantityUpdate(draft, updateContent).ifPresent(draft::setQuantity);
         parseExplicitAddressUpdate(updateContent).ifPresent(draft::setAddress);
+        parseExplicitCustomerNameUpdate(updateContent).ifPresent(draft::setCustomerName);
         applyUnlabeledContactUpdate(draft, updateContent);
     }
 
@@ -1425,6 +1429,25 @@ public class OrderDraftService {
 
         String address = cleanCustomerProvidedValue(matcher.group(1));
         return looksLikeAddress(address) ? Optional.of(address) : Optional.empty();
+    }
+
+    private Optional<String> parseExplicitCustomerNameUpdate(String updateContent) {
+        if (!StringUtils.hasText(updateContent)) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = Pattern.compile(
+                "(?iu)^\\s*(?:sua|sửa|cap\\s*nhat|cập\\s*nhật|doi|đổi)?\\s*"
+                        + "(?:ten\\s*(?:khach\\s*hang|nguoi\\s*nhan)?|tên\\s*(?:khách\\s*hàng|người\\s*nhận)?|"
+                        + "khach\\s*hang|khách\\s*hàng|nguoi\\s*nhan|người\\s*nhận)"
+                        + "(?:\\s+(?:thanh|thành|la|là))?\\s*[:\\-]?\\s*(.+)$")
+                .matcher(updateContent);
+        if (!matcher.find()) {
+            return Optional.empty();
+        }
+
+        String name = cleanCustomerProvidedValue(matcher.group(1));
+        return looksLikeCustomerName(name) ? Optional.of(name) : Optional.empty();
     }
 
     private void applyUnlabeledContactUpdate(OrderDraft draft, String updateContent) {
@@ -1491,7 +1514,24 @@ public class OrderDraftService {
         if (!StringUtils.hasText(value) || value.length() < 2 || value.length() > 80) {
             return false;
         }
+        String normalized = normalizeLookup(value);
+        if (isFieldLikeCustomerName(normalized)) {
+            return false;
+        }
         return value.chars().noneMatch(Character::isDigit);
+    }
+
+    private boolean isFieldLikeCustomerName(String normalizedValue) {
+        return normalizedValue.startsWith("so luong")
+                || normalizedValue.startsWith("ngay ")
+                || normalizedValue.contains("ngay thue")
+                || normalizedValue.contains("ngay nhan")
+                || normalizedValue.contains("ngay tra")
+                || normalizedValue.startsWith("khach hang thanh")
+                || normalizedValue.startsWith("ten khach")
+                || normalizedValue.startsWith("sua ")
+                || normalizedValue.startsWith("cap nhat ")
+                || normalizedValue.startsWith("doi ");
     }
 
     private boolean looksLikeAddress(String value) {
