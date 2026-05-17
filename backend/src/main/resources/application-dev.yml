@@ -42,6 +42,18 @@ app:
   public:
     frontend-base-url: ${PUBLIC_FRONTEND_BASE_URL:http://localhost:4200}
     tracking-secret: ${PUBLIC_ORDER_TRACKING_SECRET:}
+  payment:
+    timeout:
+      cancel-minutes: ${PAYMENT_CANCEL_MINUTES:30}
+      reminder-minutes: ${PAYMENT_REMINDER_MINUTES:25}
+    payos:
+      enabled: ${PAYOS_ENABLED:false}
+      base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+      client-id: ${PAYOS_CLIENT_ID:}
+      api-key: ${PAYOS_API_KEY:}
+      checksum-key: ${PAYOS_CHECKSUM_KEY:}
+      return-url: ${PAYOS_RETURN_URL:${app.public.frontend-base-url}/payment/payos/return}
+      cancel-url: ${PAYOS_CANCEL_URL:${app.public.frontend-base-url}/payment/payos/cancel}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
 

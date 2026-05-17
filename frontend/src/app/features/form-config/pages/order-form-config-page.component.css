@@ -32,8 +32,7 @@
 .form-config-tabs {
   display: inline-flex;
   justify-self: start;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-surface);
   box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   padding: 4px;
@@ -41,7 +40,7 @@
 
 .form-config-tabs button {
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -66,8 +65,7 @@
 }
 
 .form-config-system-card {
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--color-surface);
   box-shadow: 0 1px 2px rgb(0 0 0 / 5%);
   padding: 22px;
@@ -89,7 +87,7 @@
 .form-config-section-title span {
   width: 14px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-accent);
 }
 
@@ -102,7 +100,7 @@
 }
 
 .form-config-section-title strong {
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
   font-size: 11px;
@@ -140,8 +138,7 @@
 .form-config-system-grid select {
   width: 100%;
   min-height: 42px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
   font-size: 13px;
@@ -159,7 +156,7 @@
   justify-items: center;
   gap: 8px;
   border: 2px dashed var(--color-border-hover);
-  border-radius: 16px;
+  border-radius: 0;
   background: rgb(255 255 255 / 70%);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -181,7 +178,7 @@
   height: 46px;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-accent);
   box-shadow: 0 1px 2px rgb(0 0 0 / 8%);
@@ -217,7 +214,7 @@
 
 .form-config-skeleton div {
   min-height: 150px;
-  border-radius: 16px;
+  border-radius: 0;
   background:
     linear-gradient(90deg, rgb(255 255 255 / 60%), rgb(255 255 255 / 95%), rgb(255 255 255 / 60%)),
     #fff;

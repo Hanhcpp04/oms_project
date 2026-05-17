@@ -9,7 +9,11 @@ import {
   asOptionalString,
   unwrapApiResponse
 } from '../../../core/utils/api-response.util';
-import { PublicOrderTrackingItem, PublicOrderTrackingOrder } from './public-order-tracking.model';
+import {
+  PublicOrderTrackingItem,
+  PublicOrderTrackingOrder,
+  PublicOrderTrackingPayment
+} from './public-order-tracking.model';
 
 interface PublicOrderTrackingApi {
   orderCode?: string;
@@ -32,6 +36,23 @@ interface PublicOrderTrackingApi {
   createdAt?: string;
   updatedAt?: string;
   items?: PublicOrderTrackingItemApi[];
+  payment?: PublicOrderTrackingPaymentApi;
+}
+
+interface PublicOrderTrackingPaymentApi {
+  paymentId?: number;
+  provider?: string;
+  method?: string;
+  purpose?: string;
+  status?: string;
+  providerOrderCode?: number;
+  providerPaymentLinkId?: string;
+  amount?: number;
+  currency?: string;
+  description?: string;
+  checkoutUrl?: string;
+  qrCode?: string;
+  qrImageUrl?: string;
 }
 
 interface PublicOrderTrackingItemApi {
@@ -83,7 +104,8 @@ function normalizeTrackingOrder(raw: PublicOrderTrackingApi): PublicOrderTrackin
     rentTo: asOptionalString(raw.rentTo),
     createdAt: asOptionalString(raw.createdAt),
     updatedAt: asOptionalString(raw.updatedAt),
-    items: (raw.items ?? []).map(normalizeTrackingItem)
+    items: (raw.items ?? []).map(normalizeTrackingItem),
+    payment: raw.payment ? normalizeTrackingPayment(raw.payment) : undefined
   };
 }
 
@@ -97,5 +119,23 @@ function normalizeTrackingItem(raw: PublicOrderTrackingItemApi): PublicOrderTrac
     quantity: asNumber(raw.quantity, 1),
     unitPrice: asNumber(raw.unitPrice, 0),
     lineTotal: asNumber(raw.lineTotal, 0)
+  };
+}
+
+function normalizeTrackingPayment(raw: PublicOrderTrackingPaymentApi): PublicOrderTrackingPayment {
+  return {
+    paymentId: raw.paymentId,
+    provider: asOptionalString(raw.provider),
+    method: asOptionalString(raw.method),
+    purpose: asOptionalString(raw.purpose),
+    status: asOptionalString(raw.status),
+    providerOrderCode: raw.providerOrderCode,
+    providerPaymentLinkId: asOptionalString(raw.providerPaymentLinkId),
+    amount: raw.amount === undefined ? undefined : asNumber(raw.amount, 0),
+    currency: asOptionalString(raw.currency),
+    description: asOptionalString(raw.description),
+    checkoutUrl: asOptionalString(raw.checkoutUrl),
+    qrCode: asOptionalString(raw.qrCode),
+    qrImageUrl: asOptionalString(raw.qrImageUrl)
   };
 }

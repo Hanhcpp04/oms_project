@@ -24,8 +24,15 @@
       <div class="py-4 text-center">
         <h2 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">Thanh toán đơn hàng</h2>
         <p class="mt-2 text-sm text-[var(--color-text-secondary)]">
-          {{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Vui lòng quét mã QR dưới đây để hoàn tất thanh toán.' : 'Vui lòng tiến hành thanh toán qua VNPay.' }}
+          {{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Vui lòng quét QR bằng ứng dụng ngân hàng. Hệ thống sẽ tự ghi nhận khi ngân hàng báo thành công.' : 'Vui lòng tiến hành thanh toán qua VNPay.' }}
         </p>
+
+        @if (paymentCheckout()?.checkoutUrl) {
+        <a [href]="paymentCheckout()?.checkoutUrl" target="_blank" rel="noopener"
+          class="mt-4 inline-flex rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-2 text-sm font-semibold text-[var(--color-text-primary)] no-underline hover:bg-[var(--color-surface-secondary)]">
+          Mở trang thanh toán payOS
+        </a>
+        }
 
         @if (selectedPaymentMethod() === 'BANK_TRANSFER' && successQrUrl()) {
         <div class="mx-auto mb-8 mt-6 max-w-xl rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4 sm:p-4">
@@ -33,16 +40,37 @@
             <img [src]="successQrUrl()!" alt="QR thanh toán" class="h-56 w-56 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-white p-2 sm:h-64 sm:w-64" />
           </div>
           <div class="mx-auto mt-6 max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left">
+            @if (paymentCheckout(); as checkout) {
+            <div class="mb-1 flex justify-between gap-3 text-xs text-[var(--color-text-secondary)]">
+              <span>Số tiền:</span>
+              <span class="text-right font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(checkout.amount || totalAmount()) }}</span>
+            </div>
+            <div class="mb-1 flex justify-between gap-3 text-xs text-[var(--color-text-secondary)]">
+              <span>Nội dung:</span>
+              <span class="text-right font-semibold text-[var(--color-text-primary)]">{{ checkout.description || '--' }}</span>
+            </div>
+            <div class="flex justify-between gap-3 text-xs text-[var(--color-text-secondary)]">
+              <span>Mã thanh toán:</span>
+              <span class="text-right font-semibold text-[var(--color-text-primary)]">{{ checkout.providerOrderCode || '--' }}</span>
+            </div>
+            } @else {
             <div class="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1"><span>Chủ tài khoản:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankAccountName }}</span></div>
             <div class="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1"><span>Số tài khoản:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankAccountNumber }}</span></div>
             <div class="flex justify-between text-xs text-[var(--color-text-secondary)]"><span>Ngân hàng:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankName }}</span></div>
+            }
           </div>
         </div>
         }
 
-        <button type="button" (click)="completePayment()"
-          class="mt-4 w-full sm:w-auto rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-opacity hover:opacity-90">
-          Tôi đã thanh toán
+        @if (paymentNotice()) {
+        <p class="mx-auto mt-3 max-w-md rounded-[var(--radius-sm)] border border-[var(--color-warning)] bg-[var(--color-warning-soft)] px-3 py-2 text-sm font-medium text-[var(--color-warning-text)]">
+          {{ paymentNotice() }}
+        </p>
+        }
+
+        <button type="button" (click)="completePayment()" [disabled]="checkingPayment()"
+          class="mt-4 w-full rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
+          {{ paymentCheckout() ? (checkingPayment() ? 'Đang kiểm tra...' : 'Kiểm tra thanh toán') : 'Hoàn tất đặt hàng' }}
         </button>
       </div>
     </div>

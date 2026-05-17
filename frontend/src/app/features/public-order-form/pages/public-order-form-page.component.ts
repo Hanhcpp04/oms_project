@@ -66,6 +66,32 @@ interface PublicFormErrorState {
   message: string;
 }
 
+interface PaymentCheckout {
+  provider?: string;
+  method?: string;
+  status?: string;
+  providerOrderCode?: number;
+  providerPaymentLinkId?: string;
+  amount?: number;
+  currency?: string;
+  description?: string;
+  checkoutUrl?: string;
+  qrCode?: string;
+  qrImageUrl?: string;
+}
+
+interface PublicOrderSubmitResponse {
+  id?: number;
+  orderCode?: string;
+  paymentStatus?: string;
+  trackingToken?: string;
+  payment?: PaymentCheckout;
+}
+
+interface PublicOrderTrackingResponse {
+  paymentStatus?: string;
+}
+
 @Component({
   selector: 'app-public-order-form-page',
   standalone: true,
@@ -112,6 +138,10 @@ export class PublicOrderFormPageComponent implements OnInit {
   readonly isPaymentStep = signal(false);
   readonly selectedPaymentMethod = signal<PaymentMethodType | null>(null);
   readonly successQrUrl = signal<string | null>(null);
+  readonly paymentCheckout = signal<PaymentCheckout | null>(null);
+  readonly trackingToken = signal<string | null>(null);
+  readonly paymentNotice = signal<string | null>(null);
+  readonly checkingPayment = signal(false);
   readonly rentalVerificationValues = signal<Record<string, string>>({});
   readonly rentalVerificationErrors = signal<Record<string, string>>({});
   readonly rentalAvailabilityLoading = signal(false);
@@ -812,17 +842,27 @@ export class PublicOrderFormPageComponent implements OnInit {
       .pipe(finalize(() => this.submitting.set(false)))
       .subscribe({
         next: (response: any) => {
-          const res = unwrapApiResponse(response);
+          const res = unwrapApiResponse(response) as PublicOrderSubmitResponse;
+          const checkout = res.payment ?? null;
+          this.paymentCheckout.set(checkout);
+          this.trackingToken.set(res.trackingToken ?? null);
+          this.paymentNotice.set(null);
+          this.successQrUrl.set(null);
+
           if (this.selectedPaymentMethod() === 'BANK_TRANSFER') {
-            const cfg = this.config()?.paymentConfig;
-            if (cfg?.bankCode && cfg?.bankAccountNumber) {
-              const amount = this.totalAmount();
-              const orderCode = res.orderCode || '';
-              const name = encodeURIComponent((cfg.bankAccountName ?? '').toUpperCase());
-              const addInfo = encodeURIComponent(`Thanh toan don hang ${orderCode}`);
-              this.successQrUrl.set(
-                `https://img.vietqr.io/image/${cfg.bankCode}-${cfg.bankAccountNumber}-compact.png?amount=${Math.round(amount)}&addInfo=${addInfo}&accountName=${name}`
-              );
+            if (checkout?.qrImageUrl) {
+              this.successQrUrl.set(checkout.qrImageUrl);
+            } else {
+              const cfg = this.config()?.paymentConfig;
+              if (cfg?.bankCode && cfg?.bankAccountNumber) {
+                const amount = this.totalAmount();
+                const orderCode = res.orderCode || '';
+                const name = encodeURIComponent((cfg.bankAccountName ?? '').toUpperCase());
+                const addInfo = encodeURIComponent(`Thanh toan don hang ${orderCode}`);
+                this.successQrUrl.set(
+                  `https://img.vietqr.io/image/${cfg.bankCode}-${cfg.bankAccountNumber}-compact.png?amount=${Math.round(amount)}&addInfo=${addInfo}&accountName=${name}`
+                );
+              }
             }
             this.isPaymentStep.set(true);
             this.success.set(false);
@@ -842,9 +882,41 @@ export class PublicOrderFormPageComponent implements OnInit {
   }
 
   completePayment() {
-    this.isPaymentStep.set(false);
-    this.success.set(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!this.paymentCheckout()) {
+      this.isPaymentStep.set(false);
+      this.success.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const token = this.trackingToken();
+    if (!token) {
+      this.isPaymentStep.set(false);
+      this.success.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    this.checkingPayment.set(true);
+    this.http.get(`/public/orders/track/${encodeURIComponent(token)}`)
+      .pipe(finalize(() => this.checkingPayment.set(false)))
+      .subscribe({
+        next: (response: any) => {
+          const trackedOrder = unwrapApiResponse(response) as PublicOrderTrackingResponse;
+          if (trackedOrder.paymentStatus === 'PAID') {
+            this.paymentNotice.set(null);
+            this.isPaymentStep.set(false);
+            this.success.set(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+
+          this.paymentNotice.set('Hệ thống chưa ghi nhận thanh toán. Nếu bạn vừa chuyển khoản, vui lòng đợi vài giây rồi kiểm tra lại.');
+        },
+        error: () => {
+          this.toast.error('Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại!');
+        }
+      });
   }
 
 
@@ -852,6 +924,10 @@ export class PublicOrderFormPageComponent implements OnInit {
     this.success.set(false);
     this.isPaymentStep.set(false);
     this.successQrUrl.set(null);
+    this.paymentCheckout.set(null);
+    this.trackingToken.set(null);
+    this.paymentNotice.set(null);
+    this.checkingPayment.set(false);
     this.form.reset();
     this.quantity.set(1);
     this.customFieldValues.set({});

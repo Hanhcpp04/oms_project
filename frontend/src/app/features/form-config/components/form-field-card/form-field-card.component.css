@@ -5,8 +5,7 @@
 .field-card {
   display: grid;
   gap: 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--color-surface);
   padding: 20px 22px;
   transition: 180ms ease;
@@ -51,7 +50,7 @@
   align-items: center;
   justify-content: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -142,7 +141,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--color-surface-secondary);
   color: var(--color-text-secondary);
   font-size: 11px;
@@ -179,7 +178,7 @@
 }
 
 .field-card__errors {
-  border-radius: 12px;
+  border-radius: 0;
   background: var(--color-danger-soft);
   color: var(--color-danger-text);
   font-size: 12px;
@@ -217,11 +216,11 @@
   width: 16px;
   height: 16px;
   border: 2px solid var(--color-border-hover);
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .field-card__choice-preview .field-card__checkbox-dot {
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 @media (max-width: 760px) {

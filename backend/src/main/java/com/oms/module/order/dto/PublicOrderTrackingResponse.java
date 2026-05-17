@@ -1,6 +1,7 @@
 package com.oms.module.order.dto;
 
 import com.oms.module.order.entity.Order;
+import com.oms.module.payment.dto.PaymentCheckoutResponse;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -38,6 +39,7 @@ public class PublicOrderTrackingResponse {
     private LocalDateTime updatedAt;
 
     private List<ItemResponse> items;
+    private PaymentCheckoutResponse payment;
 
     @Getter
     @Builder

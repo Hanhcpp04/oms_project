@@ -113,6 +113,10 @@ public class Order extends BaseEntity {
     @Column(name = "messenger_draft_id")
     private Long messengerDraftId;
 
+    @Column(name = "payment_reminder_sent", nullable = false)
+    @Builder.Default
+    private Boolean paymentReminderSent = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "source_method", length = 20, columnDefinition = "enum('AI_PARSE','MANUAL','MESSENGER','PUBLIC_FORM')")
     @Builder.Default

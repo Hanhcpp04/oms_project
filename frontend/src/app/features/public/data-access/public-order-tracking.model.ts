@@ -11,6 +11,22 @@ export interface PublicOrderTrackingItem {
   lineTotal: number;
 }
 
+export interface PublicOrderTrackingPayment {
+  paymentId?: number;
+  provider?: string;
+  method?: string;
+  purpose?: string;
+  status?: string;
+  providerOrderCode?: number;
+  providerPaymentLinkId?: string;
+  amount?: number;
+  currency?: string;
+  description?: string;
+  checkoutUrl?: string;
+  qrCode?: string;
+  qrImageUrl?: string;
+}
+
 export interface PublicOrderTrackingOrder {
   orderCode: string;
   orderType: OrderType;
@@ -32,4 +48,5 @@ export interface PublicOrderTrackingOrder {
   createdAt?: string;
   updatedAt?: string;
   items: PublicOrderTrackingItem[];
+  payment?: PublicOrderTrackingPayment;
 }

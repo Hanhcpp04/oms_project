@@ -8,6 +8,9 @@ import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.service.OrderService;
+import com.oms.module.order.service.PublicOrderTrackingTokenService;
+import com.oms.module.payment.dto.PaymentCheckoutResponse;
+import com.oms.module.payment.service.PaymentService;
 import com.oms.module.product.dto.ProductResponse;
 import com.oms.module.product.entity.ProductType;
 import com.oms.module.product.service.ProductService;
@@ -52,6 +55,8 @@ public class PublicOrderFormController {
     private final ShopOrderSourceService orderSourceService;
     private final ShopPaymentConfigService paymentConfigService;
     private final RentalAvailabilityService availabilityService;
+    private final PaymentService paymentService;
+    private final PublicOrderTrackingTokenService trackingTokenService;
 
     /**
      * Lấy thông tin form đặt hàng public của shop (tên shop, danh sách sản phẩm active).
@@ -126,7 +131,31 @@ public class PublicOrderFormController {
         request.setSourceMethod(Order.SourceMethod.PUBLIC_FORM);
 
         OrderResponse result = orderService.createOrder(shop.getId(), request, null);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(result));
+        PaymentCheckoutResponse payment = null;
+        if (request.getPaymentMethod() == Order.PaymentMethod.BANK_TRANSFER
+                && paymentService.canCreatePayosCheckout()
+                && result.getId() != null) {
+            payment = paymentService.createPayosCheckout(shop.getId(), result.getId());
+        }
+
+        String trackingToken = createTrackingToken(result);
+        OrderResponse response = result.toBuilder()
+                .payment(payment)
+                .trackingToken(trackingToken)
+                .build();
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(response));
+    }
+
+    private String createTrackingToken(OrderResponse order) {
+        if (order == null || order.getId() == null || order.getOrderCode() == null) {
+            return null;
+        }
+
+        Order tokenOrder = new Order();
+        tokenOrder.setId(order.getId());
+        tokenOrder.setOrderCode(order.getOrderCode());
+        return trackingTokenService.createToken(tokenOrder);
     }
 
     private void rejectIfStorefrontUnavailable(Shop shop) {

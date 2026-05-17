@@ -827,8 +827,14 @@ public class OrderService {
             return Order.OrderStatus.PENDING;
         }
 
-        if (request.getSourceMethod() != Order.SourceMethod.PUBLIC_FORM) {
-            return Order.OrderStatus.NEW;
+        if (request.getSourceMethod() == Order.SourceMethod.MANUAL || 
+            request.getSourceMethod() == Order.SourceMethod.AI_PARSE) {
+            return Order.OrderStatus.CONFIRMED;
+        }
+
+        if (request.getSourceMethod() == Order.SourceMethod.PUBLIC_FORM &&
+            request.getPaymentMethod() == Order.PaymentMethod.BANK_TRANSFER) {
+            return Order.OrderStatus.PENDING;
         }
 
         return Boolean.TRUE.equals(shop.getAutoAcceptOrders())

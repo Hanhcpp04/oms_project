@@ -5,6 +5,7 @@ import com.oms.module.order.dto.PublicOrderTrackingResponse;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.entity.OrderItem;
 import com.oms.module.order.repository.OrderRepository;
+import com.oms.module.payment.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class PublicOrderTrackingService {
 
     private final OrderRepository orderRepository;
     private final PublicOrderTrackingTokenService tokenService;
+    private final PaymentService paymentService;
 
     @Transactional(readOnly = true)
     public PublicOrderTrackingResponse getByToken(String token) {
@@ -57,6 +59,7 @@ public class PublicOrderTrackingService {
                 .createdAt(order.getCreatedAt())
                 .updatedAt(order.getUpdatedAt())
                 .items(toItemResponses(order.getItems()))
+                .payment(paymentService.getLatestCheckout(order.getId()))
                 .build();
     }
 

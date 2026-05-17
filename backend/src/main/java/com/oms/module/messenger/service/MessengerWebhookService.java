@@ -8,13 +8,21 @@ import com.oms.module.messenger.entity.Message;
 import com.oms.module.messenger.entity.OrderDraft;
 import com.oms.module.messenger.enums.MessageSenderType;
 import com.oms.module.order.entity.Order;
+import com.oms.module.order.service.PublicOrderTrackingTokenService;
+import com.oms.module.payment.dto.PaymentCheckoutResponse;
+import com.oms.module.payment.entity.Payment;
+import com.oms.module.payment.service.PaymentService;
 import com.oms.module.shop.entity.Shop;
+import com.oms.module.shop.entity.ShopPaymentConfig;
+import com.oms.module.shop.repository.ShopPaymentConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -37,6 +45,12 @@ public class MessengerWebhookService {
     private final MessengerOrderService messengerOrderService;
     private final MessengerSendService messengerSendService;
     private final MessengerPageResolver messengerPageResolver;
+    private final PaymentService paymentService;
+    private final ShopPaymentConfigRepository paymentConfigRepository;
+    private final PublicOrderTrackingTokenService trackingTokenService;
+
+    @Value("${app.public.frontend-base-url:http://localhost:4200}")
+    private String frontendBaseUrl;
 
     @Transactional
     public void handleWebhook(String body) {
@@ -182,6 +196,14 @@ public class MessengerWebhookService {
         }
 
         Optional<OrderDraft> activeDraft = orderDraftService.findLatestActiveDraft(conversation.getId());
+        if (activeDraft.isPresent()) {
+            Optional<PaymentSelection> paymentSelection = resolvePaymentSelection(normalized, activeDraft.get());
+            if (paymentSelection.isPresent()) {
+                confirmCustomerDraftWithPayment(conversation, activeDraft.get(), paymentSelection.get());
+                return;
+            }
+        }
+
         if (activeDraft.isPresent()
                 && orderDraftService.canReceiveCustomerUpdates(activeDraft.get())
                 && shouldTreatAsDraftUpdate(normalized, activeDraft.get())) {
@@ -242,14 +264,11 @@ public class MessengerWebhookService {
         }
 
         try {
-            Optional<Order> confirmedOrder = messengerOrderService.confirmLatestWaitingOrder(conversation);
-            if (confirmedOrder.isPresent()) {
-                messengerSendService.sendSystemMessage(
-                        conversation.getPageId(),
-                        conversation.getSenderId(),
-                        CUSTOMER_CONFIRM_REPLY.formatted(confirmedOrder.get().getOrderCode())
-                );
-            }
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    buildPaymentSelectionMessage(draft)
+            );
         } catch (BusinessException ex) {
             log.info("Customer confirm rejected. conversationId={}, reason={}", conversation.getId(), ex.getMessage());
             messengerSendService.sendSystemMessage(
@@ -258,6 +277,256 @@ public class MessengerWebhookService {
                     "Shop chưa thể tạo đơn: " + ex.getMessage()
             );
         }
+    }
+
+    private void confirmCustomerDraftWithPayment(
+            Conversation conversation,
+            OrderDraft draft,
+            PaymentSelection selection
+    ) {
+        var missingFields = orderDraftService.findBlockingMissingFields(draft);
+        if (!missingFields.isEmpty()) {
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    orderDraftService.buildConfirmMessage(draft)
+            );
+            return;
+        }
+
+        try {
+            Optional<Order> confirmedOrder = messengerOrderService.confirmLatestWaitingOrder(
+                    conversation,
+                    selection.paymentMethod()
+            );
+            if (confirmedOrder.isEmpty()) {
+                return;
+            }
+
+            Order order = confirmedOrder.get();
+            if (selection.paymentMethod() == Order.PaymentMethod.COD) {
+                messengerSendService.sendSystemMessage(
+                        conversation.getPageId(),
+                        conversation.getSenderId(),
+                        CUSTOMER_CONFIRM_REPLY.formatted(order.getOrderCode())
+                );
+                return;
+            }
+
+            PaymentCheckoutResponse checkout = paymentService.createPayosCheckout(order, selection.paymentPurpose());
+            sendPayosPaymentInstruction(conversation, order, checkout, selection);
+        } catch (BusinessException ex) {
+            log.info("Customer payment selection rejected. conversationId={}, reason={}",
+                    conversation.getId(), ex.getMessage());
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    "Shop chưa thể tạo thanh toán cho đơn: " + ex.getMessage()
+            );
+        }
+    }
+
+    private void sendPayosPaymentInstruction(
+            Conversation conversation,
+            Order order,
+            PaymentCheckoutResponse checkout,
+            PaymentSelection selection
+    ) {
+        if (StringUtils.hasText(checkout.getQrImageUrl())) {
+            messengerSendService.sendImage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    checkout.getQrImageUrl()
+            );
+        }
+
+        String trackingUrl = buildTrackingUrl(order);
+        String message = """
+                Đơn %s đã được tạo.
+                Hình thức: %s
+                Số tiền: %s
+                Nội dung chuyển khoản: %s
+
+                Trang theo dõi đơn hàng:
+                %s
+
+                Sau khi thanh toán thành công, hệ thống sẽ tự cập nhật trạng thái đơn.
+                """.formatted(
+                order.getOrderCode(),
+                selection.label(),
+                formatMoney(checkout.getAmount()),
+                valueOrFallback(checkout.getDescription(), "--"),
+                trackingUrl
+        ).trim();
+
+        messengerSendService.sendSystemMessage(
+                conversation.getPageId(),
+                conversation.getSenderId(),
+                message
+        );
+    }
+
+    private String buildPaymentSelectionMessage(OrderDraft draft) {
+        ShopPaymentConfig config = draft.getShop() != null && draft.getShop().getId() != null
+                ? paymentConfigRepository.findByShopId(draft.getShop().getId()).orElse(null)
+                : null;
+
+        if (draft.getOrderType() == Order.OrderType.RENT) {
+            return buildRentalPaymentSelectionMessage(draft, config);
+        }
+
+        return buildSellPaymentSelectionMessage(config);
+    }
+
+    private String buildSellPaymentSelectionMessage(ShopPaymentConfig config) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("Thông tin đơn đã được xác nhận. Bạn vui lòng chọn phương thức thanh toán:\n");
+
+        boolean hasOption = false;
+        if (config != null && Boolean.TRUE.equals(config.getCodEnabled())) {
+            builder.append("- Nhắn \"COD\" để thanh toán khi nhận hàng.\n");
+            hasOption = true;
+        }
+        if (config != null && Boolean.TRUE.equals(config.getBankTransferEnabled()) && paymentService.canCreatePayosCheckout()) {
+            builder.append("- Nhắn \"Chuyển khoản\" để nhận QR thanh toán.\n");
+            hasOption = true;
+        }
+
+        if (!hasOption) {
+            return "Shop chưa cấu hình phương thức thanh toán khả dụng cho đơn Messenger. Vui lòng chờ shop hỗ trợ.";
+        }
+
+        builder.append("\nNếu cần sửa thông tin, bạn vẫn có thể nhắn \"Sửa địa chỉ...\" hoặc \"Hủy đơn\".");
+        return builder.toString().trim();
+    }
+
+    private String buildRentalPaymentSelectionMessage(OrderDraft draft, ShopPaymentConfig config) {
+        if (config == null || !Boolean.TRUE.equals(config.getBankTransferEnabled()) || !paymentService.canCreatePayosCheckout()) {
+            return "Shop chưa cấu hình thanh toán chuyển khoản tự động cho đơn thuê. Vui lòng chờ shop hỗ trợ.";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("Thông tin đơn thuê đã được xác nhận. Bạn vui lòng chọn khoản thanh toán:\n");
+        if (resolveDraftDepositAmount(draft).compareTo(BigDecimal.ZERO) > 0) {
+            builder.append("- Nhắn \"Đặt cọc\" để thanh toán tiền cọc ")
+                    .append(formatMoney(resolveDraftDepositAmount(draft)))
+                    .append(".\n");
+        }
+        builder.append("- Nhắn \"Tất toán\" để thanh toán toàn bộ ")
+                .append(formatMoney(draft.getTotalAmount()))
+                .append(".\n");
+        builder.append("\nHệ thống sẽ gửi QR payOS sau khi bạn chọn.");
+        return builder.toString().trim();
+    }
+
+    private Optional<PaymentSelection> resolvePaymentSelection(String normalized, OrderDraft draft) {
+        if (!StringUtils.hasText(normalized) || draft == null) {
+            return Optional.empty();
+        }
+
+        if (draft.getOrderType() == Order.OrderType.RENT) {
+            if (isRentalDepositPaymentCommand(normalized)) {
+                return Optional.of(new PaymentSelection(
+                        Order.PaymentMethod.BANK_TRANSFER,
+                        Payment.Purpose.RENTAL_DEPOSIT,
+                        "Đặt cọc qua chuyển khoản"
+                ));
+            }
+            if (isRentalFullPaymentCommand(normalized) || isBankTransferCommand(normalized)) {
+                return Optional.of(new PaymentSelection(
+                        Order.PaymentMethod.BANK_TRANSFER,
+                        Payment.Purpose.ORDER_FULL,
+                        "Tất toán qua chuyển khoản"
+                ));
+            }
+            return Optional.empty();
+        }
+
+        if (isCodCommand(normalized)) {
+            return Optional.of(new PaymentSelection(
+                    Order.PaymentMethod.COD,
+                    null,
+                    "COD"
+            ));
+        }
+        if (isBankTransferCommand(normalized)) {
+            return Optional.of(new PaymentSelection(
+                    Order.PaymentMethod.BANK_TRANSFER,
+                    Payment.Purpose.ORDER_FULL,
+                    "Chuyển khoản"
+            ));
+        }
+
+        return Optional.empty();
+    }
+
+    private boolean isCodCommand(String normalizedText) {
+        return "cod".equals(normalizedText)
+                || normalizedText.contains("thanh toan khi nhan")
+                || normalizedText.contains("tra tien khi nhan")
+                || normalizedText.contains("nhan hang tra tien");
+    }
+
+    private boolean isBankTransferCommand(String normalizedText) {
+        return "ck".equals(normalizedText)
+                || "qr".equals(normalizedText)
+                || normalizedText.contains("chuyen khoan")
+                || normalizedText.contains("quyet qr")
+                || normalizedText.contains("quet qr")
+                || normalizedText.contains("bank");
+    }
+
+    private boolean isRentalDepositPaymentCommand(String normalizedText) {
+        return normalizedText.contains("dat coc")
+                || normalizedText.equals("coc")
+                || normalizedText.contains("tien coc")
+                || normalizedText.contains("chuyen khoan coc");
+    }
+
+    private boolean isRentalFullPaymentCommand(String normalizedText) {
+        return normalizedText.contains("tat toan")
+                || normalizedText.contains("thanh toan het")
+                || normalizedText.contains("thanh toan toan bo")
+                || normalizedText.contains("tra het")
+                || normalizedText.equals("full");
+    }
+
+    private BigDecimal resolveDraftDepositAmount(OrderDraft draft) {
+        if (draft == null || draft.getDepositAmount() == null) {
+            return BigDecimal.ZERO;
+        }
+        return draft.getDepositAmount();
+    }
+
+    private String buildTrackingUrl(Order order) {
+        return trimTrailingSlash(resolveFrontendBaseUrl()) + "/track-order/" + trackingTokenService.createToken(order);
+    }
+
+    private String resolveFrontendBaseUrl() {
+        if (StringUtils.hasText(frontendBaseUrl)) {
+            return frontendBaseUrl.trim();
+        }
+
+        return "http://localhost:4200";
+    }
+
+    private String trimTrailingSlash(String value) {
+        String result = value;
+        while (result.endsWith("/")) {
+            result = result.substring(0, result.length() - 1);
+        }
+        return result;
+    }
+
+    private String formatMoney(BigDecimal amount) {
+        if (amount == null) {
+            return "--";
+        }
+        return amount.setScale(0, java.math.RoundingMode.HALF_UP).toPlainString() + " VND";
+    }
+
+    private String valueOrFallback(String value, String fallback) {
+        return StringUtils.hasText(value) ? value : fallback;
     }
 
     private boolean isSystemEcho(String mid, String text) {
@@ -332,5 +601,12 @@ public class MessengerWebhookService {
                 .replace('\u0111', 'd')
                 .replace('\u0110', 'D');
         return normalized.toLowerCase().trim().replaceAll("\\s+", " ");
+    }
+
+    private record PaymentSelection(
+            Order.PaymentMethod paymentMethod,
+            Payment.Purpose paymentPurpose,
+            String label
+    ) {
     }
 }

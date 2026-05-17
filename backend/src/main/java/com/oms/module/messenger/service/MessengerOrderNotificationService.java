@@ -49,11 +49,11 @@ public class MessengerOrderNotificationService {
     }
 
     private String buildConfirmedMessage(Order order, String trackingUrl) {
-        String typeLabel = order.getOrderType() == Order.OrderType.RENT ? "thue" : "mua";
+        String typeLabel = order.getOrderType() == Order.OrderType.RENT ? "thuê" : "mua";
         return """
-                Don hang %s cua ban da duoc shop xac nhan.
-                Loai don: %s
-                Theo doi trang thai don hang tai:
+                Đơn hàng %s của bạn đã được shop xác nhận.
+                Loại đơn: %s
+                Theo dõi trạng thái đơn hàng tại:
                 %s
                 """.formatted(order.getOrderCode(), typeLabel, trackingUrl).trim();
     }

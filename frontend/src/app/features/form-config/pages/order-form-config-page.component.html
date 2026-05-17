@@ -15,24 +15,7 @@
         (save)="saveConfiguration()"
       />
 
-      @if (businessMode() === 'BOTH') {
-        <div class="form-config-tabs">
-          <button
-            type="button"
-            [class.is-active]="activeTab() === 'SELL'"
-            (click)="setTab('SELL')"
-          >
-            Đơn bán
-          </button>
-          <button
-            type="button"
-            [class.is-active]="activeTab() === 'RENT'"
-            (click)="setTab('RENT')"
-          >
-            Đơn thuê
-          </button>
-        </div>
-      }
+
 
       @if (loading() && localFields().length === 0) {
         <section class="form-config-skeleton" aria-label="Đang tải cấu hình">

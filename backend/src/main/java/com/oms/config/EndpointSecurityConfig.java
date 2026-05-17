@@ -26,6 +26,8 @@ public final class EndpointSecurityConfig {
             "/api/auth/google",
             "/api/auth/refresh",
             "/api/auth/logout",
+            "/api/public/**",
+            "/api/payments/payos/webhook",
             "/api/orders/public",
             "/public/**",
             "/webhook"

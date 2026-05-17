@@ -48,4 +48,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.orderType = :orderType AND o.status NOT IN (:excludedStatuses)")
     long countOpenOrdersByType(@Param("shopId") Long shopId, @Param("orderType") Order.OrderType orderType, @Param("excludedStatuses") java.util.Collection<Order.OrderStatus> excludedStatuses);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.paymentStatus = :paymentStatus AND o.paymentMethod = :paymentMethod AND o.sourceMethod IN :sourceMethods AND o.paymentReminderSent = false AND o.createdAt <= :threshold")
+    java.util.List<Order> findOrdersPendingPaymentReminder(@Param("status") Order.OrderStatus status, @Param("paymentStatus") Order.PaymentStatus paymentStatus, @Param("paymentMethod") Order.PaymentMethod paymentMethod, @Param("sourceMethods") java.util.Collection<Order.SourceMethod> sourceMethods, @Param("threshold") java.time.LocalDateTime threshold);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.paymentStatus = :paymentStatus AND o.paymentMethod = :paymentMethod AND o.sourceMethod IN :sourceMethods AND o.createdAt <= :threshold")
+    java.util.List<Order> findOrdersPendingPaymentCancellation(@Param("status") Order.OrderStatus status, @Param("paymentStatus") Order.PaymentStatus paymentStatus, @Param("paymentMethod") Order.PaymentMethod paymentMethod, @Param("sourceMethods") java.util.Collection<Order.SourceMethod> sourceMethods, @Param("threshold") java.time.LocalDateTime threshold);
 }

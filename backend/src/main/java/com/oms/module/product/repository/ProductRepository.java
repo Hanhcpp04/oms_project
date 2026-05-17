@@ -21,6 +21,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     Optional<Product> findByIdAndShopId(Long id, Long shopId);
 
+    boolean existsByCategoryId(Long categoryId);
+
     @Query("SELECT DISTINCT p FROM Product p JOIN p.customAttributeValues attr " +
            "WHERE p.shop.id = :shopId AND p.isActive = true " +
            "AND LOWER(REPLACE(REPLACE(attr.valueJson, '\"', ''), ' ', '')) = LOWER(REPLACE(:productCode, ' ', ''))")

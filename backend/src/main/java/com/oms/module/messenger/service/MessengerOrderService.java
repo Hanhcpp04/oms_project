@@ -48,17 +48,22 @@ public class MessengerOrderService {
 
     @Transactional
     public Optional<Order> confirmLatestWaitingOrder(Conversation conversation) {
+        return confirmLatestWaitingOrder(conversation, null);
+    }
+
+    @Transactional
+    public Optional<Order> confirmLatestWaitingOrder(Conversation conversation, Order.PaymentMethod paymentMethod) {
         return orderDraftRepository.findTopByConversationIdAndStatusInOrderByCreatedAtDesc(
                         conversation.getId(),
                         OrderDraftService.CONFIRMABLE_DRAFT_STATUSES
                 )
                 .map(OrderDraft::getId)
-                .map(this::confirmDraftOrder);
+                .map(draftId -> confirmDraftOrder(draftId, paymentMethod));
     }
 
     @Transactional
     public Order confirmDraftManually(Long draftId) {
-        return confirmDraftOrder(draftId);
+        return confirmDraftOrder(draftId, null);
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +71,7 @@ public class MessengerOrderService {
         return messengerOrderRepository.findAll(pageable);
     }
 
-    private Order confirmDraftOrder(Long draftId) {
+    private Order confirmDraftOrder(Long draftId, Order.PaymentMethod paymentMethod) {
         OrderDraft draft = orderDraftRepository.findByIdForUpdate(draftId)
                 .orElseThrow(() -> new ResourceNotFoundException("OrderDraft", draftId));
 
@@ -102,7 +107,7 @@ public class MessengerOrderService {
 
         orderDraftService.validateDraftCanCreateOrder(draft);
 
-        Order savedOrder = orderService.createOrderEntity(shop.getId(), toOrderRequest(draft), null);
+        Order savedOrder = orderService.createOrderEntity(shop.getId(), toOrderRequest(draft, paymentMethod), null);
         savedOrder.setPaymentStatus(Order.PaymentStatus.UNPAID);
         savedOrder.setMessengerPageId(draft.getPageId());
         savedOrder.setMessengerCustomerPsid(draft.getCustomerPsid());
@@ -130,7 +135,7 @@ public class MessengerOrderService {
         return savedOrder;
     }
 
-    private OrderRequest toOrderRequest(OrderDraft draft) {
+    private OrderRequest toOrderRequest(OrderDraft draft, Order.PaymentMethod paymentMethod) {
         List<OrderDraftItem> draftItems = draft.getItems();
         if (draftItems == null || draftItems.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR,
@@ -146,6 +151,7 @@ public class MessengerOrderService {
         request.setSourceChannel("MESSENGER");
         request.setShippingFee(BigDecimal.ZERO);
         request.setSourceMethod(Order.SourceMethod.MESSENGER);
+        request.setPaymentMethod(paymentMethod);
         request.setRentFrom(draft.getRentFrom());
         request.setRentTo(draft.getRentTo());
         request.setDepositPaid(BigDecimal.ZERO);

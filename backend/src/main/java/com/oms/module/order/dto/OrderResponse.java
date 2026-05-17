@@ -1,6 +1,7 @@
 package com.oms.module.order.dto;
 
 import com.oms.module.order.entity.Order;
+import com.oms.module.payment.dto.PaymentCheckoutResponse;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,7 +11,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class OrderResponse {
 
     private Long id;
@@ -49,6 +50,8 @@ public class OrderResponse {
     private List<CustomFieldValueResponse> customFieldValues;
     private RentalInfo rentalInfo;
     private MessengerInfo messenger;
+    private PaymentCheckoutResponse payment;
+    private String trackingToken;
 
     @Getter
     @Builder
