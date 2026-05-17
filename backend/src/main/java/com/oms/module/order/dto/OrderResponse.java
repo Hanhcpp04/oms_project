@@ -17,6 +17,8 @@ public class OrderResponse {
     private String orderCode;
     private Order.OrderType orderType;
     private Order.OrderStatus status;
+    private String fulfillmentStatus;
+    private String source;
     private Order.PaymentStatus paymentStatus;
     private Order.PaymentMethod paymentMethod;
     private Order.SourceMethod sourceMethod;
@@ -35,6 +37,7 @@ public class OrderResponse {
 
     // Computed
     private BigDecimal totalAmount;
+    private BigDecimal depositAmount;
 
     private String createdByFullName;
     private String createdByUsername;
@@ -45,6 +48,7 @@ public class OrderResponse {
     private List<ItemResponse> items;
     private List<CustomFieldValueResponse> customFieldValues;
     private RentalInfo rentalInfo;
+    private MessengerInfo messenger;
 
     @Getter
     @Builder
@@ -85,5 +89,14 @@ public class OrderResponse {
         private BigDecimal depositPaid;
         private String returnStatus;
         private LocalDateTime returnedAt;
+    }
+
+    @Getter
+    @Builder
+    public static class MessengerInfo {
+        private String pageId;
+        private String customerPsid;
+        private Long conversationId;
+        private Long draftId;
     }
 }

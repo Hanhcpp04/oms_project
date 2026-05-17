@@ -11,6 +11,8 @@ import java.util.List;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
+    boolean existsByMid(String mid);
+
     List<Message> findByConversationIdOrderByMessageTimeAsc(Long conversationId);
 
     List<Message> findByConversationIdOrderByMessageTimeDesc(Long conversationId, Pageable pageable);

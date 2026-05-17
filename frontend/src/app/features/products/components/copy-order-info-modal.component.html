@@ -1,0 +1,244 @@
+@if (isOpen && product) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4"
+    (click)="onClose()"
+  >
+    <section
+      class="flex max-h-[92vh] w-full max-w-4xl flex-col overflow-hidden rounded-sm bg-white shadow-sm"
+      (click)="$event.stopPropagation()"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="copy-order-info-title"
+    >
+      <header class="flex items-start justify-between gap-4 border-b border-[#e5e7eb] px-5 py-4">
+        <div>
+          <h2 id="copy-order-info-title" class="m-0 text-lg font-bold text-[#111827]">
+            Copy thông tin tạo đơn
+          </h2>
+          <p class="m-0 mt-1 text-sm text-[#6b7280]">
+            Chọn đúng biến thể trong database để AI/webhook tạo draft chính xác.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="grid h-9 w-9 shrink-0 place-items-center rounded-sm text-[#6b7280] transition-colors hover:bg-[#f3f4f6] hover:text-[#111827]"
+          title="Đóng"
+          (click)="onClose()"
+        >
+          <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="grid gap-5 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div class="grid gap-5">
+          <div class="grid gap-4 rounded-sm border border-[#e5e7eb] p-4 sm:grid-cols-[112px_minmax(0,1fr)]">
+            <div class="aspect-square overflow-hidden rounded-sm bg-[#f3f4f6]">
+              @if (primaryImageUrl; as imageUrl) {
+                <img [src]="imageUrl" [alt]="product.name" class="h-full w-full object-cover" />
+              } @else {
+                <div class="grid h-full place-items-center text-[#9ca3af]">
+                  <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                    <rect x="3" y="4" width="18" height="16" rx="3" />
+                    <circle cx="8.5" cy="9.5" r="1.5" />
+                    <path d="m21 15-4.5-4.5L7 20" />
+                  </svg>
+                </div>
+              }
+            </div>
+            <div class="min-w-0">
+              <p class="m-0 text-xs font-semibold uppercase text-[#6b7280]">Product ID {{ product.id }}</p>
+              <h3 class="m-0 mt-1 text-base font-bold text-[#111827]">{{ product.name }}</h3>
+              <p class="m-0 mt-2 text-sm text-[#6b7280]">
+                Mã sản phẩm: {{ productCode || '--' }}
+              </p>
+              <p class="m-0 mt-1 text-sm text-[#6b7280]">
+                {{ product.variants.length }} biến thể · {{ product.category || 'Chưa phân loại' }}
+              </p>
+            </div>
+          </div>
+
+          <div class="grid gap-4">
+            <label class="grid gap-2">
+              <span class="text-sm font-semibold text-[#111827]">Biến thể / SKU</span>
+              <select
+                class="h-11 w-full rounded-sm border border-[#d1d5db] bg-white px-3 text-sm text-[#111827] outline-none transition-colors focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                [(ngModel)]="selectedVariantId"
+                (ngModelChange)="onVariantChange()"
+              >
+                @for (variant of product.variants; track variant.id) {
+                  <option [value]="variant.id">{{ variantLabel(variant) }}</option>
+                }
+              </select>
+            </label>
+
+            @if (selectedVariant; as variant) {
+              <div class="grid gap-3 rounded-sm bg-[#f8fafc] p-4 sm:grid-cols-2">
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Variant ID</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ variant.id }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">SKU</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ variant.sku || '--' }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Size</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ variant.size || '--' }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Màu</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ variant.color || '--' }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Tồn kho</p>
+                  <p class="m-0 mt-1 text-sm font-bold" [ngClass]="variant.stockQty <= 0 ? 'text-red-700' : 'text-[#111827]'">
+                    {{ variant.stockQty }}
+                  </p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Giá DB</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">
+                    {{ orderType === 'SELL' ? formatCurrency(variant.priceSell) : formatCurrency(variant.priceRentPerDay) }}
+                  </p>
+                </div>
+              </div>
+
+              @if (variant.stockQty <= 0) {
+                <div class="rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+                  Biến thể này đang hết hàng. Kiểm tra lại tồn kho trước khi gửi cho khách.
+                </div>
+              }
+            }
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="grid gap-2">
+              <span class="text-sm font-semibold text-[#111827]">Loại đơn</span>
+              <div class="grid grid-cols-2 gap-2 rounded-sm bg-[#f3f4f6] p-1">
+                <button
+                  type="button"
+                  class="h-10 rounded-sm text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  [disabled]="!supportsSell"
+                  [ngClass]="orderType === 'SELL' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6b7280] hover:text-[#111827]'"
+                  (click)="selectOrderType('SELL')"
+                >
+                  Bán
+                </button>
+                <button
+                  type="button"
+                  class="h-10 rounded-sm text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+                  [disabled]="!supportsRent"
+                  [ngClass]="orderType === 'RENT' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6b7280] hover:text-[#111827]'"
+                  (click)="selectOrderType('RENT')"
+                >
+                  Thuê
+                </button>
+              </div>
+            </div>
+
+            <label class="grid gap-2">
+              <span class="text-sm font-semibold text-[#111827]">Số lượng</span>
+              <input
+                type="number"
+                min="1"
+                class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                [(ngModel)]="quantity"
+              />
+            </label>
+          </div>
+
+          @if (orderType === 'SELL') {
+            <label class="grid gap-2">
+              <span class="text-sm font-semibold text-[#111827]">Đơn giá</span>
+              <input
+                type="text"
+                inputmode="numeric"
+                readonly
+                class="h-11 rounded-sm border border-[#d1d5db] bg-[#f9fafb] px-3 text-sm text-[#111827] outline-none"
+                [value]="formatCurrencyInput(unitPrice)"
+              />
+            </label>
+          } @else {
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-[#111827]">Số ngày thuê</span>
+                <input
+                  type="number"
+                  min="1"
+                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                  [(ngModel)]="rentalDays"
+                />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-[#111827]">Ngày nhận</span>
+                <input
+                  type="date"
+                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                  [(ngModel)]="deliveryDate"
+                />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-[#111827]">Tiền cọc</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                  [value]="formatCurrencyInput(depositAmount)"
+                  (input)="setMoneyField('depositAmount', $any($event.target).value)"
+                />
+              </label>
+              <label class="grid gap-2">
+                <span class="text-sm font-semibold text-[#111827]">Giá thuê</span>
+                <input
+                  type="text"
+                  inputmode="numeric"
+                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
+                  [value]="formatCurrencyInput(rentalPrice)"
+                  (input)="setMoneyField('rentalPrice', $any($event.target).value)"
+                />
+              </label>
+            </div>
+          }
+
+          @if (validationMessage; as message) {
+            <div class="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+              {{ message }}
+            </div>
+          }
+        </div>
+
+        <aside class="flex min-h-0 flex-col gap-3">
+          <div class="rounded-sm border border-[#e5e7eb] bg-[#111827] p-4 text-white">
+            <p class="m-0 text-sm font-semibold">Text sẽ copy</p>
+            <pre class="mt-3 max-h-[520px] overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-white/90">{{ copyPreview }}</pre>
+          </div>
+        </aside>
+      </div>
+
+      <footer class="flex flex-col-reverse gap-3 border-t border-[#e5e7eb] px-5 py-4 sm:flex-row sm:justify-end">
+        <button
+          type="button"
+          class="inline-flex h-11 items-center justify-center rounded-sm border border-[#d1d5db] bg-white px-4 text-sm font-semibold text-[#111827] transition-colors hover:border-[#111827] hover:bg-[#f9fafb]"
+          (click)="onClose()"
+        >
+          Đóng
+        </button>
+        <button
+          type="button"
+          class="inline-flex h-11 items-center justify-center gap-2 rounded-sm bg-[#111827] px-5 text-sm font-semibold text-white transition-colors hover:bg-black disabled:cursor-not-allowed disabled:opacity-45"
+          [disabled]="!!validationMessage"
+          (click)="copy()"
+        >
+          <svg class="h-4.5 w-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+          Copy
+        </button>
+      </footer>
+    </section>
+  </div>
+}

@@ -2,9 +2,13 @@ package com.oms.module.messenger.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.oms.common.exception.BusinessException;
 import com.oms.module.messenger.entity.Conversation;
-import com.oms.module.messenger.entity.MessengerOrder;
+import com.oms.module.messenger.entity.Message;
+import com.oms.module.messenger.entity.OrderDraft;
 import com.oms.module.messenger.enums.MessageSenderType;
+import com.oms.module.order.entity.Order;
+import com.oms.module.shop.entity.Shop;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -23,15 +27,16 @@ import java.util.Optional;
 public class MessengerWebhookService {
 
     private static final String CUSTOMER_CONFIRM_REPLY =
-            "Cảm ơn bạn, đơn hàng của bạn đã được xác nhận. Shop sẽ xử lý đơn sớm ạ.";
-    private static final String INTERNAL_CREATE_DRAFT_COMMAND = "tao don msg";
-
+            "Cảm ơn bạn. Đơn hàng %s đã được tạo và đang chờ nhân viên duyệt. Shop sẽ xử lý đơn hàng sớm nhất có thể.";
+    private static final String CUSTOMER_CANCEL_REPLY =
+            "Shop đã hủy đơn tạm của bạn.";
     private final ObjectMapper objectMapper;
     private final ConversationService conversationService;
     private final MessageService messageService;
     private final OrderDraftService orderDraftService;
     private final MessengerOrderService messengerOrderService;
     private final MessengerSendService messengerSendService;
+    private final MessengerPageResolver messengerPageResolver;
 
     @Transactional
     public void handleWebhook(String body) {
@@ -68,78 +73,199 @@ public class MessengerWebhookService {
         String pageId = echo
                 ? textValue(event.path("sender").path("id"))
                 : textValue(event.path("recipient").path("id"));
-        String conversationSenderId = echo
+        String customerPsid = echo
                 ? textValue(event.path("recipient").path("id"))
                 : textValue(event.path("sender").path("id"));
-        String actualSenderId = echo
-                ? textValue(event.path("sender").path("id"))
-                : textValue(event.path("sender").path("id"));
+        String actualSenderId = textValue(event.path("sender").path("id"));
 
-        if (!StringUtils.hasText(pageId) || !StringUtils.hasText(conversationSenderId)) {
-            log.warn("Messenger message ignored because pageId or senderId is missing. event={}", event);
+        if (!StringUtils.hasText(pageId) || !StringUtils.hasText(customerPsid)) {
+            log.warn("Messenger message ignored because pageId or customerPsid is missing. event={}", event);
             return;
         }
 
         String text = textValue(messageNode.path("text"));
-        LocalDateTime messageTime = parseMessageTime(event.path("timestamp").asLong(0));
-        Conversation conversation = conversationService.getOrCreateFacebookConversation(pageId, conversationSenderId);
-        MessageSenderType senderType = echo ? MessageSenderType.STAFF : MessageSenderType.CUSTOMER;
+        String mid = textValue(messageNode.path("mid"));
+        boolean systemEcho = echo && isSystemEcho(mid, text);
+        MessageSenderType senderType = systemEcho
+                ? MessageSenderType.SYSTEM
+                : echo ? MessageSenderType.STAFF : MessageSenderType.CUSTOMER;
 
-        messageService.saveMessage(
+        LocalDateTime messageTime = parseMessageTime(event.path("timestamp").asLong(0));
+        Conversation conversation = conversationService.getOrCreateFacebookConversation(pageId, customerPsid);
+
+        Optional<Message> savedMessage = messageService.saveMessage(
                 conversation,
                 senderType,
-                StringUtils.hasText(actualSenderId) ? actualSenderId : conversationSenderId,
+                StringUtils.hasText(actualSenderId) ? actualSenderId : customerPsid,
+                mid,
+                echo,
                 text,
                 rawPayload,
                 messageTime
         );
+        if (savedMessage.isEmpty()) {
+            return;
+        }
 
-        handleTextCommand(conversation, senderType, text);
+        handleTextCommand(conversation, savedMessage.get(), senderType, text);
     }
 
-    private void handleTextCommand(Conversation conversation, MessageSenderType senderType, String text) {
-        if (!StringUtils.hasText(text)) {
+    private void handleTextCommand(
+            Conversation conversation,
+            Message message,
+            MessageSenderType senderType,
+            String text
+    ) {
+        if (!StringUtils.hasText(text) || senderType == MessageSenderType.SYSTEM) {
             return;
         }
 
         String normalized = normalize(text.trim());
         if (senderType == MessageSenderType.CUSTOMER) {
-            if (isConfirmCommand(normalized)) {
-                Optional<MessengerOrder> confirmedOrder = messengerOrderService.confirmLatestWaitingOrder(conversation);
-                if (confirmedOrder.isPresent()) {
-                    messengerSendService.sendMessage(conversation.getPageId(), conversation.getSenderId(), CUSTOMER_CONFIRM_REPLY);
-                } else {
-                    log.info("Customer confirm ignored because no WAITING_CONFIRM draft exists. conversationId={}",
-                            conversation.getId());
-                }
+            handleCustomerMessage(conversation, normalized, text);
+            return;
+        }
+
+        if (senderType == MessageSenderType.STAFF) {
+            if (!isOmsOrderCopyBlock(normalized)) {
                 return;
             }
 
-            if (isUpdateCommand(normalized)) {
-                orderDraftService.applyCustomerUpdate(conversation, stripUpdatePrefix(text));
+            Optional<Shop> shop = messengerPageResolver.resolveShop(conversation.getPageId());
+            if (shop.isEmpty()) {
+                log.warn("OMS order copy block ignored because page is not linked to a shop. pageId={}, conversationId={}",
+                        conversation.getPageId(), conversation.getId());
                 return;
             }
+            try {
+                orderDraftService.createOrderDraftFromSellerMessage(conversation, message, shop.get());
+            } catch (BusinessException ex) {
+                log.info("OMS order copy block rejected. conversationId={}, reason={}",
+                        conversation.getId(), ex.getMessage());
+                messengerSendService.sendSystemMessage(
+                        conversation.getPageId(),
+                        conversation.getSenderId(),
+                        "Shop chưa thể tạo đơn tạm: " + ex.getMessage()
+                );
+            }
+        }
+    }
+
+    private void handleCustomerMessage(Conversation conversation, String normalized, String originalText) {
+        if (isCancelCommand(normalized)) {
+            orderDraftService.findLatestActiveDraft(conversation.getId())
+                    .ifPresent(draft -> {
+                        orderDraftService.cancel(draft.getId());
+                        messengerSendService.sendSystemMessage(
+                                conversation.getPageId(),
+                                conversation.getSenderId(),
+                                CUSTOMER_CANCEL_REPLY
+                        );
+                    });
+            return;
         }
 
-        if (senderType == MessageSenderType.STAFF && INTERNAL_CREATE_DRAFT_COMMAND.equals(normalized)) {
-            orderDraftService.createOrderDraftFromConversation(conversation.getId());
+        if (isConfirmCommand(normalized)) {
+            confirmCustomerDraft(conversation);
+            return;
         }
+
+        Optional<OrderDraft> activeDraft = orderDraftService.findLatestActiveDraft(conversation.getId());
+        if (activeDraft.isPresent()
+                && orderDraftService.canReceiveCustomerUpdates(activeDraft.get())
+                && shouldTreatAsDraftUpdate(normalized, activeDraft.get())) {
+            orderDraftService.applyCustomerUpdate(conversation, stripUpdatePrefix(originalText),
+                    activeDraft.get().getShop() != null ? activeDraft.get().getShop().getId() : null);
+        }
+    }
+
+    private void confirmCustomerDraft(Conversation conversation) {
+        Optional<OrderDraft> activeDraft = orderDraftService.findLatestActiveDraft(conversation.getId());
+        if (activeDraft.isEmpty()) {
+            log.info("Customer confirm ignored because no active draft exists. conversationId={}", conversation.getId());
+            return;
+        }
+
+        OrderDraft draft = activeDraft.get();
+        var missingFields = orderDraftService.findBlockingMissingFields(draft);
+        if (!missingFields.isEmpty()) {
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    orderDraftService.buildConfirmMessage(draft)
+            );
+            log.info("Customer confirm deferred because draft is missing required fields. conversationId={}, draftId={}, missingFields={}",
+                    conversation.getId(), draft.getId(), missingFields);
+            return;
+        }
+
+        try {
+            Optional<Order> confirmedOrder = messengerOrderService.confirmLatestWaitingOrder(conversation);
+            if (confirmedOrder.isPresent()) {
+                messengerSendService.sendSystemMessage(
+                        conversation.getPageId(),
+                        conversation.getSenderId(),
+                        CUSTOMER_CONFIRM_REPLY.formatted(confirmedOrder.get().getOrderCode())
+                );
+            }
+        } catch (BusinessException ex) {
+            log.info("Customer confirm rejected. conversationId={}, reason={}", conversation.getId(), ex.getMessage());
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    orderDraftService.buildConfirmMessage(draft)
+            );
+        }
+    }
+
+    private boolean isSystemEcho(String mid, String text) {
+        return messengerSendService.isSystemMessageId(mid) || messengerSendService.hasSystemPrefix(text);
+    }
+
+    private boolean isOmsOrderCopyBlock(String normalizedText) {
+        boolean hasOmsHeader = normalizedText.contains("tao don messenger tu oms")
+                || normalizedText.contains("tao don tu oms")
+                || normalizedText.contains("tao don cho khach");
+        return hasOmsHeader
+                && normalizedText.contains("product id")
+                && normalizedText.contains("variant id")
+                && normalizedText.contains("so luong")
+                && normalizedText.contains("loai don");
     }
 
     private boolean isConfirmCommand(String normalizedText) {
-        return "xac nhan".equals(normalizedText) || "xac nhan don hang".equals(normalizedText);
+        return "xac nhan".equals(normalizedText)
+                || "xac nhan don".equals(normalizedText)
+                || "xac nhan don hang".equals(normalizedText)
+                || "ok".equals(normalizedText)
+                || "dong y".equals(normalizedText)
+                || "chot".equals(normalizedText)
+                || "chot don".equals(normalizedText);
     }
 
-    private boolean isUpdateCommand(String normalizedText) {
-        return normalizedText.startsWith("cap nhat lai");
+    private boolean isCancelCommand(String normalizedText) {
+        return "huy".equals(normalizedText)
+                || "huy don".equals(normalizedText)
+                || "huy don tam".equals(normalizedText)
+                || "cancel".equals(normalizedText);
+    }
+
+    private boolean shouldTreatAsDraftUpdate(String normalizedText, OrderDraft draft) {
+        return draft.getStatus() == com.oms.module.messenger.enums.OrderDraftStatus.NEED_MORE_INFO
+                || normalizedText.startsWith("sua")
+                || normalizedText.startsWith("cap nhat")
+                || normalizedText.startsWith("doi")
+                || normalizedText.contains("dia chi")
+                || normalizedText.contains("sdt")
+                || normalizedText.contains("so dien thoai");
     }
 
     private String stripUpdatePrefix(String text) {
         int colonIndex = text.indexOf(':');
-        if (colonIndex < 0 || colonIndex == text.length() - 1) {
-            return text.trim();
+        if (colonIndex >= 0 && colonIndex < text.length() - 1) {
+            return text.substring(colonIndex + 1).trim();
         }
-        return text.substring(colonIndex + 1).trim();
+        return text.trim();
     }
 
     private LocalDateTime parseMessageTime(long timestamp) {
@@ -159,8 +285,8 @@ public class MessengerWebhookService {
     private String normalize(String value) {
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
-                .replace('đ', 'd')
-                .replace('Đ', 'D');
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D');
         return normalized.toLowerCase().trim().replaceAll("\\s+", " ");
     }
 }

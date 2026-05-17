@@ -1,6 +1,8 @@
 package com.oms.module.order.controller;
 
 import com.oms.common.dto.ApiResponse;
+import com.oms.common.exception.BusinessException;
+import com.oms.common.exception.ErrorCode;
 import com.oms.common.exception.ResourceNotFoundException;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
@@ -63,13 +65,18 @@ public class PublicOrderFormController {
 
         Shop shop = shopRepository.findBySlug(shopSlug)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop", "slug", shopSlug));
+        rejectIfStorefrontUnavailable(shop);
 
         List<ProductResponse> products = productService.getActiveProductsForPublicForm(shop.getId());
 
         Map<String, Object> formConfig = new HashMap<>();
         formConfig.put("shopName", shop.getName());
         formConfig.put("shopSlug", shop.getSlug());
-        formConfig.put("businessMode", shop.getBusinessMode());
+        formConfig.put("logoUrl", shop.getLogoUrl());
+        formConfig.put("shopPhone", shop.getSupportPhone() != null ? shop.getSupportPhone() : shop.getPhone());
+        formConfig.put("shopEmail", shop.getSupportEmail() != null ? shop.getSupportEmail() : shop.getEmail());
+        formConfig.put("businessMode", resolveBusinessMode(shop));
+        formConfig.put("showInventoryOnStorefront", Boolean.TRUE.equals(shop.getShowInventoryOnStorefront()));
         formConfig.put("products", products);
         formConfig.put("sellConfig", orderFormConfigService.getOrCreateConfig(shop.getId(), ProductType.SELL));
         formConfig.put("rentConfig", orderFormConfigService.getOrCreateConfig(shop.getId(), ProductType.RENT));
@@ -113,11 +120,33 @@ public class PublicOrderFormController {
 
         Shop shop = shopRepository.findBySlug(shopSlug)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop", "slug", shopSlug));
+        rejectIfStorefrontUnavailable(shop);
 
         // Force source method = PUBLIC_FORM so service sets PENDING status
         request.setSourceMethod(Order.SourceMethod.PUBLIC_FORM);
 
         OrderResponse result = orderService.createOrder(shop.getId(), request, null);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(result));
+    }
+
+    private void rejectIfStorefrontUnavailable(Shop shop) {
+        if (shop.getStatus() != Shop.ShopStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.SHOP_SUSPENDED, "Shop is not active");
+        }
+
+        if (Boolean.TRUE.equals(shop.getMaintenanceMode())) {
+            throw new BusinessException(ErrorCode.SHOP_MAINTENANCE, "Shop is currently in maintenance mode");
+        }
+    }
+
+    private String resolveBusinessMode(Shop shop) {
+        boolean enableSell = Boolean.TRUE.equals(shop.getEnableSell());
+        boolean enableRent = Boolean.TRUE.equals(shop.getEnableRent());
+
+        if (enableSell && enableRent) {
+            return "BOTH";
+        }
+
+        return enableSell ? "SELL" : "RENT";
     }
 }

@@ -1,5 +1,5 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
-import { CreateOrderInput, Order, OrderStatus, OrderType, OrdersQuery } from '../data-access/models/order.model';
+import { inject, Injectable, signal } from '@angular/core';
+import { CreateOrderInput, Order, OrderStatus, OrderType, OrdersQuery, UpdateOrderInput } from '../data-access/models/order.model';
 import { OrdersApiService } from '../data-access/orders-api.service';
 
 @Injectable({ providedIn: 'root' })
@@ -66,14 +66,77 @@ export class OrdersStore {
       this.loadingState.set(true);
       this.api.updateStatus(orderId, status).subscribe({
         next: (updatedOrder) => {
-          // Update order in list
-          this.ordersState.update(orders => 
-            orders.map(o => o.id === orderId ? updatedOrder : o)
-          );
-          // Update selected order if it's the current one
-          if (this.selectedOrderState()?.id === orderId) {
-            this.selectedOrderState.set(updatedOrder);
-          }
+          this.syncOrder(updatedOrder);
+          this.loadingState.set(false);
+          resolve(updatedOrder);
+        },
+        error: (err) => {
+          this.loadingState.set(false);
+          reject(err);
+        }
+      });
+    });
+  }
+
+  confirmOrder(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.confirm(id));
+  }
+
+  markPacking(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markPacking(id));
+  }
+
+  markShipped(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markShipped(id));
+  }
+
+  markDone(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markDone(id));
+  }
+
+  markDeposited(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markDeposited(id));
+  }
+
+  markRenting(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markRenting(id));
+  }
+
+  markOverdue(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markOverdue(id));
+  }
+
+  markReturned(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.markReturned(id));
+  }
+
+  cancelOrder(orderId: string): Promise<Order> {
+    return this.invokeStatusAction(orderId, (id) => this.api.cancel(id));
+  }
+
+  updateOrder(orderId: string, input: UpdateOrderInput): Promise<Order> {
+    return new Promise((resolve, reject) => {
+      this.loadingState.set(true);
+      this.api.update(orderId, input).subscribe({
+        next: (updatedOrder) => {
+          this.syncOrder(updatedOrder);
+          this.loadingState.set(false);
+          resolve(updatedOrder);
+        },
+        error: (err) => {
+          this.loadingState.set(false);
+          reject(err);
+        }
+      });
+    });
+  }
+
+  updatePayment(orderId: string, input: { paymentStatus?: Order['paymentStatus']; paymentMethod?: Order['paymentMethod'] }): Promise<Order> {
+    return new Promise((resolve, reject) => {
+      this.loadingState.set(true);
+      this.api.updatePayment(orderId, input).subscribe({
+        next: (updatedOrder) => {
+          this.syncOrder(updatedOrder);
           this.loadingState.set(false);
           resolve(updatedOrder);
         },
@@ -87,6 +150,30 @@ export class OrdersStore {
 
   refresh(): void {
     this.loadOrders(this.queryState());
+  }
+
+  private invokeStatusAction(orderId: string, action: (id: string) => import('rxjs').Observable<Order>): Promise<Order> {
+    return new Promise((resolve, reject) => {
+      this.loadingState.set(true);
+      action(orderId).subscribe({
+        next: (updatedOrder) => {
+          this.syncOrder(updatedOrder);
+          this.loadingState.set(false);
+          resolve(updatedOrder);
+        },
+        error: (err) => {
+          this.loadingState.set(false);
+          reject(err);
+        }
+      });
+    });
+  }
+
+  private syncOrder(updatedOrder: Order): void {
+    this.ordersState.update((orders) => orders.map((order) => (order.id === updatedOrder.id ? updatedOrder : order)));
+    if (this.selectedOrderState()?.id === updatedOrder.id) {
+      this.selectedOrderState.set(updatedOrder);
+    }
   }
 }
 

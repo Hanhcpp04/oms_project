@@ -211,6 +211,41 @@ export class ProductsStore {
     });
   }
 
+  restoreProduct(product: Product, callback?: (restored: Product) => void): void {
+    const applyRestoredProduct = (restoredProduct: Product): void => {
+      this.localProductsState.update((products) => {
+        const exists = products.some((item) => item.id === restoredProduct.id);
+        if (!exists) {
+          return [restoredProduct, ...products];
+        }
+
+        return products.map((item) => (item.id === restoredProduct.id ? restoredProduct : item));
+      });
+
+      this.productsState.update((products) => {
+        const exists = products.some((item) => item.id === restoredProduct.id);
+        if (!exists) {
+          return [restoredProduct, ...products];
+        }
+
+        return products.map((item) => (item.id === restoredProduct.id ? restoredProduct : item));
+      });
+
+      this.selectedProductState.set(restoredProduct);
+    };
+
+    this.productsApiService.restore(product.id).subscribe({
+      next: (restoredProduct) => {
+        applyRestoredProduct(restoredProduct);
+        this.notificationService.success(`Đã hiển thị lại sản phẩm ${restoredProduct.name}.`);
+        callback?.(restoredProduct);
+      },
+      error: () => {
+        this.notificationService.error('Khôi phục sản phẩm thất bại. Vui lòng thử lại.');
+      }
+    });
+  }
+
   selectProduct(product: Product | null): void {
     this.selectedProductState.set(product);
   }

@@ -1,16 +1,16 @@
 ﻿<app-page-title [title]="getTitle()" [description]="getDescription()"
   [actionLabel]="onboardingFlow() ? getSaveActionLabel() : ''" (action)="onboardingFlow() ? saveSettings() : null" />
 
-<section class="grid gap-8"
+<section class="grid gap-5"
   [ngClass]="settingView() === 'profile' && !onboardingFlow() ? 'lg:grid-cols-[1.2fr_1fr]' : 'lg:grid-cols-1'">
   <!-- PROFILE VIEW -->
   @if (settingView() === 'profile') {
   <app-ui-card>
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-4">
       <!-- Avatar Section -->
       <div class="flex items-center gap-5">
         <div
-          class="relative h-20 w-20 shrink-0 overflow-hidden rounded-full border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+          class="relative h-20 w-20 shrink-0 overflow-hidden rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
           @if (logoUrl()) {
           <img [src]="logoUrl()" alt="Shop Avatar" class="h-full w-full object-cover" />
           } @else {
@@ -98,7 +98,7 @@
         <div class="grid gap-3">
           @for (addr of shopAddresses(); track addr.id) {
           <div
-            class="flex items-start justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] p-3 transition hover:border-[var(--color-accent)]/30">
+            class="flex items-start justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] p-3 transition hover:border-[var(--color-accent)]/30">
             <div class="flex gap-3 flex-1">
               <div class="mt-0.5 text-lg text-[var(--color-text-tertiary)]">📍</div>
               <div class="flex-1">
@@ -145,9 +145,9 @@
     <div class="mt-5 flex gap-2">
       <input type="text" [value]="newCategoryName" (input)="newCategoryName = $any($event.target).value"
         (keyup.enter)="addCategory()" placeholder="Tên danh mục mới"
-        class="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--color-accent)]" />
+        class="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm outline-none transition focus:border-[var(--color-accent)]" />
       <button (click)="addCategory()"
-        class="flex h-[38px] shrink-0 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
+        class="flex h-[38px] shrink-0 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
         Thêm
       </button>
     </div>
@@ -156,7 +156,7 @@
     <div class="mt-5 grid gap-1.5">
       @for (cat of categories(); track $index) {
       <div
-        class="flex items-center gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+        class="flex items-center gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
         @if (editingCategoryIndex === $index) {
         <input type="text" [value]="editingCategoryName" (input)="editingCategoryName = $any($event.target).value"
           (keyup.enter)="confirmEditCategory($index)" (keyup.escape)="cancelEditCategory()"
@@ -185,7 +185,7 @@
       }
     </div>
     } @else {
-    <div class="mt-5 rounded-[var(--radius-md)] border border-dashed border-[var(--color-border)] py-8 text-center">
+    <div class="mt-5 rounded-[var(--radius-sm)] border border-dashed border-[var(--color-border)] py-8 text-center">
       <p class="m-0 text-sm text-[var(--color-text-tertiary)]">Chưa có danh mục nào. Hãy thêm danh mục đầu tiên.</p>
     </div>
     }
@@ -199,7 +199,7 @@
       <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Quản lý nhân viên</h3>
       @if (staffSubView() === 'management') {
       <button
-        class="flex h-8 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--color-accent-hover)]"
+        class="flex h-8 items-center gap-1.5 rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 text-xs font-semibold text-white transition hover:bg-[var(--color-accent-hover)]"
         (click)="openAddEmployeeModal()">
         + Thêm NV
       </button>
@@ -209,7 +209,7 @@
     <div class="mt-3 flex flex-wrap gap-1.5">
       @for (tab of staffSubViewTabs; track tab.value) {
       <button
-        class="inline-flex h-8 items-center rounded-[var(--radius-md)] px-3 text-xs font-semibold transition-all duration-150"
+        class="inline-flex h-8 items-center rounded-[var(--radius-sm)] px-3 text-xs font-semibold transition-all duration-150"
         [ngClass]="{
           'bg-[var(--color-accent)] text-white shadow-sm': staffSubView() === tab.value,
           'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]': staffSubView() !== tab.value
@@ -224,11 +224,11 @@
     <div class="mt-3 grid gap-2">
       @for (emp of employees; track emp.id) {
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-accent)]/30"
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 transition hover:border-[var(--color-accent)]/30"
         (dblclick)="openEmployeeDetail(emp, $event)">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[var(--radius-xs)] text-sm font-bold text-white"
               [class]="emp.active ? 'bg-emerald-500' : 'bg-gray-400'">
               {{ emp.name.charAt(0) }}
             </div>
@@ -236,7 +236,7 @@
               <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ emp.name }}</p>
               <div class="mt-0.5 flex items-center gap-2">
                 <span class="text-[10px] text-[var(--color-text-tertiary)]">{{ emp.role }}</span>
-                <span class="h-1 w-1 rounded-full bg-[var(--color-border)]"></span>
+                <span class="h-1 w-1 rounded-[var(--radius-xs)] bg-[var(--color-border)]"></span>
                 <span class="text-[10px] font-medium text-[var(--color-accent)]">{{ emp.username }}</span>
               </div>
             </div>
@@ -322,7 +322,7 @@
     }
 
     @if (staffSubView() === 'schedule') {
-    <div class="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
+    <div class="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h4 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Lịch phân ca
@@ -333,7 +333,7 @@
         <div class="flex flex-wrap gap-1.5">
           @for (mode of scheduleModeTabs; track mode.value) {
           <button
-            class="inline-flex h-8 items-center rounded-[var(--radius-md)] px-3 text-xs font-semibold transition-all duration-150"
+            class="inline-flex h-8 items-center rounded-[var(--radius-sm)] px-3 text-xs font-semibold transition-all duration-150"
             [ngClass]="{
               'bg-[var(--color-accent)] text-white shadow-sm': scheduleViewMode() === mode.value,
               'border border-[var(--color-border)] bg-white text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]': scheduleViewMode() !== mode.value
@@ -345,7 +345,7 @@
       </div>
 
       <div
-        class="mt-3 flex flex-wrap items-end gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white p-2.5">
+        class="mt-3 flex flex-wrap items-end gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-white p-2.5">
         <div class="grid gap-1">
           <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngày
             xem</label>
@@ -373,9 +373,9 @@
         <div class="flex min-w-max gap-2">
           @for (day of dayStaffBuckets; track day.key) {
           <div #dayCard
-            class="flex w-56 shrink-0 flex-col rounded-[var(--radius-md)] border border-[var(--color-border)] bg-white p-2.5 transition"
+            class="flex w-56 shrink-0 flex-col rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-white p-2.5 transition"
             [ngClass]="{
-              'ring-2 ring-[var(--color-accent)]/40 shadow-md': day.isFocused,
+              'ring-2 ring-[var(--color-accent)]/40 shadow-sm': day.isFocused,
               'hover:border-[var(--color-accent)]/30': !day.isFocused
             }">
             <div class="flex items-center justify-between">
@@ -403,7 +403,7 @@
 
             <div class="mt-2 grid gap-1.5">
               @for (shift of getShiftsForDate(day.key); track shift.id) {
-              <div class="rounded-md bg-[var(--color-accent-soft)] px-2 py-1.5 border border-[var(--color-accent)]/20">
+              <div class="rounded-sm bg-[var(--color-accent-soft)] px-2 py-1.5 border border-[var(--color-accent)]/20">
                 <div class="flex items-center justify-between">
                   <p class="m-0 text-[10px] font-bold text-[var(--color-accent)]">{{ shift.startTime }} - {{
                     shift.endTime }}</p>
@@ -417,7 +417,7 @@
                   }
                   @for (member of shift.assignedStaff; track member.id) {
                   <span
-                    class="inline-flex h-4 items-center rounded-full bg-white/80 px-1.5 text-[9px] font-semibold text-[var(--color-text-primary)]">{{
+                    class="inline-flex h-4 items-center rounded-[var(--radius-xs)] bg-white/80 px-1.5 text-[9px] font-semibold text-[var(--color-text-primary)]">{{
                     member.fullName }}</span>
                   }
                 </div>
@@ -433,7 +433,7 @@
       }
 
       @if (scheduleViewMode() === 'month') {
-      <div class="mt-3 rounded-[var(--radius-md)] border border-[var(--color-border)] p-2.5 sm:p-3">
+      <div class="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] p-2.5 sm:p-3">
         <div class="mb-2 flex items-center justify-between">
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ monthTitle }}</p>
           <p class="m-0 text-[11px] text-[var(--color-text-tertiary)]">Lịch tổng quan nhân sự</p>
@@ -449,7 +449,7 @@
         <div class="mt-1 grid grid-cols-7 gap-1.5">
           @for (day of monthCalendarDays; track day.isoDate) {
           <div
-            class="relative flex min-h-[130px] flex-col rounded-[var(--radius-md)] border px-2 py-2 cursor-pointer transition hover:shadow-sm group"
+            class="relative flex min-h-[130px] flex-col rounded-[var(--radius-sm)] border px-2 py-2 cursor-pointer transition hover:shadow-sm group"
             [ngClass]="{
               'border-[var(--color-border)] bg-[var(--color-surface)]': day.isCurrentMonth,
               'border-[var(--color-border)]/60 bg-[var(--color-surface-hover)] opacity-60': !day.isCurrentMonth,
@@ -510,7 +510,7 @@
     <p class="m-0 mt-1 text-xs text-[var(--color-text-tertiary)]">Chọn loại hình kinh doanh phù hợp với shop của bạn.
       Cần bật ít nhất một chế độ.</p>
     <div class="mt-5 grid gap-3">
-      <div class="flex items-center justify-between rounded-[var(--radius-md)] border px-4 py-3.5 transition"
+      <div class="flex items-center justify-between rounded-[var(--radius-sm)] border px-4 py-3.5 transition"
         [ngClass]="enableSell() ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent)]/3' : 'border-[var(--color-border)]'">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Bán hàng</p>
@@ -519,7 +519,7 @@
         <app-ui-toggle [checked]="enableSell()" ariaLabel="Bật chế độ bán hàng"
           (toggled)="toggleSellCapability($event)" />
       </div>
-      <div class="flex items-center justify-between rounded-[var(--radius-md)] border px-4 py-3.5 transition"
+      <div class="flex items-center justify-between rounded-[var(--radius-sm)] border px-4 py-3.5 transition"
         [ngClass]="enableRent() ? 'border-[var(--color-accent)]/40 bg-[var(--color-accent)]/3' : 'border-[var(--color-border)]'">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Cho thuê</p>
@@ -549,7 +549,7 @@
         <div class="mt-2 grid gap-2">
           @for (form of forms; track form) {
           <div
-            class="flex items-center justify-between rounded-[var(--radius-md)] border px-3 py-3 transition cursor-pointer"
+            class="flex items-center justify-between rounded-[var(--radius-sm)] border px-3 py-3 transition cursor-pointer"
             [ngClass]="{
               'border-[var(--color-accent)] bg-[var(--color-accent)]/5': selectedFormTemplate === form,
               'border-[var(--color-border)] bg-[var(--color-surface)] hover:border-[var(--color-accent)]/50': selectedFormTemplate !== form
@@ -573,15 +573,15 @@
 
       <!-- Create custom form -->
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
         <h4 class="m-0 text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Tạo form mới
         </h4>
         <div class="mt-3 flex gap-2">
           <input type="text" [value]="newFormName" (input)="newFormName = $any($event.target).value"
             placeholder="Nhập tên form mới"
-            class="flex-1 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]" />
+            class="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]" />
           <button (click)="createCustomForm()"
-            class="flex h-10 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
+            class="flex h-10 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--color-accent-hover)]">
             Tạo
           </button>
         </div>
@@ -600,10 +600,10 @@
       </p>
 
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-6">
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
         <div class="flex items-center justify-center gap-4">
           <div
-            class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-[var(--color-accent)]/10 text-3xl">
+            class="flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--radius-xs)] bg-[var(--color-accent)]/10 text-3xl">
             📦
           </div>
           <div>
@@ -613,7 +613,7 @@
         </div>
       </div>
 
-      <div class="rounded-[var(--radius-md)] border border-emerald-200 bg-emerald-50 px-4 py-3">
+      <div class="rounded-[var(--radius-sm)] border border-emerald-200 bg-emerald-50 px-4 py-3">
         <p class="m-0 text-sm text-emerald-800">
           💡 Mẹo: Bạn có thể bỏ qua bước này và thêm sản phẩm sau khi vào trang quản trị.
         </p>
@@ -628,16 +628,16 @@
     <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Cài đặt vận hành</h3>
     <div class="mt-4 grid gap-3">
       <div
-        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        class="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-3">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Tự động nhận đơn</p>
-          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Đơn mới sẽ tự chuyển sang trạng thái "Đang xử lý".</p>
+          <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Đơn public mới sẽ tự chuyển sang trạng thái "Đã xác nhận".</p>
         </div>
         <app-ui-toggle [checked]="autoAcceptOrders()" ariaLabel="Bật tắt tự động nhận đơn"
           (toggled)="toggleAutoAcceptOrders($event)" />
       </div>
       <div
-        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        class="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-3">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Bảo trì storefront</p>
           <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Ẩn tạm trang public trong thời gian bảo trì.</p>
@@ -646,7 +646,7 @@
           (toggled)="toggleMaintenanceMode($event)" />
       </div>
       <div
-        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        class="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-3">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Hiển thị tồn kho</p>
           <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Cho phép khách thấy số lượng tồn trên trang public.
@@ -656,7 +656,7 @@
           (toggled)="toggleShowInventoryOnStorefront($event)" />
       </div>
       <div
-        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        class="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-3">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Nhận thông báo</p>
           <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Gửi thông báo khi có đơn mới.</p>
@@ -666,7 +666,7 @@
       </div>
       @if (authStore.currentShop()?.enableRent) {
       <div
-        class="flex items-center justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-3">
+        class="flex items-center justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-3">
         <div>
           <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Xác thực giấy tờ đơn thuê</p>
           <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Hiển thị cố định 2 ô upload giấy tờ tùy thân trên form đơn thuê.</p>
@@ -684,7 +684,7 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4"
   (click)="closeAddEmployeeModal()">
   <div
-    class="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xl)]"
+    class="w-full max-w-md rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]"
     (click)="$event.stopPropagation()">
     <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
       <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Bạn muốn tạo thêm nhân viên</h3>
@@ -698,7 +698,7 @@
         (valueChange)="newEmployeeName = $event" [errorText]="errorNewEmployeeName()" />
 
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
         <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Chức vụ mặc định</p>
         <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">Nhân viên</p>
       </div>
@@ -720,14 +720,14 @@
           createdEmployeeAccount.employeeName }}</strong>.</p>
 
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
         <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Tên đăng nhập</p>
         <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ createdEmployeeAccount.username }}
         </p>
       </div>
 
       <div
-        class="rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+        class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
         <p class="m-0 text-xs text-[var(--color-text-tertiary)]">Mật khẩu</p>
         <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ createdEmployeeAccount.password }}
         </p>
@@ -758,20 +758,20 @@
         [ngClass]="selectedUser.active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'">
         {{ selectedUser.active ? 'Đang hoạt động' : 'Tạm khóa' }}
       </span>
-      <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+      <span class="inline-flex items-center rounded-[var(--radius-xs)] bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-semibold text-[var(--color-text-secondary)]">
         {{ getUserRoleLabel(selectedUser.role) }}
       </span>
     </div>
 
     @if (usersStore.selectedUserLoading()) {
-    <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
+    <span class="inline-flex items-center rounded-[var(--radius-xs)] bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
       Đang tải chi tiết...
     </span>
     }
   </div>
 
   <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-    <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
       <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin cá nhân</h4>
 
       <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -796,7 +796,7 @@
       </div>
     </div>
 
-    <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
       <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin tài khoản</h4>
 
       <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -829,11 +829,11 @@
   </div>
 
   <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-    <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-3">
       <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn hôm nay</p>
       <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersToday }}</p>
     </div>
-    <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-3">
       <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn tháng này</p>
       <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersThisMonth }}</p>
     </div>
@@ -846,7 +846,7 @@
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-overlay)] p-4"
   (click)="closeAddressModal()">
   <div
-    class="w-full max-w-md rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-xl)]"
+    class="w-full max-w-md rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-sm)]"
     (click)="$event.stopPropagation()">
     <div class="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
       <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">
@@ -873,7 +873,7 @@
       <app-ui-select label="Phường/Xã" [value]="newAddressWard()" [options]="wardOptions()" placeholder="Chọn phường/xã"
         (valueChange)="newAddressWard.set($event)" [errorText]="errorAddressWard()" [disabled]="submittingAddress()" />
 
-      <div class="flex items-center gap-3 rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2">
+      <div class="flex items-center gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2">
         <app-ui-toggle [checked]="newAddressIsDefault()" [disabled]="submittingAddress()" (toggled)="newAddressIsDefault.set($event)" />
         <div>
           <p class="m-0 text-xs font-semibold text-[var(--color-text-primary)]">Đặt làm địa chỉ mặc định</p>
@@ -883,11 +883,11 @@
 
       <div class="flex justify-end gap-2 mt-2">
         <button
-          class="flex h-9 items-center rounded-[var(--radius-md)] px-4 text-sm font-semibold text-[var(--color-text-tertiary)] disabled:opacity-50"
+          class="flex h-9 items-center rounded-[var(--radius-sm)] px-4 text-sm font-semibold text-[var(--color-text-tertiary)] disabled:opacity-50"
           [disabled]="submittingAddress()"
           (click)="closeAddressModal()">Hủy</button>
         <button
-          class="flex h-9 items-center rounded-[var(--radius-md)] bg-[var(--color-accent)] px-6 text-sm font-semibold text-white disabled:opacity-50"
+          class="flex h-9 items-center rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-6 text-sm font-semibold text-white disabled:opacity-50"
           [disabled]="submittingAddress()"
           (click)="editingAddressId ? saveEditedAddress() : addAddress()">
           {{ submittingAddress() ? 'Đang lưu...' : (editingAddressId ? 'Cập nhật' : 'Thêm') }}

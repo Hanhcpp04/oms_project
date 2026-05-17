@@ -14,6 +14,8 @@ public class MessageResponse {
     private Long conversationId;
     private MessageSenderType senderType;
     private String senderId;
+    private String mid;
+    private Boolean echo;
     private String text;
     private String rawPayload;
     private LocalDateTime messageTime;

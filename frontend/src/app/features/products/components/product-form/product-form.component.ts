@@ -7,15 +7,23 @@ import { CreateProductInput, ProductType, VariantInput, Product } from '../../da
 import { parseNumber, parseOptionalNumber } from '../../utils/form.util';
 import { FileApiService } from '../../../../core/services/file-api.service';
 import { NotificationService } from '../../../../core/services/notification.service';
+import {
+    formatVndCurrency,
+    formatVndCurrencyInput,
+    normalizeVndCurrencyInput
+} from '../../../../shared/utils/currency.util';
 import { finalize } from 'rxjs';
 import { AuthStore } from '../../../../core/auth/auth.store';
+import { DynamicFormRendererComponent } from '../../../../shared/components/dynamic-form/dynamic-form-renderer.component';
+import { DynamicFieldValue, DynamicRenderField } from '../../../../shared/components/dynamic-form/dynamic-form.types';
 
 @Component({
     selector: 'app-product-form',
     standalone: true,
     imports: [
         CommonModule,
-        RouterModule
+        RouterModule,
+        DynamicFormRendererComponent
     ],
     templateUrl: './product-form.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush
@@ -57,7 +65,7 @@ export class ProductFormComponent {
     readonly uploading = signal(false);
 
     // Form state
-    readonly productType = signal<ProductType>('SELL');
+    readonly productType = signal<ProductType>(this.getDefaultProductType());
     readonly category = signal('');
     readonly name = signal('');
     readonly description = signal('');
@@ -93,12 +101,22 @@ export class ProductFormComponent {
     });
 
     readonly typeOptions = [
-        { label: 'Bán', value: 'SELL' },
-        { label: 'Cho thuê', value: 'RENT' },
-        { label: 'Cả hai', value: 'SELL_RENT' }
+        { label: 'Chỉ bán', value: 'SELL' },
+        { label: 'Chỉ thuê', value: 'RENT' },
+        { label: 'Bán & Thuê', value: 'SELL_RENT' }
     ];
 
     constructor() {
+        effect(() => {
+            if (this.mode !== 'create') {
+                return;
+            }
+
+            if (!this.isProductTypeAllowed(this.productType())) {
+                this.productType.set(this.getDefaultProductType());
+            }
+        }, { allowSignalWrites: true });
+
         effect(() => {
             const template = this.activeTemplate();
             // Only reset if creating new product, skip if we have initialData
@@ -209,8 +227,35 @@ export class ProductFormComponent {
         return this.activeTemplate()?.fields.filter(f => !f.coreKey && f.enabled) || [];
     }
 
+    protected getRenderableCustomFields(): ProductFormTemplateField[] {
+        return this.getCustomFields().filter(field => field.type !== 'image');
+    }
+
+    protected getImageCustomFields(): ProductFormTemplateField[] {
+        return this.getCustomFields().filter(field => field.type === 'image');
+    }
+
+    protected onCustomValuesChange(values: Record<string, DynamicFieldValue>): void {
+        if (this.mode === 'view') return;
+        if (!this.isProductTypeAllowed(this.productType())) {
+            this.notificationService.error('Loại sản phẩm này đang tắt trong mô hình kinh doanh của shop.');
+            return;
+        }
+
+        this.customValues.set({ ...values });
+        this.customErrors.update((errors) => {
+            const next = { ...errors };
+            Object.keys(values).forEach((fieldId) => delete next[fieldId]);
+            return next;
+        });
+    }
+
     protected updateCustomValue(fieldId: string, value: any): void {
         if (this.mode === 'view') return;
+        if (!this.isProductTypeAllowed(this.productType())) {
+            this.notificationService.error('Loại sản phẩm này đang tắt trong mô hình kinh doanh của shop.');
+            return;
+        }
         this.customValues.update(v => ({ ...v, [fieldId]: value }));
         this.customErrors.update(e => {
             const { [fieldId]: _, ...rest } = e;
@@ -266,6 +311,71 @@ export class ProductFormComponent {
         this.imageUrls.update(urls => urls.filter((_, i) => i !== index));
     }
 
+    protected applyDescriptionFormat(
+        editor: HTMLTextAreaElement,
+        format: 'bold' | 'italic' | 'underline' | 'list' | 'link' | 'image'
+    ): void {
+        if (this.mode === 'view') return;
+
+        const start = editor.selectionStart ?? 0;
+        const end = editor.selectionEnd ?? start;
+        const current = this.description();
+        const selectedText = current.slice(start, end);
+        let replacement = selectedText;
+        let cursorStart = start;
+        let cursorEnd = start;
+
+        switch (format) {
+            case 'bold':
+                replacement = `**${selectedText || 'văn bản'}**`;
+                cursorStart = start + 2;
+                cursorEnd = start + replacement.length - 2;
+                break;
+            case 'italic':
+                replacement = `*${selectedText || 'văn bản'}*`;
+                cursorStart = start + 1;
+                cursorEnd = start + replacement.length - 1;
+                break;
+            case 'underline':
+                replacement = `<u>${selectedText || 'văn bản'}</u>`;
+                cursorStart = start + 3;
+                cursorEnd = start + replacement.length - 4;
+                break;
+            case 'list':
+                replacement = selectedText
+                    ? selectedText.split('\n').map((line) => `- ${line}`).join('\n')
+                    : '- ';
+                cursorStart = start + replacement.length;
+                cursorEnd = cursorStart;
+                break;
+            case 'link':
+                replacement = `[${selectedText || 'liên kết'}](https://)`;
+                cursorStart = start + replacement.indexOf('https://');
+                cursorEnd = cursorStart + 'https://'.length;
+                break;
+            case 'image':
+                replacement = `![${selectedText || 'ảnh sản phẩm'}](https://)`;
+                cursorStart = start + replacement.indexOf('https://');
+                cursorEnd = cursorStart + 'https://'.length;
+                break;
+        }
+
+        this.description.set(`${current.slice(0, start)}${replacement}${current.slice(end)}`);
+
+        queueMicrotask(() => {
+            editor.focus();
+            editor.setSelectionRange(cursorStart, cursorEnd);
+        });
+    }
+
+    protected visibleThumbnailUrls(): string[] {
+        return this.imageUrls().slice(0, 5);
+    }
+
+    protected hiddenImageCount(index: number): number {
+        return index === 4 ? Math.max(this.imageUrls().length - 5, 0) : 0;
+    }
+
     protected updateCustomImage(fieldId: string, event: Event): void {
         if (this.mode === 'view') return;
         const input = event.target as HTMLInputElement;
@@ -284,13 +394,33 @@ export class ProductFormComponent {
             });
     }
 
-    protected submit(): void {
+    protected onCustomRendererFileSelected(event: { field: DynamicRenderField; file: File }): void {
+        if (this.mode === 'view') return;
+
+        this.uploading.set(true);
+        this.fileApiService.upload(event.file)
+            .pipe(finalize(() => this.uploading.set(false)))
+            .subscribe({
+                next: (url) => {
+                    this.updateCustomValue(event.field.id, url);
+                    this.notificationService.success('Tải ảnh lên thành công');
+                },
+                error: () => this.notificationService.error('Tải ảnh lên thất bại')
+            });
+    }
+
+    public submit(): void {
         if (this.mode === 'view') return;
         if (!this.name().trim()) {
             this.nameError.set('Vui lòng nhập tên sản phẩm.');
             return;
         }
         this.nameError.set('');
+
+        if (!this.isProductTypeAllowed(this.productType())) {
+            this.notificationService.error('Loại sản phẩm này đang tắt trong mô hình kinh doanh của shop.');
+            return;
+        }
 
         if (this.variants().length === 0) {
             this.variantError.set('Vui lòng thêm ít nhất một biến thể (size/màu).');
@@ -327,10 +457,55 @@ export class ProductFormComponent {
 
         this.saved.emit(input);
     }
+
+    public cancel(): void {
+        this.canceled.emit();
+    }
     
     // Format currency for view mode
-    protected formatCurrency(val: number | undefined): string {
-        if (val === undefined || val === null) return '--';
-        return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    protected formatCurrency(val: number | undefined | null): string {
+        return formatVndCurrency(val);
+    }
+
+    protected formatCurrencyInput(value: string | number | undefined | null): string {
+        return formatVndCurrencyInput(value);
+    }
+
+    protected normalizeCurrencyInput(value: string | number | undefined | null): string {
+        return normalizeVndCurrencyInput(value);
+    }
+
+    protected canUseSell(): boolean {
+        const shop = this.authStore.currentShop();
+        return shop ? Boolean(shop.enableSell) : true;
+    }
+
+    protected canUseRent(): boolean {
+        const shop = this.authStore.currentShop();
+        return shop ? Boolean(shop.enableRent) : true;
+    }
+
+    protected canUseSellRent(): boolean {
+        return this.canUseSell() && this.canUseRent();
+    }
+
+    private isProductTypeAllowed(type: ProductType): boolean {
+        switch (type) {
+            case 'SELL':
+                return this.canUseSell();
+            case 'RENT':
+                return this.canUseRent();
+            case 'SELL_RENT':
+                return this.canUseSellRent();
+        }
+    }
+
+    private getDefaultProductType(): ProductType {
+        const shop = this.authStore.currentShop();
+        if (shop?.enableSell) {
+            return 'SELL';
+        }
+
+        return 'RENT';
     }
 }

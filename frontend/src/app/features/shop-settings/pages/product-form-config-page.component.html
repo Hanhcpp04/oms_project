@@ -1,10 +1,15 @@
 
+<app-page-title
+  title="Cấu hình form sản phẩm"
+  description="Thiết lập các trường thông tin sản phẩm theo mô hình bán hàng hoặc cho thuê."
+/>
+
 <!-- Main Card -->
 <app-ui-card>
     <!-- Header -->
     <div class="bg-white border-b border-[var(--color-border)] px-6 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-lg bg-[var(--color-accent-soft)] flex items-center justify-center text-[var(--color-accent)]">
+        <div class="h-10 w-10 rounded-sm bg-[var(--color-accent-soft)] flex items-center justify-center text-[var(--color-accent)]">
           <i class="i-lucide-package-plus text-2xl"></i>
         </div>
         <div>
@@ -15,7 +20,7 @@
       
       <div class="flex items-center gap-4">
         <!-- Tab Selector -->
-        <div class="flex bg-[var(--color-surface-secondary)] p-1 rounded-md border border-[var(--color-border)]">
+        <div class="flex bg-[var(--color-surface-secondary)] p-1 rounded-sm border border-[var(--color-border)]">
           @if (businessMode() === 'SELL' || businessMode() === 'BOTH') {
             <button
               type="button"
@@ -47,20 +52,20 @@
     </div>
 
     <!-- Modal Body -->
-    <div class="p-6 flex flex-col gap-6 bg-[#f8f9fa]">
+    <div class="p-4 flex flex-col gap-4 bg-[#f8f9fa]">
       
       <!-- Combined System Fields -->
       <div class="grid gap-4">
         <div class="flex items-center gap-2">
-          <span class="h-1 w-3 bg-[var(--color-accent)] rounded-full"></span>
+          <span class="h-1 w-3 bg-[var(--color-accent)] rounded-[var(--radius-xs)]"></span>
           <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">Thông tin sản phẩm</h3>
         </div>
         
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
           <!-- Left: Image -->
           <div class="md:col-span-1">
-            <div class="aspect-square rounded-xl border-2 border-dashed border-[var(--color-border)] bg-white flex flex-col items-center justify-center gap-2 text-[var(--color-text-tertiary)] hover:bg-gray-50 hover:border-[var(--color-accent)] cursor-pointer transition-all group">
-              <div class="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-[var(--color-accent-soft)] group-hover:text-[var(--color-accent)] transition-colors">
+            <div class="aspect-square rounded-sm border-2 border-dashed border-[var(--color-border)] bg-white flex flex-col items-center justify-center gap-2 text-[var(--color-text-tertiary)] hover:bg-gray-50 hover:border-[var(--color-accent)] cursor-pointer transition-all group">
+              <div class="h-12 w-12 rounded-[var(--radius-xs)] bg-gray-50 flex items-center justify-center group-hover:bg-[var(--color-accent-soft)] group-hover:text-[var(--color-accent)] transition-colors">
                 <i class="i-lucide-image text-2xl"></i>
               </div>
               <span class="text-[9px] font-black uppercase tracking-widest">Tải ảnh lên</span>
@@ -118,7 +123,7 @@
             </div>
             
             <!-- Info Box -->
-            <div class="p-3 bg-amber-50 rounded-lg border border-amber-100 flex gap-3 mt-2">
+            <div class="p-3 bg-amber-50 rounded-sm border border-amber-100 flex gap-3 mt-2">
                <i class="i-lucide-info text-amber-500 text-lg shrink-0"></i>
                <p class="text-[9px] text-amber-700 leading-relaxed font-medium">Đây là các trường thông tin cơ bản của sản phẩm. Bạn có thể bổ sung thêm các đặc tính riêng biệt (như chất liệu, xuất xứ...) ở phần "Trường tùy chỉnh" bên dưới.</p>
             </div>

@@ -37,6 +37,7 @@ yarn-error.log*
 .env.local
 .env.production
 *.env
+frontend/public/env.js
 
 # ==================== Docker ====================
 docker-compose.override.yml

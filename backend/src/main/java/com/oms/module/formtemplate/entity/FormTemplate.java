@@ -42,15 +42,15 @@ public class FormTemplate extends BaseEntity {
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "form_type", nullable = false, length = 30)
+    @Column(name = "form_type", nullable = false, length = 30, columnDefinition = "enum('INTERNAL','ORDER_CAPTURE','PUBLIC')")
     private FormType formType;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 30)
+    @Column(length = 30, columnDefinition = "enum('general','rent','sell')")
     private FormCategory category;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 20, columnDefinition = "enum('ARCHIVED','DRAFT','PUBLISHED')")
     @Builder.Default
     private FormStatus status = FormStatus.DRAFT;
 

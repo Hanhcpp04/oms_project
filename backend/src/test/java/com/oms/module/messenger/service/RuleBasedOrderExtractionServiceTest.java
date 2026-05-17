@@ -1,0 +1,128 @@
+package com.oms.module.messenger.service;
+
+import com.oms.module.messenger.dto.OrderInfoExtractedDto;
+import com.oms.module.messenger.entity.Message;
+import com.oms.module.messenger.enums.MessageSenderType;
+import com.oms.module.order.entity.Order;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class RuleBasedOrderExtractionServiceTest {
+
+    private final RuleBasedOrderExtractionService service = new RuleBasedOrderExtractionService();
+
+    @Test
+    void shouldExtractOmsCopiedRentProductBlock() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now())
+                .text("""
+                        Tạo đơn Messenger từ OMS:
+                        - Product ID: 12
+                        - Variant ID: 34
+                        - Mã sản phẩm: DRESS-01
+                        - Tên sản phẩm: Váy dự tiệc
+                        - SKU: DRESS-01-BLACK-M
+                        - Size: M
+                        - Màu: Đen
+                        - Số lượng: 2
+                        - Loại đơn: RENT
+                        - Giá thuê: 150000
+                        - Tiền cọc: 500000
+                        - Số ngày thuê: 3
+                        - Ngày nhận: 2026-05-20
+                        - Ngày trả: 2026-05-22
+                        """)
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+
+        assertThat(result.getOrderType()).isEqualTo(Order.OrderType.RENT);
+        assertThat(result.getProductId()).isEqualTo(12L);
+        assertThat(result.getVariantId()).isEqualTo(34L);
+        assertThat(result.getProductCode()).isEqualTo("DRESS-01");
+        assertThat(result.getSku()).isEqualTo("DRESS-01-BLACK-M");
+        assertThat(result.getQuantity()).isEqualTo(2);
+        assertThat(result.getRentalDays()).isEqualTo(3);
+        assertThat(result.getRentFrom()).isEqualTo(LocalDate.of(2026, 5, 20));
+        assertThat(result.getRentTo()).isEqualTo(LocalDate.of(2026, 5, 22));
+        assertThat(result.getPrice()).isEqualByComparingTo(new BigDecimal("150000"));
+        assertThat(result.getDepositAmount()).isEqualByComparingTo(new BigDecimal("500000"));
+        assertThat(result.getItems()).hasSize(1);
+        assertThat(result.getItems().get(0).getVariantId()).isEqualTo(34L);
+    }
+
+    @Test
+    void shouldDeriveRentalDaysFromCopiedDateRange() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now())
+                .text("""
+                        Tạo đơn Messenger từ OMS:
+                        - Product ID: 12
+                        - Variant ID: 34
+                        - Tên sản phẩm: Váy dự tiệc
+                        - SKU: DRESS-01-BLACK-M
+                        - Số lượng: 1
+                        - Loại đơn: RENT
+                        - Ngày nhận: 2026-05-20
+                        - Ngày trả: 2026-05-22
+                        """)
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+
+        assertThat(result.getRentalDays()).isEqualTo(3);
+        assertThat(result.getRentFrom()).isEqualTo(LocalDate.of(2026, 5, 20));
+        assertThat(result.getRentTo()).isEqualTo(LocalDate.of(2026, 5, 22));
+    }
+
+    @Test
+    void shouldUseLatestCopiedProductBlockWhenContextContainsPreviousBlock() {
+        Message oldMessage = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now().minusMinutes(1))
+                .text("""
+                        Tạo đơn Messenger từ OMS:
+                        - Product ID: 7
+                        - Variant ID: 2
+                        - Tên sản phẩm: test
+                        - Số lượng: 1
+                        - Loại đơn: SELL
+                        - Đơn giá: 333333
+                        """)
+                .build();
+        Message latestMessage = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now())
+                .text("""
+                        Tạo đơn Messenger từ OMS:
+                        - Product ID: 12
+                        - Variant ID: 8
+                        - Tên sản phẩm: váy cưới áo dài truyền thống việt nam
+                        - Size: S
+                        - Màu: Đen
+                        - Số lượng: 1
+                        - Loại đơn: SELL
+                        - Đơn giá: 1121231
+                        """)
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(oldMessage, latestMessage), 1L);
+
+        assertThat(result.getProductId()).isEqualTo(12L);
+        assertThat(result.getVariantId()).isEqualTo(8L);
+        assertThat(result.getProductName()).isEqualTo("váy cưới áo dài truyền thống việt nam");
+        assertThat(result.getPrice()).isEqualByComparingTo(new BigDecimal("1121231"));
+    }
+}

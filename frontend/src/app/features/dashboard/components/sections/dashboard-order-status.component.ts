@@ -8,7 +8,7 @@ import { DashboardStore } from '../../state/dashboard.store';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="rounded-2xl border border-[var(--color-border)] bg-white">
+    <div class="rounded-sm border border-[var(--color-border)] bg-white">
       <div class="border-b border-[var(--color-border)] px-5 py-4">
         <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Trạng thái đơn hàng</h3>
         <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">Phân bổ theo trạng thái hiện tại</p>
@@ -33,7 +33,7 @@ import { DashboardStore } from '../../state/dashboard.store';
           <!-- Legend -->
           <div class="flex-1 space-y-1">
             @for (g of store.orderStatusGroups(); track g.status) {
-              <div class="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-colors hover:bg-[var(--color-bg)]">
+              <div class="flex items-center justify-between rounded-sm px-2.5 py-1.5 transition-colors hover:bg-[var(--color-bg)]">
                 <div class="flex items-center gap-2">
                   <span class="h-2.5 w-2.5 rounded-full" [style.background-color]="g.color"></span>
                   <span class="text-xs text-[var(--color-text-secondary)]">{{ g.label }}</span>

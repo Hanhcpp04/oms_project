@@ -7,6 +7,7 @@ import { UiCardComponent } from '../../../shared/components/ui/ui-card.component
 import { UiModalComponent } from '../../../shared/components/ui/ui-modal.component';
 import { ShippingMethodService, ShippingMethodDto, FeePolicy } from '../../../core/services/shipping-method.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { finalize } from 'rxjs';
 
 @Component({
@@ -25,13 +26,13 @@ import { finalize } from 'rxjs';
     <section class="mt-6">
       <app-ui-card>
         @if (loading()) {
-          <div class="flex justify-center p-8 text-[var(--color-text-tertiary)]">
+          <div class="flex justify-center p-5 text-[var(--color-text-tertiary)]">
              <i class="ri-loader-4-line animate-spin text-2xl"></i>
           </div>
         } @else {
           <div class="grid gap-3">
             @for (method of methods(); track method.id) {
-              <div class="flex items-start justify-between rounded-[var(--radius-md)] border border-[var(--color-border)] p-4 hover:border-[var(--color-accent)]/30 transition-all">
+              <div class="flex items-start justify-between rounded-[var(--radius-sm)] border border-[var(--color-border)] p-4 hover:border-[var(--color-accent)]/30 transition-all">
                 <div>
                   <div class="flex items-center gap-2">
                     <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">{{ method.name }}</h3>
@@ -60,7 +61,7 @@ import { finalize } from 'rxjs';
                 </div>
               </div>
             } @empty {
-              <div class="py-10 text-center text-[var(--color-text-tertiary)] border border-dashed rounded-[var(--radius-md)] border-[var(--color-border)]">
+              <div class="py-10 text-center text-[var(--color-text-tertiary)] border border-dashed rounded-[var(--radius-sm)] border-[var(--color-border)]">
                 <p class="text-sm">Chưa có phương thức vận chuyển nào.</p>
                 <button class="mt-2 text-xs text-[var(--color-accent)] font-semibold hover:underline" (click)="openModal()">Thêm ngay</button>
               </div>
@@ -86,7 +87,7 @@ import { finalize } from 'rxjs';
           <div class="space-y-2">
             <label class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Chính sách thu phí</label>
             <div class="grid gap-2">
-              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-md)] cursor-pointer transition-all"
+              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-sm)] cursor-pointer transition-all"
                 [class.border-[var(--color-accent)]]="form.get('feePolicy')?.value === 'FREESHIP'"
                 [class.bg-[var(--color-accent)]]="form.get('feePolicy')?.value === 'FREESHIP'"
                 [class.bg-opacity-5]="form.get('feePolicy')?.value === 'FREESHIP'"
@@ -98,7 +99,7 @@ import { finalize } from 'rxjs';
                 </div>
               </label>
 
-              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-md)] cursor-pointer transition-all"
+              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-sm)] cursor-pointer transition-all"
                 [class.border-[var(--color-accent)]]="form.get('feePolicy')?.value === 'CUSTOMER_PAYS_SHIPPER'"
                 [class.bg-[var(--color-accent)]]="form.get('feePolicy')?.value === 'CUSTOMER_PAYS_SHIPPER'"
                 [class.bg-opacity-5]="form.get('feePolicy')?.value === 'CUSTOMER_PAYS_SHIPPER'"
@@ -110,7 +111,7 @@ import { finalize } from 'rxjs';
                 </div>
               </label>
 
-              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-md)] cursor-pointer transition-all"
+              <label class="flex items-center gap-2 p-3 border rounded-[var(--radius-sm)] cursor-pointer transition-all"
                 [class.border-[var(--color-accent)]]="form.get('feePolicy')?.value === 'FIXED_FEE'"
                 [class.bg-[var(--color-accent)]]="form.get('feePolicy')?.value === 'FIXED_FEE'"
                 [class.bg-opacity-5]="form.get('feePolicy')?.value === 'FIXED_FEE'"
@@ -127,7 +128,8 @@ import { finalize } from 'rxjs';
           @if (form.get('feePolicy')?.value === 'FIXED_FEE') {
             <app-ui-input 
               formControlName="defaultFee"
-              type="number"
+              type="text"
+              format="currency"
               label="Mức phí (VNĐ)"
               placeholder="VD: 30000"
               [required]="true"
@@ -207,7 +209,7 @@ export class ShippingMethodManagementPageComponent implements OnInit {
   }
 
   formatCurrency(val: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val);
+    return formatVndCurrency(val);
   }
 
   openModal() {
@@ -235,7 +237,10 @@ export class ShippingMethodManagementPageComponent implements OnInit {
     if (this.form.invalid) return;
 
     this.saving.set(true);
-    const val = this.form.value as ShippingMethodDto;
+    const val = {
+      ...this.form.value,
+      defaultFee: Number(this.form.value.defaultFee || 0)
+    } as ShippingMethodDto;
     
     if (val.feePolicy !== 'FIXED_FEE') {
       val.defaultFee = undefined;

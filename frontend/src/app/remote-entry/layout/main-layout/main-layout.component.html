@@ -1,6 +1,6 @@
 <div class="flex h-screen overflow-hidden">
   <!-- Sidebar -->
-  <app-oms-sidebar [menuItems]="menuItems" [collapsed]="sidebarCollapsed()" [mobileOpen]="mobileSidebarOpen()"
+  <app-oms-sidebar [menuItems]="menuItems()" [collapsed]="sidebarCollapsed()" [mobileOpen]="mobileSidebarOpen()"
     (closeMobile)="closeMobileSidebar()" />
 
   <!-- Main area -->
@@ -11,7 +11,7 @@
       (toggleMobileSidebar)="onToggleMobileSidebar()" (logout)="onLogout()" />
 
     <!-- Scrollable content area -->
-    <main class="flex-1 overflow-y-auto bg-[var(--color-bg)] p-4 md:p-6 lg:p-8">
+    <main class="flex-1 overflow-y-auto bg-[var(--color-bg)] p-[5px]">
       <div class="mx-auto max-w-none">
         <router-outlet />
       </div>

@@ -76,6 +76,7 @@ public class ShopService {
                 .email(email)
                 .phone(phone)
                 .logoUrl(logoUrl)
+                .businessMode("BOTH")
                 .status(Shop.ShopStatus.ACTIVE)
                 .build();
 
@@ -106,8 +107,15 @@ public class ShopService {
             throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
         }
 
-        shop.setEnableSell(request.getEnableSell());
-        shop.setEnableRent(request.getEnableRent());
+        boolean enableSell = Boolean.TRUE.equals(request.getEnableSell());
+        boolean enableRent = Boolean.TRUE.equals(request.getEnableRent());
+        if (!enableSell && !enableRent) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Shop must enable at least sell or rent mode");
+        }
+
+        shop.setEnableSell(enableSell);
+        shop.setEnableRent(enableRent);
+        shop.setBusinessMode(resolveBusinessMode(enableSell, enableRent));
         shopRepository.save(shop);
 
         ShopOnboardingState state = onboardingStateRepository.findFirstByShopOrderByIdDesc(shop)
@@ -515,6 +523,14 @@ public class ShopService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String resolveBusinessMode(boolean enableSell, boolean enableRent) {
+        if (enableSell && enableRent) {
+            return "BOTH";
+        }
+
+        return enableSell ? "SELL" : "RENT";
     }
 
     private String generateUniqueSlug(String shopName) {

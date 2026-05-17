@@ -38,7 +38,7 @@ public class Product extends BaseEntity {
     private com.oms.module.shop.entity.ShopCategory category;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "product_type", length = 20, nullable = false)
+    @Column(name = "product_type", length = 20, nullable = false, columnDefinition = "enum('RENT','SELL','SELL_RENT')")
     private ProductType productType;
 
     @Column(nullable = false)

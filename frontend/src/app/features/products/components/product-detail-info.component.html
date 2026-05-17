@@ -1,0 +1,159 @@
+<section class="flex flex-col gap-5">
+  <!-- Top Metadata & Actions -->
+  <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div class="min-w-0 flex-1">
+      <div class="mb-4 flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all" [ngClass]="typeBadgeClass">
+          {{ typeLabel }}
+        </span>
+        <span class="inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-all" [ngClass]="stockStateClass">
+          {{ stockStateLabel }}
+        </span>
+        @if (!product.active) {
+          <span class="inline-flex items-center border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-700">
+            Đang ẩn
+          </span>
+        }
+      </div>
+
+      <h2 class="m-0 text-3xl font-bold leading-tight tracking-tight text-[var(--color-text-primary)] lg:text-4xl">
+        {{ product.name }}
+      </h2>
+      
+      <div class="mt-3 flex items-center gap-4">
+        <p class="m-0 flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text-secondary)]">
+          <i class="ri-folder-3-fill text-[var(--color-accent)]"></i>
+          {{ product.category || 'Chưa phân loại' }}
+        </p>
+        <span class="h-3 w-[1px] bg-[var(--color-border)]"></span>
+        <p class="m-0 flex items-center gap-1.5 text-xs font-medium text-[var(--color-text-muted)]">
+          SKU: <span class="font-mono text-[var(--color-text-primary)]">PROD-{{ product.id.toString().substring(0, 8) }}</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Secondary Actions -->
+    <div class="flex shrink-0 items-center gap-1.5">
+      @if (canGenerateQr) {
+        <button type="button" 
+          class="group flex h-9 w-9 items-center justify-center border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] transition-all hover:border-[var(--color-text-primary)] hover:text-[var(--color-text-primary)]" 
+          (click)="generateQr.emit()" title="Mã QR">
+          <i class="ri-qr-code-line text-base"></i>
+        </button>
+      }
+      @if (canEdit) {
+        <button type="button" 
+          class="group flex h-9 w-9 items-center justify-center border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] transition-all hover:border-[var(--color-text-primary)] hover:text-[var(--color-text-primary)]" 
+          (click)="edit.emit()" title="Chỉnh sửa">
+          <i class="ri-pencil-line text-base"></i>
+        </button>
+      }
+      @if (product.active) {
+        <button type="button" 
+          class="group flex h-9 w-9 items-center justify-center border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] transition-all hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600" 
+          (click)="hideProduct.emit()" title="Ẩn sản phẩm">
+          <i class="ri-eye-off-line text-base"></i>
+        </button>
+      } @else {
+        <button type="button" 
+          class="group flex h-9 w-9 items-center justify-center border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-600" 
+          (click)="restoreProduct.emit()" title="Hiện lại">
+          <i class="ri-eye-line text-base"></i>
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Compact Purchase Section -->
+  <div class="flex items-stretch border border-[var(--color-border)] bg-[var(--color-border)] gap-px">
+    <div class="flex flex-1 items-center justify-between bg-[var(--color-surface)] px-5 py-3">
+      <div class="flex flex-col">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
+          @if (supportsSell(product.productType)) { Giá bán } @else { Giá thuê }
+        </span>
+        <div class="flex items-baseline gap-1.5">
+          <span class="text-xl font-black tracking-tight text-[var(--color-text-primary)]">
+            {{ formatCurrency(supportsSell(product.productType) ? sellPrice : rentPrice) }}
+          </span>
+          <span class="text-[10px] font-bold text-[var(--color-text-muted)]">VND</span>
+        </div>
+      </div>
+      
+      @if (canCreateOrder) {
+        <button type="button" 
+          class="flex h-9 items-center justify-center bg-[var(--color-text-primary)] px-5 text-[11px] font-black uppercase tracking-[0.1em] text-[var(--color-surface)] transition-all hover:bg-[var(--color-accent)] active:scale-95" 
+          (click)="createOrder.emit()">
+          <i class="ri-add-line mr-1.5 text-base"></i>
+          Tạo đơn hàng
+        </button>
+      }
+    </div>
+  </div>
+
+  <!-- Additional Pricing Grid -->
+  @if (product.productType === 'SELL_RENT' || product.productType === 'RENT') {
+    <div class="grid grid-cols-1 gap-px bg-[var(--color-border)] border border-[var(--color-border)] sm:grid-cols-2">
+      @if (product.productType === 'SELL_RENT') {
+        <div class="group flex items-center justify-between bg-[var(--color-surface)] p-4 transition-colors hover:bg-[var(--color-surface-hover)]">
+          <div class="flex flex-col">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Giá thuê / Ngày</span>
+            <span class="mt-0.5 text-base font-bold text-[var(--color-text-primary)]">{{ formatCurrency(rentPrice) }}</span>
+          </div>
+          <i class="ri-calendar-check-line text-xl text-blue-500 opacity-20 group-hover:opacity-100 transition-opacity"></i>
+        </div>
+      }
+      <div class="group flex items-center justify-between bg-[var(--color-surface)] p-4 transition-colors hover:bg-[var(--color-surface-hover)]">
+        <div class="flex flex-col">
+          <span class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Tiền đặt cọc</span>
+          <span class="mt-0.5 text-base font-bold text-[var(--color-text-primary)]">{{ formatCurrency(depositAmount) }}</span>
+        </div>
+        <i class="ri-shield-flash-line text-xl text-amber-500 opacity-20 group-hover:opacity-100 transition-opacity"></i>
+      </div>
+    </div>
+  }
+
+  <!-- Stats List -->
+  <div class="grid grid-cols-2 gap-5 border-t border-[var(--color-border)] pt-8 sm:grid-cols-4">
+    <div class="space-y-1">
+      <p class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Tổng tồn kho</p>
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-[var(--color-text-primary)]">{{ totalStock }}</span>
+        <span class="text-[10px] font-medium text-[var(--color-text-muted)]">Sản phẩm</span>
+      </div>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Biến thể</p>
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-[var(--color-text-primary)]">{{ product.variants.length }}</span>
+        <span class="text-[10px] font-medium text-[var(--color-text-muted)]">Phân loại</span>
+      </div>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Ngày khởi tạo</p>
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-[var(--color-text-primary)]">{{ formatDate(product.createdAt) }}</span>
+      </div>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-muted)]">Tình trạng</p>
+      <div class="flex items-center gap-2">
+        <span class="relative flex h-2 w-2">
+          @if (product.active) {
+            <span class="absolute inline-flex h-full w-full animate-ping bg-emerald-400 opacity-75"></span>
+            <span class="relative inline-flex h-2 w-2 bg-emerald-500"></span>
+          } @else {
+            <span class="relative inline-flex h-2 w-2 bg-rose-500"></span>
+          }
+        </span>
+        <span class="text-sm font-bold" [class.text-emerald-600]="product.active" [class.text-rose-600]="!product.active">
+          {{ product.active ? 'Đang hiển thị' : 'Đang ẩn' }}
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+

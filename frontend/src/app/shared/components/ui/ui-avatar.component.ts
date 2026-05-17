@@ -39,7 +39,7 @@ export class UiAvatarComponent {
 
   protected get avatarClasses(): string {
     const base =
-      'inline-flex items-center justify-center rounded-full font-bold text-white select-none';
+      'inline-flex items-center justify-center rounded-[var(--radius-xs)] font-bold text-white select-none';
     const sizes: Record<string, string> = {
       sm: 'h-8 w-8 text-[11px]',
       md: 'h-10 w-10 text-xs',

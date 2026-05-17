@@ -1,151 +1,334 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, signal, effect, ViewChild } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { forkJoin, Observable } from 'rxjs';
+import { AuthStore } from '../../../core/auth/auth.store';
 import {
-  OrderFormTemplateType,
-  OrderFormFieldOption,
+  OrderFormFieldType,
+  OrderFormTemplateField,
+  OrderFormTemplateType
 } from '../../../core/models/order-form-template.model';
 import { NotificationService } from '../../../core/services/notification.service';
-import { AuthStore } from '../../../core/auth/auth.store';
 import { OrderFormTemplateService } from '../../../core/services/order-form-template.service';
-import { forkJoin, Observable } from 'rxjs';
-import { DynamicFormFieldManagerComponent, DynamicFormField } from '../../../shared/components/form-config/dynamic-form-field-manager.component';
+import { FormConfigToolbarComponent } from '../components/form-config-toolbar/form-config-toolbar.component';
+import {
+  FormConfigMode,
+  FormHeaderEditorComponent
+} from '../components/form-header-editor/form-header-editor.component';
+import { FormFieldCardComponent } from '../components/form-field-card/form-field-card.component';
+import { FormPreviewComponent } from '../components/form-preview/form-preview.component';
+import {
+  FIELD_TYPE_OPTIONS,
+  createEmptyOrderField,
+  duplicateOrderField,
+  formTypeLabel,
+  isTempId,
+  normalizeFieldForSave,
+  validateFields
+} from '../models/form-config-ui.model';
 
 @Component({
   selector: 'app-order-form-config-page',
   standalone: true,
-  imports: [CommonModule, UiCardComponent, DynamicFormFieldManagerComponent],
+  imports: [
+    CommonModule,
+    FormHeaderEditorComponent,
+    FormFieldCardComponent,
+    FormConfigToolbarComponent,
+    FormPreviewComponent
+  ],
   templateUrl: './order-form-config-page.component.html',
   styleUrls: ['./order-form-config-page.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class OrderFormConfigPageComponent {
-  @ViewChild(DynamicFormFieldManagerComponent) manager!: DynamicFormFieldManagerComponent;
-  
   private readonly notificationService = inject(NotificationService);
   private readonly authStore = inject(AuthStore);
   private readonly templateService = inject(OrderFormTemplateService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
-  readonly businessMode = computed(() => this.authStore.currentShop()?.businessMode || 'BOTH');
+  readonly loading = this.templateService.loading;
+  readonly businessMode = computed(() => this.resolveBusinessMode());
   readonly activeTab = signal<OrderFormTemplateType>('SELL');
+  readonly currentTemplate = computed(() => this.templateService.getTemplateByType(this.activeTab()));
 
-  protected readonly localFields = signal<DynamicFormField[]>([]);
-  readonly isSaving = signal(false);
+  protected readonly mode = signal<FormConfigMode>('edit');
+  protected readonly activeFieldId = signal<string | null>(null);
+  protected readonly localFields = signal<OrderFormTemplateField[]>([]);
+  protected readonly deletedFieldIds = signal<string[]>([]);
+  protected readonly isSaving = signal(false);
+  protected readonly savedSnapshot = signal('');
+  protected readonly fieldTypeOptions = FIELD_TYPE_OPTIONS;
+  protected readonly formTypeLabel = computed(() => formTypeLabel(this.activeTab()));
+  protected readonly formDescription = computed(
+    () =>
+      `Thiết lập các trường thông tin cần thu thập khi tạo ${formTypeLabel(this.activeTab()).toLowerCase()}, public order form và form nội bộ.`
+  );
+  protected readonly fieldCount = computed(
+    () => this.localFields().filter((field) => field.active !== false).length
+  );
+  protected readonly validationErrors = computed(() => validateFields(this.localFields()));
+  protected readonly isInvalid = computed(() => Object.keys(this.validationErrors()).length > 0);
+  protected readonly hasUnsavedChanges = computed(
+    () => this.createSnapshot(this.localFields(), this.deletedFieldIds()) !== this.savedSnapshot()
+  );
+  private lastSyncedTemplateKey = '';
 
   constructor() {
-    // Read category from route data if available
     const routeCategory = this.route.snapshot.data['category'] as string;
     if (routeCategory === 'rent') {
+      if (!this.canUseRent()) {
+        void this.router.navigate(['/app/form-config', this.canUseSell() ? 'sell' : 'rent']);
+        return;
+      }
       this.activeTab.set('RENT');
     } else if (routeCategory === 'sell') {
+      if (!this.canUseSell()) {
+        void this.router.navigate(['/app/form-config', this.canUseRent() ? 'rent' : 'sell']);
+        return;
+      }
       this.activeTab.set('SELL');
     }
 
-    // Auto-load fields when tab changes or service data updates
-    effect(() => {
-      const type = this.activeTab();
-      const template = this.templateService.getTemplateByType(type);
-      if (template) {
-        // Deep clone to avoid direct signal mutation
-        this.localFields.set(JSON.parse(JSON.stringify(template.fields)));
-      } else {
-        this.localFields.set([]);
-      }
-    }, { allowSignalWrites: true });
+    effect(
+      () => {
+        const template = this.currentTemplate();
+        const fields = this.cloneFields(template.fields).sort(
+          (first, second) => first.sortOrder - second.sortOrder
+        );
+        const templateKey = `${template.templateType}:${template.updatedAt}:${this.createSnapshot(fields, [])}`;
 
-    effect(() => {
-      if (!routeCategory) {
+        if (templateKey === this.lastSyncedTemplateKey) {
+          return;
+        }
+
+        this.lastSyncedTemplateKey = templateKey;
+
+        this.localFields.set(fields);
+        this.deletedFieldIds.set([]);
+        this.activeFieldId.set(fields[0]?.id ?? null);
+        this.savedSnapshot.set(this.createSnapshot(fields, []));
+      },
+      { allowSignalWrites: true }
+    );
+
+    effect(
+      () => {
+        if (routeCategory) {
+          return;
+        }
+
         const mode = this.businessMode();
-        if (mode === 'RENT') this.activeTab.set('RENT');
-        else this.activeTab.set('SELL');
-      }
-    }, { allowSignalWrites: true });
+        this.activeTab.set(mode === 'RENT' ? 'RENT' : 'SELL');
+      },
+      { allowSignalWrites: true }
+    );
+  }
+
+  protected setMode(mode: FormConfigMode): void {
+    this.mode.set(mode);
   }
 
   protected setTab(type: OrderFormTemplateType): void {
-    this.activeTab.set(type);
-  }
-
-  protected onFieldsChanged(fields: DynamicFormField[]): void {
-    this.localFields.set(fields);
-  }
-
-  // ── Individual Operations ──
-
-  protected onSaveField(field: DynamicFormField): void {
-    this.isSaving.set(true);
-    const type = this.activeTab();
-    const validationRulesJson = field.validationRules ? JSON.stringify(field.validationRules) : undefined;
-
-    let obs$: Observable<any>;
-    if (field.id.startsWith('temp-')) {
-      obs$ = this.templateService.addField(type, {
-        label: field.label,
-        type: field.type as any,
-        placeholder: field.placeholder,
-        required: field.required,
-        helperText: field.helperText,
-        showInOrderList: field['showInOrderList'] ?? false,
-        showInOrderDetail: field['showInOrderDetail'] ?? true,
-        options: field.options as OrderFormFieldOption[],
-        validationRulesJson
-      });
-    } else {
-      obs$ = this.templateService.updateField(type, field.id, {
-        label: field.label,
-        fieldKey: field['fieldKey'],
-        type: field.type as any,
-        placeholder: field.placeholder,
-        helperText: field.helperText,
-        required: field.required,
-        active: field.active ?? true,
-        sortOrder: field.sortOrder,
-        showInOrderList: field['showInOrderList'] ?? false,
-        showInOrderDetail: field['showInOrderDetail'] ?? true,
-        validationRules: field.validationRules,
-        options: field.options as OrderFormFieldOption[]
-      });
-    }
-
-    obs$.subscribe({
-      next: () => {
-        this.isSaving.set(false);
-        this.notificationService.success('Đã lưu trường thành công');
-        this.templateService.loadConfig(type);
-        this.manager.closeAfterSave();
-      },
-      error: () => {
-        this.isSaving.set(false);
-        this.notificationService.error('Có lỗi xảy ra khi lưu trường');
-      }
-    });
-  }
-
-  protected onDeleteField(field: DynamicFormField): void {
-    const type = this.activeTab();
-    
-    // Nếu là trường tạm (chưa lưu DB) thì chỉ cần xóa khỏi list local
-    if (field.id.startsWith('temp-')) {
-      this.localFields.update(fields => fields.filter(f => f.id !== field.id));
-      this.manager.closeAfterSave();
+    if ((type === 'SELL' && !this.canUseSell()) || (type === 'RENT' && !this.canUseRent())) {
       return;
     }
 
-    // Nếu đã lưu DB thì gọi API xóa
+    if (type !== this.activeTab() && this.hasUnsavedChanges()) {
+      const shouldContinue = confirm('Bạn có thay đổi chưa lưu. Chuyển loại form sẽ bỏ các thay đổi này?');
+      if (!shouldContinue) {
+        return;
+      }
+    }
+
+    this.mode.set('edit');
+    this.activeTab.set(type);
+  }
+
+  protected addField(type: OrderFormFieldType = 'text'): void {
+    const templateId = this.currentTemplate().id;
+    const nextField = createEmptyOrderField(templateId, type, this.localFields().length + 1);
+
+    this.localFields.update((fields) => this.reindexFields([...fields, nextField]));
+    this.activeFieldId.set(nextField.id);
+    this.mode.set('edit');
+  }
+
+  protected updateField(updatedField: OrderFormTemplateField): void {
+    this.localFields.update((fields) =>
+      fields.map((field) => (field.id === updatedField.id ? updatedField : field))
+    );
+  }
+
+  protected duplicateField(field: OrderFormTemplateField): void {
+    const fields = this.localFields();
+    const fieldIndex = fields.findIndex((item) => item.id === field.id);
+    const copy = duplicateOrderField(field, fieldIndex + 2);
+    const nextFields = [...fields];
+    nextFields.splice(fieldIndex + 1, 0, copy);
+
+    this.localFields.set(this.reindexFields(nextFields));
+    this.activeFieldId.set(copy.id);
+  }
+
+  protected deleteField(field: OrderFormTemplateField): void {
+    const shouldDelete = confirm(`Xóa field "${field.label || 'chưa đặt tên'}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    if (!isTempId(field.id)) {
+      this.deletedFieldIds.update((ids) => [...ids, field.id]);
+    }
+
+    this.localFields.update((fields) => this.reindexFields(fields.filter((item) => item.id !== field.id)));
+    this.activeFieldId.set(null);
+  }
+
+  protected moveField(fieldId: string, direction: 'up' | 'down'): void {
+    const fields = [...this.localFields()];
+    const currentIndex = fields.findIndex((field) => field.id === fieldId);
+
+    if (currentIndex < 0) {
+      return;
+    }
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= fields.length) {
+      return;
+    }
+
+    [fields[currentIndex], fields[targetIndex]] = [fields[targetIndex], fields[currentIndex]];
+    this.localFields.set(this.reindexFields(fields));
+  }
+
+  protected saveConfiguration(): void {
+    const errors = this.validationErrors();
+    const firstInvalidId = Object.keys(errors)[0];
+    if (firstInvalidId) {
+      this.activeFieldId.set(firstInvalidId);
+      this.mode.set('edit');
+      this.notificationService.error(errors[firstInvalidId][0]);
+      return;
+    }
+
+    if (!this.hasUnsavedChanges()) {
+      this.notificationService.info('Không có thay đổi mới để lưu.');
+      return;
+    }
+
+    const type = this.activeTab();
+    const fields = this.localFields().map((field, index) => normalizeFieldForSave(field, index));
+    const operations: Observable<unknown>[] = [];
+
+    for (const fieldId of this.deletedFieldIds()) {
+      operations.push(this.templateService.removeCustomField(type, fieldId));
+    }
+
+    for (const field of fields) {
+      if (isTempId(field.id)) {
+        operations.push(
+          this.templateService.addField(type, {
+            label: field.label,
+            type: field.type,
+            placeholder: field.placeholder,
+            required: field.required,
+            helperText: field.helperText,
+            showInOrderList: field.showInOrderList,
+            showInOrderDetail: field.showInOrderDetail,
+            sortOrder: field.sortOrder,
+            options: field.options,
+            validationRulesJson: this.serializeValidationRules(field)
+          })
+        );
+      } else {
+        operations.push(
+          this.templateService.updateField(type, field.id, {
+            label: field.label,
+            fieldKey: field.fieldKey,
+            type: field.type,
+            placeholder: field.placeholder,
+            helperText: field.helperText,
+            required: field.required,
+            active: field.active,
+            sortOrder: field.sortOrder,
+            showInOrderList: field.showInOrderList,
+            showInOrderDetail: field.showInOrderDetail,
+            validationRules: field.validationRules,
+            options: field.options
+          })
+        );
+      }
+    }
+
+    if (operations.length === 0) {
+      return;
+    }
+
     this.isSaving.set(true);
-    this.templateService.removeCustomField(type, field.id).subscribe({
+    forkJoin(operations).subscribe({
       next: () => {
         this.isSaving.set(false);
-        this.notificationService.success('Đã xóa trường thành công');
+        this.deletedFieldIds.set([]);
+        this.savedSnapshot.set(this.createSnapshot(fields, []));
+        this.notificationService.success('Đã lưu cấu hình form thành công.');
         this.templateService.loadConfig(type);
-        this.manager.closeAfterSave();
       },
       error: () => {
         this.isSaving.set(false);
-        this.notificationService.error('Có lỗi xảy ra khi xóa trường');
+        this.notificationService.error('Không thể lưu cấu hình form. Vui lòng thử lại.');
       }
     });
+  }
+
+  protected getFieldErrors(fieldId: string): string[] {
+    return this.validationErrors()[fieldId] ?? [];
+  }
+
+  private serializeValidationRules(field: OrderFormTemplateField): string | undefined {
+    if (!field.validationRules || Object.keys(field.validationRules).length === 0) {
+      return undefined;
+    }
+
+    return JSON.stringify(field.validationRules);
+  }
+
+  private reindexFields(fields: OrderFormTemplateField[]): OrderFormTemplateField[] {
+    return fields.map((field, index) => ({ ...field, sortOrder: index + 1 }));
+  }
+
+  private cloneFields(fields: OrderFormTemplateField[]): OrderFormTemplateField[] {
+    return fields.map((field) => ({
+      ...field,
+      options: field.options.map((option) => ({ ...option })),
+      validationRules: { ...(field.validationRules ?? {}) }
+    }));
+  }
+
+  private createSnapshot(fields: OrderFormTemplateField[], deletedFieldIds: string[]): string {
+    return JSON.stringify({
+      deletedFieldIds,
+      fields: fields.map((field, index) => normalizeFieldForSave(field, index))
+    });
+  }
+
+  private resolveBusinessMode(): string {
+    const shop = this.authStore.currentShop();
+    if (shop?.enableSell && shop.enableRent) {
+      return 'BOTH';
+    }
+
+    return shop?.enableRent ? 'RENT' : 'SELL';
+  }
+
+  private canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  private canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
   }
 }

@@ -1,4 +1,5 @@
 import { Order } from '../data-access/models/order.model';
+import { formatVndCurrency, isCurrencyFieldLike, parseVndCurrencyInput } from '../../../shared/utils/currency.util';
 
 export interface CustomFieldDisplayEntry {
   key: string;
@@ -18,11 +19,15 @@ export function getOrderCustomFieldDisplayEntries(order: Order | null | undefine
         } catch {
           // ignore
         }
+        const type = normalizeFieldType(cfv.formTypeSnapshot);
+
         return {
           key: cfv.fieldKeySnapshot,
           label: cfv.labelSnapshot,
-          value: formatDisplayValue(value),
-          type: cfv.formTypeSnapshot
+          value: type === 'image'
+            ? resolveImageValue(value)
+            : formatDisplayValue(value, { fieldKey: cfv.fieldKeySnapshot, label: cfv.labelSnapshot }),
+          type
         };
       });
   }
@@ -32,11 +37,18 @@ export function getOrderCustomFieldDisplayEntries(order: Order | null | undefine
     return [];
   }
 
-  return Object.entries(order.customFields).map(([key, rawFieldValue]) => ({
-    key,
-    label: resolveFieldLabel(key, rawFieldValue),
-    value: resolveFieldValue(rawFieldValue)
-  }));
+  return Object.entries(order.customFields).map(([key, rawFieldValue]) => {
+    const type = resolveFieldType(rawFieldValue);
+    const rawValue = unwrapFieldValue(rawFieldValue);
+    const label = resolveFieldLabel(key, rawFieldValue);
+
+    return {
+      key,
+      label,
+      value: type === 'image' ? resolveImageValue(rawValue) : formatDisplayValue(rawValue, { fieldKey: key, label }),
+      type
+    };
+  });
 }
 
 function resolveFieldLabel(key: string, rawFieldValue: unknown): string {
@@ -52,16 +64,81 @@ function resolveFieldLabel(key: string, rawFieldValue: unknown): string {
 }
 
 function resolveFieldValue(rawFieldValue: unknown): string {
-  const value = isRecord(rawFieldValue) && Object.prototype.hasOwnProperty.call(rawFieldValue, 'value')
-    ? rawFieldValue['value']
-    : rawFieldValue;
-
-  return formatDisplayValue(value);
+  return formatDisplayValue(unwrapFieldValue(rawFieldValue));
 }
 
-function formatDisplayValue(value: unknown): string {
+function unwrapFieldValue(rawFieldValue: unknown): unknown {
+  return isRecord(rawFieldValue) && Object.prototype.hasOwnProperty.call(rawFieldValue, 'value')
+    ? rawFieldValue['value']
+    : rawFieldValue;
+}
+
+function resolveFieldType(rawFieldValue: unknown): string | undefined {
+  if (!isRecord(rawFieldValue)) {
+    return undefined;
+  }
+
+  const type = rawFieldValue['type'] ?? rawFieldValue['fieldType'] ?? rawFieldValue['formType'];
+
+  return typeof type === 'string' ? normalizeFieldType(type) : undefined;
+}
+
+function normalizeFieldType(type: string | undefined): string | undefined {
+  if (!type) {
+    return undefined;
+  }
+
+  const normalized = type.trim().toLowerCase();
+
+  if (['image', 'file_image', 'image_upload', 'upload_image'].includes(normalized)) {
+    return 'image';
+  }
+
+  return normalized;
+}
+
+function resolveImageValue(value: unknown): string {
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    return normalized || '';
+  }
+
+  if (Array.isArray(value)) {
+    const firstImage = value
+      .map((item) => resolveImageValue(item))
+      .find((item) => item.length > 0);
+
+    return firstImage ?? '';
+  }
+
+  if (isRecord(value)) {
+    const imageValue =
+      value['url'] ??
+      value['fileUrl'] ??
+      value['imageUrl'] ??
+      value['path'] ??
+      value['src'] ??
+      value['value'];
+
+    return resolveImageValue(imageValue);
+  }
+
+  return '';
+}
+
+function formatDisplayValue(value: unknown, field?: { fieldKey?: string; label?: string }): string {
   if (value === null || value === undefined) {
     return '(trống)';
+  }
+
+  if (field && isCurrencyFieldLike(field)) {
+    const amount = parseVndCurrencyInput(
+      typeof value === 'string' || typeof value === 'number' ? value : undefined
+    );
+
+    if (amount !== undefined) {
+      return formatVndCurrency(amount);
+    }
   }
 
   if (typeof value === 'string') {

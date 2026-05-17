@@ -64,9 +64,9 @@ export class UiToggleComponent implements ControlValueAccessor {
 
   protected onToggle(): void {
     if (!this.disabled) {
-      this.checked = !this.checked;
-      this.onChange(this.checked);
-      this.toggled.emit(this.checked);
+      const nextValue = !this.checked;
+      this.onChange(nextValue);
+      this.toggled.emit(nextValue);
     }
   }
 

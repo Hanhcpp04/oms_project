@@ -3,7 +3,14 @@ import { map, Observable } from 'rxjs';
 import { API_ENDPOINTS } from '../../../core/constants/app.constants';
 import { HttpService } from '../../../core/http/http.service';
 import { PageResponse } from '../../../core/models/pagination.model';
-import { CreateProductRequest, Product, ProductImage, ProductsQuery, ProductVariant } from './models/product.model';
+import {
+  CreateProductRequest,
+  Product,
+  ProductCustomAttribute,
+  ProductImage,
+  ProductsQuery,
+  ProductVariant
+} from './models/product.model';
 import { asNullableNumber, asNumber, asString, isRecord, unwrapApiResponse } from '../../../core/utils/api-response.util';
 
 export type ProductsViewMode = 'all' | 'rent' | 'sell';
@@ -38,6 +45,7 @@ interface ProductApi {
 
 interface ProductVariantApi {
   id?: string | number;
+  sku?: string;
   size?: string;
   color?: string;
   stockQty?: number;
@@ -52,6 +60,14 @@ interface ProductImageApi {
   url?: string;
   altText?: string;
   sortOrder?: number;
+}
+
+interface ProductCustomAttributeApi {
+  id?: string | number;
+  fieldId?: string | number;
+  fieldKey?: string;
+  label?: string;
+  value?: unknown;
 }
 
 export interface ProductQrCode {
@@ -122,6 +138,12 @@ export class ProductsApiService {
       .pipe(map(() => undefined));
   }
 
+  restore(productId: string): Observable<Product> {
+    return this.httpService
+      .patch<ProductApi | ApiEnvelope<ProductApi>, null>(`${this.endpoint}/${productId}/restore`, null)
+      .pipe(map((response) => normalizeProduct(unwrapApiResponse(response))));
+  }
+
   generateQrCode(productId: string, amount: number, note?: string): Observable<ProductQrCode> {
     return this.httpService
       .post<ProductQrCode | ApiEnvelope<ProductQrCode>, { amount: number; note?: string }>(
@@ -161,13 +183,15 @@ function normalizeProduct(raw: ProductApi): Product {
     createdAt: raw.createdAt || new Date().toISOString(),
     variants: (raw.variants ?? []).map((variant) => normalizeVariant(variant)),
     images: (raw.images ?? []).map((image) => normalizeImage(image)),
-    customAttributes: normalizeCustomAttributes(raw.customAttributes ?? raw.customAttributesJson)
+    customAttributes: normalizeCustomAttributes(raw.customAttributes ?? raw.customAttributesJson),
+    customAttributeValues: normalizeCustomAttributeValues(raw.customAttributes ?? raw.customAttributesJson)
   };
 }
 
 function normalizeVariant(raw: ProductVariantApi): ProductVariant {
   return {
     id: asString(raw.id),
+    sku: raw.sku?.trim() || undefined,
     size: raw.size?.trim() || '--',
     color: raw.color?.trim() || '--',
     stockQty: asNumber(raw.stockQty, 0),
@@ -203,11 +227,7 @@ function normalizeCustomAttributes(value: unknown): Record<string, unknown> | un
     const record: Record<string, unknown> = {};
     for (const attr of value) {
       if (attr && typeof attr === 'object' && 'fieldId' in attr && 'value' in attr) {
-        try {
-          record[String(attr.fieldId)] = typeof attr.value === 'string' ? JSON.parse(attr.value) : attr.value;
-        } catch {
-          record[String(attr.fieldId)] = attr.value;
-        }
+        record[String(attr.fieldId)] = parseCustomAttributeValue(attr.value);
       }
     }
     return Object.keys(record).length > 0 ? record : undefined;
@@ -226,6 +246,41 @@ function normalizeCustomAttributes(value: unknown): Record<string, unknown> | un
     return isRecord(parsed) ? parsed : undefined;
   } catch {
     return undefined;
+  }
+}
+
+function normalizeCustomAttributeValues(value: unknown): ProductCustomAttribute[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const attributes = value
+    .filter((item): item is ProductCustomAttributeApi => isRecord(item))
+    .map((item) => ({
+      id: asString(item.id),
+      fieldId: asString(item.fieldId),
+      fieldKey: item.fieldKey?.trim() || '',
+      label: item.label?.trim() || item.fieldKey?.trim() || asString(item.fieldId),
+      value: parseCustomAttributeValue(item.value)
+    }))
+    .filter((item) => item.fieldId || item.label);
+
+  return attributes.length > 0 ? attributes : undefined;
+}
+
+function parseCustomAttributeValue(value: unknown): unknown {
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  if (!value.trim()) {
+    return '';
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
   }
 }
 

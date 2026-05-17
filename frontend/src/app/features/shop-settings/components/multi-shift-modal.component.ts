@@ -19,7 +19,7 @@ export interface ShiftSlot {
     <div class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
       (click)="closed.emit()">
       <div
-        class="w-full max-w-xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-2xl"
+        class="w-full max-w-xl max-h-[92vh] flex flex-col rounded-t-2xl sm:rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm"
         (click)="$event.stopPropagation()">
 
         <!-- Header -->
@@ -40,7 +40,7 @@ export interface ShiftSlot {
         <!-- Body: scrollable -->
         <div class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           @for (slot of slots; track $index; let i = $index) {
-          <div class="rounded-xl border bg-[var(--color-surface-secondary)] overflow-visible"
+          <div class="rounded-sm border bg-[var(--color-surface-secondary)] overflow-visible"
             [class]="slot.error ? 'border-red-300' : 'border-[var(--color-border)]'">
 
             <!-- Slot title row -->
@@ -66,13 +66,13 @@ export interface ShiftSlot {
                   <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Bắt đầu</label>
                   <input type="time" [value]="slot.startTime"
                     (change)="updateSlotTime(slot, 'startTime', $any($event.target).value)"
-                    class="h-9 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]" />
+                    class="h-9 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]" />
                 </div>
                 <div class="grid gap-1">
                   <label class="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Kết thúc</label>
                   <input type="time" [value]="slot.endTime"
                     (change)="updateSlotTime(slot, 'endTime', $any($event.target).value)"
-                    class="h-9 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]" />
+                    class="h-9 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-2 text-sm text-[var(--color-text-primary)] outline-none transition focus:border-[var(--color-accent)]" />
                 </div>
               </div>
 
@@ -96,7 +96,7 @@ export interface ShiftSlot {
                 <div class="relative">
                   <!-- Trigger button -->
                   <button type="button"
-                    class="flex h-9 w-full items-center justify-between rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-left transition hover:border-[var(--color-accent)]/50"
+                    class="flex h-9 w-full items-center justify-between rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-sm text-left transition hover:border-[var(--color-accent)]/50"
                     (click)="toggleDropdown(slot)">
                     <span [class]="slot.selectedStaffIds.size > 0 ? 'text-[var(--color-text-primary)] font-medium' : 'text-[var(--color-text-tertiary)]'">
                       @if (slot.selectedStaffIds.size === 0) {
@@ -113,7 +113,7 @@ export interface ShiftSlot {
 
                   <!-- Dropdown list -->
                   @if (slot.staffDropdownOpen) {
-                  <div class="absolute left-0 right-0 top-10 z-10 max-h-44 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] shadow-lg">
+                  <div class="absolute left-0 right-0 top-10 z-10 max-h-44 overflow-y-auto rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] shadow-sm">
                     @for (staff of availableStaff; track staff.id) {
                     <button type="button"
                       class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm transition hover:bg-[var(--color-surface-hover)]"
@@ -150,7 +150,7 @@ export interface ShiftSlot {
 
           <!-- Add slot button -->
           <button
-            class="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-[var(--color-accent)]/40 py-2.5 text-sm font-semibold text-[var(--color-accent)] transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
+            class="flex w-full items-center justify-center gap-2 rounded-sm border border-dashed border-[var(--color-accent)]/40 py-2.5 text-sm font-semibold text-[var(--color-accent)] transition hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-soft)]"
             (click)="addSlot()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
@@ -166,10 +166,10 @@ export interface ShiftSlot {
           </p>
           <div class="flex gap-2">
             <button
-              class="flex h-9 items-center rounded-lg px-4 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              class="flex h-9 items-center rounded-sm px-4 text-sm font-semibold text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
               (click)="closed.emit()">Hủy</button>
             <button
-              class="flex h-9 items-center rounded-lg bg-[var(--color-accent)] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+              class="flex h-9 items-center rounded-sm bg-[var(--color-accent)] px-5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--color-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
               [disabled]="saving || !isValid()"
               (click)="submit()">
               {{ saving ? 'Đang lưu...' : 'Lưu ' + slots.length + ' ca' }}

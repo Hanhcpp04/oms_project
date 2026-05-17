@@ -32,6 +32,14 @@ public class ShopOrderSourceController {
         return ResponseEntity.ok(ApiResponse.ok(orderSourceService.getAllByShopId(user.getShopId())));
     }
 
+    @GetMapping("/active")
+    @RequirePermission(PermissionCode.ORDER_CREATE)
+    @Operation(summary = "Lay danh sach nguon don hang dang bat de tao don")
+    public ResponseEntity<ApiResponse<List<OrderSourceDto>>> getActive(
+            @AuthenticationPrincipal CustomUserDetails user) {
+        return ResponseEntity.ok(ApiResponse.ok(orderSourceService.getActiveByShopId(user.getShopId())));
+    }
+
     @PostMapping
     @RequirePermission(PermissionCode.SHOP_SETTINGS)
     @Operation(summary = "Tạo mới nguồn đơn hàng")

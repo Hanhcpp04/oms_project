@@ -1,0 +1,48 @@
+<section>
+  <div class="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Lịch thuê</h2>
+      <p class="m-0 mt-1 text-xs text-[var(--color-text-secondary)]">Xem nhanh 60 ngày tới theo từng biến thể.</p>
+    </div>
+
+    <label class="relative">
+      <span class="sr-only">Chọn biến thể</span>
+      <select
+        class="h-9 min-w-[220px] appearance-none rounded-none border border-[var(--color-input-border)] bg-[var(--color-surface)] pl-3 pr-9 text-[13px] font-semibold text-[var(--color-text-primary)] outline-none focus:border-[var(--color-border-focus)] focus:ring-1 focus:ring-[var(--color-focus-ring)]"
+        [value]="selectedVariantId || ''" (change)="setVariant($event)">
+        @for (variant of product.variants; track variant.id) {
+        <option [value]="variant.id">{{ formatVariantLabel(variant) }}</option>
+        }
+      </select>
+      <i class="ri-arrow-down-s-line pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-secondary)]"></i>
+    </label>
+  </div>
+
+  <div class="border-t border-[var(--color-border)] pt-3">
+    <div class="mb-3 flex flex-wrap items-center gap-4 text-xs font-medium text-[var(--color-text-secondary)]">
+      <span class="inline-flex items-center gap-1.5">
+        <span class="h-3 w-3 rounded-none border border-[var(--color-success)] bg-[var(--color-success-soft)]"></span>
+        Còn trống
+      </span>
+      <span class="inline-flex items-center gap-1.5">
+        <span class="h-3 w-3 rounded-none border border-[var(--color-danger)] bg-[var(--color-danger-soft)]"></span>
+        Đã giữ lịch
+      </span>
+      @if (loading) {
+      <span class="font-semibold text-[var(--color-text-muted)]">Đang tải lịch...</span>
+      }
+    </div>
+
+    <div class="grid grid-cols-5 gap-2 sm:grid-cols-7 md:grid-cols-10 lg:grid-cols-12">
+      @for (day of days; track day.date) {
+      <div class="flex min-h-12 flex-col items-center justify-center rounded-none border px-1 text-center" [ngClass]="{
+            'border-[var(--color-danger-soft)] bg-[var(--color-danger-soft)] text-[var(--color-danger-text)]': isDayBlocked(day.date),
+            'border-[var(--color-success-soft)] bg-[var(--color-success-soft)] text-[var(--color-success-text)]': !isDayBlocked(day.date)
+          }" [title]="isDayBlocked(day.date) ? 'Đã giữ lịch' : 'Còn trống'">
+        <span class="text-[10px] font-semibold uppercase">{{ day.weekday }}</span>
+        <span class="text-xs font-semibold">{{ formatDayLabel(day.date) }}</span>
+      </div>
+      }
+    </div>
+  </div>
+</section>

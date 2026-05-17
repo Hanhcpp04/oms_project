@@ -34,6 +34,15 @@ public class ShopShippingMethodController {
         return ResponseEntity.ok(ApiResponse.ok(methods));
     }
 
+    @GetMapping("/active")
+    @RequirePermission(PermissionCode.ORDER_CREATE)
+    @Operation(summary = "Get active shipping methods for order creation")
+    public ResponseEntity<ApiResponse<List<ShippingMethodDto>>> getActiveMethods(@AuthenticationPrincipal CustomUserDetails userDetails) {
+        Long shopId = userDetails.getShopId();
+        List<ShippingMethodDto> methods = shippingMethodService.getActiveByShopId(shopId);
+        return ResponseEntity.ok(ApiResponse.ok(methods));
+    }
+
     @PostMapping
     @RequirePermission(PermissionCode.SHOP_SETTINGS)
     @Operation(summary = "Create a new shipping method")

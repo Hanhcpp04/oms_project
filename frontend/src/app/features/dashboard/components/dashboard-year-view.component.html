@@ -5,13 +5,13 @@
         <h3 class="m-0 text-base font-bold text-[var(--color-text-primary)]">Toàn cảnh năm</h3>
         <p class="m-0 mt-1 text-sm text-[var(--color-text-tertiary)]">Biểu đồ tăng trưởng doanh thu theo tháng</p>
       </div>
-      <div class="rounded-xl bg-[var(--color-surface-secondary)] px-5 py-3 text-right">
+      <div class="rounded-sm bg-[var(--color-surface-secondary)] px-5 py-3 text-right">
         <p class="m-0 text-[11px] font-semibold uppercase tracking-widest text-[var(--color-text-tertiary)]">Doanh thu dự kiến</p>
         <p class="m-0 mt-1 text-2xl font-bold text-[var(--color-text-primary)]">{{ formatCurrency(totalYearRevenue) }}</p>
       </div>
     </div>
 
-    <div class="relative w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-2 sm:p-4">
+    <div class="relative w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] p-2 sm:p-4">
       <div class="w-full">
         <svg [attr.viewBox]="'0 0 ' + chartWidth + ' ' + chartHeight" class="h-auto w-full overflow-visible">
           <defs>
@@ -112,7 +112,7 @@
     <h3 class="m-0 mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Nhịp độ từng tháng</h3>
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
       @for (point of store.growth(); track point.month) {
-      <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
+      <div class="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
         <div class="mb-2 flex items-center justify-between">
           <p class="m-0 text-xs font-medium text-[var(--color-text-secondary)]">{{ point.month }}</p>
           <span class="text-[10px] font-medium text-[var(--color-text-tertiary)]">{{ point.orders }} đơn</span>

@@ -10,7 +10,10 @@ import {
   OrdersQuery,
   OrderType,
   CreateOrderInput,
-  OrderStatus
+  OrderStatus,
+  PaymentStatus,
+  UpdateOrderInput,
+  FulfillmentStatus
 } from './models/order.model';
 import {
   asNumber,
@@ -74,7 +77,9 @@ interface OrderApi {
   id?: string | number;
   orderCode?: string;
   orderType?: string;
+  source?: string;
   status?: string;
+  fulfillmentStatus?: FulfillmentStatus;
   paymentStatus?: string;
   sourceMethod?: string;
   customerName?: string;
@@ -85,6 +90,7 @@ interface OrderApi {
   shippingMethod?: string;
   shippingFee?: number;
   totalAmount?: number;
+  depositAmount?: number;
   createdByFullName?: string;
   createdByUsername?: string;
   createdAt?: string;
@@ -92,6 +98,12 @@ interface OrderApi {
   paymentMethod?: string;
   items?: OrderItemApi[];
   customFieldValues?: any[];
+  messenger?: {
+    pageId?: string;
+    customerPsid?: string;
+    conversationId?: string | number;
+    draftId?: string | number;
+  };
   rentalInfo?: {
     rentFrom?: string;
     rentTo?: string;
@@ -212,6 +224,75 @@ export class OrdersApiService {
       })
       .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
   }
+
+  confirm(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/confirm`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markPacking(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/packing`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markShipped(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/shipped`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markDone(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/done`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markDeposited(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/deposited`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markRenting(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/renting`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markOverdue(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/overdue`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  markReturned(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/returned`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  cancel(orderId: string | number): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, any>(`${this.endpoint}/${orderId}/cancel`, {})
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  update(orderId: string | number, input: UpdateOrderInput): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, UpdateOrderInput>(`${this.endpoint}/${orderId}`, input)
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
+
+  updatePayment(orderId: string | number, input: { paymentStatus?: PaymentStatus; paymentMethod?: Order['paymentMethod'] }): Observable<Order> {
+    return this.httpService
+      .patch<OrderApi | ApiEnvelope<OrderApi>, { paymentStatus?: PaymentStatus; paymentMethod?: Order['paymentMethod'] }>(
+        `${this.endpoint}/${orderId}/payment`,
+        input
+      )
+      .pipe(map((res) => normalizeOrder(unwrapApiResponse(res))));
+  }
 }
 
 function normalizePageResponse(raw: RawPageResponse<OrderApi>): PageResponse<Order> {
@@ -230,7 +311,9 @@ function normalizeOrder(raw: OrderApi): Order {
     orderCode: raw.orderCode || '',
     orderNumber: raw.orderCode, // Fallback orderNumber to orderCode
     orderType: (raw.orderType as OrderType) || 'SELL',
+    source: raw.source,
     status: (raw.status as OrderStatus) || 'NEW',
+    fulfillmentStatus: raw.fulfillmentStatus,
     paymentStatus: raw.paymentStatus as any,
     paymentMethod: raw.paymentMethod as any,
     sourceMethod: raw.sourceMethod as any,
@@ -241,6 +324,7 @@ function normalizeOrder(raw: OrderApi): Order {
     createdAt: raw.createdAt || new Date().toISOString(),
     updatedAt: raw.updatedAt,
     totalAmount: asNumber(raw.totalAmount, 0),
+    depositAmount: asNumber(raw.depositAmount, 0),
     sourceChannel: raw.sourceChannel,
     shippingMethod: raw.shippingMethod,
     shippingFee: asNumber(raw.shippingFee, 0),
@@ -250,9 +334,10 @@ function normalizeOrder(raw: OrderApi): Order {
     customFieldValues: raw.customFieldValues,
     rentFrom: raw.rentalInfo?.rentFrom,
     rentTo: raw.rentalInfo?.rentTo,
-    depositPaid: raw.rentalInfo?.depositPaid,
+    depositPaid: raw.rentalInfo?.depositPaid ?? asNumber(raw.depositAmount, 0),
     returnStatus: raw.rentalInfo?.returnStatus,
-    returnedAt: raw.rentalInfo?.returnedAt
+    returnedAt: raw.rentalInfo?.returnedAt,
+    messenger: raw.messenger
   };
 }
 

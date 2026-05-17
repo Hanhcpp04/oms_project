@@ -1,0 +1,422 @@
+<div class="min-h-screen bg-[var(--color-bg)] px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
+  <div class="mx-auto max-w-[980px]">
+    @if (loading()) {
+    <div
+      class="grid min-h-64 place-items-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div class="flex flex-col items-center gap-3 text-[var(--color-text-secondary)]">
+        <div class="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent)] border-t-transparent"></div>
+        <p class="m-0 text-sm">Đang tải thông tin form...</p>
+      </div>
+    </div>
+    } @else if (error()) {
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 sm:p-5">
+      <div class="mx-auto max-w-xl text-center">
+        <div
+          class="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-[var(--radius-xs)] bg-[var(--color-danger-soft)] text-[var(--color-danger-text)]">
+          <i class="ri-error-warning-line text-2xl"></i>
+        </div>
+        <h2 class="m-0 text-2xl font-semibold text-[var(--color-text-primary)]">{{ error()?.title }}</h2>
+        <p class="m-0 mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">{{ error()?.message }}</p>
+      </div>
+    </div>
+    } @else if (isPaymentStep()) {
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-5">
+      <div class="py-4 text-center">
+        <h2 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)]">Thanh toán đơn hàng</h2>
+        <p class="mt-2 text-sm text-[var(--color-text-secondary)]">
+          {{ selectedPaymentMethod() === 'BANK_TRANSFER' ? 'Vui lòng quét mã QR dưới đây để hoàn tất thanh toán.' : 'Vui lòng tiến hành thanh toán qua VNPay.' }}
+        </p>
+
+        @if (selectedPaymentMethod() === 'BANK_TRANSFER' && successQrUrl()) {
+        <div class="mx-auto mb-8 mt-6 max-w-xl rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4 sm:p-4">
+          <div class="mt-2 flex justify-center">
+            <img [src]="successQrUrl()!" alt="QR thanh toán" class="h-56 w-56 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-white p-2 sm:h-64 sm:w-64" />
+          </div>
+          <div class="mx-auto mt-6 max-w-sm rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-left">
+            <div class="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1"><span>Chủ tài khoản:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankAccountName }}</span></div>
+            <div class="flex justify-between text-xs text-[var(--color-text-secondary)] mb-1"><span>Số tài khoản:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankAccountNumber }}</span></div>
+            <div class="flex justify-between text-xs text-[var(--color-text-secondary)]"><span>Ngân hàng:</span><span class="font-semibold text-[var(--color-text-primary)]">{{ config()?.paymentConfig?.bankName }}</span></div>
+          </div>
+        </div>
+        }
+
+        <button type="button" (click)="completePayment()"
+          class="mt-4 w-full sm:w-auto rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-8 py-3.5 text-base font-semibold text-white shadow-sm transition-opacity hover:opacity-90">
+          Tôi đã thanh toán
+        </button>
+      </div>
+    </div>
+    } @else if (success()) {
+    <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-5">
+      <div class="py-4 text-center">
+        <div
+          class="mx-auto mb-6 grid h-16 w-16 place-items-center rounded-[var(--radius-xs)] bg-[var(--color-success-soft)] text-[var(--color-success-text)]">
+          <i class="ri-check-line text-4xl"></i>
+        </div>
+        <h2 class="m-0 text-2xl font-semibold tracking-[-0.02em] text-[var(--color-text-primary)] sm:text-3xl">Đặt hàng
+          thành công!</h2>
+        <p class="mx-auto mt-3 max-w-md text-base leading-7 text-[var(--color-text-secondary)] sm:text-lg">Đơn hàng của
+          bạn đã được ghi nhận. Chủ shop sẽ sớm liên hệ với bạn qua số điện thoại để xác nhận.</p>
+
+        <button type="button" (click)="resetForm()"
+          class="mt-8 rounded-[var(--radius-sm)] border border-[var(--color-border)] px-6 py-3 font-semibold text-[var(--color-text-primary)] hover:bg-[var(--color-surface-secondary)]">Quay
+          lại trang đặt hàng</button>
+      </div>
+    </div>
+    } @else if (config()) {
+    <div class="grid gap-5 sm:gap-4">
+      <section
+        class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <div class="h-2 bg-[var(--color-accent)]"></div>
+        <div class="px-4 py-5 sm:px-8 sm:py-6">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex items-start gap-4 sm:gap-5">
+              @if (config()?.logoUrl) {
+              <img [src]="config()?.logoUrl" alt="Shop Logo"
+                class="h-16 w-16 flex-shrink-0 rounded-[var(--radius-xs)] border border-[var(--color-border)] object-cover bg-[var(--color-surface-secondary)] sm:h-20 sm:w-20" />
+              } @else {
+              <div
+                class="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] sm:h-20 sm:w-20">
+                <i class="ri-store-2-line text-2xl text-[var(--color-text-muted)]"></i></div>
+              }
+              <div>
+                <div class="mb-1.5 flex items-center gap-2">
+                  <h1
+                    class="m-0 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-text-primary)] sm:text-3xl">
+                    {{ config()?.shopName }}</h1>
+                  <span
+                    class="inline-flex rounded-[var(--radius-xs)] bg-[var(--color-success-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-success-text)]">{{
+                    isRentOrderSelected() ? 'Đơn thuê' : 'Đơn bán' }}</span>
+                </div>
+                <div
+                  class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--color-text-secondary)]">
+                  @if (config()?.shopPhone) { <span class="flex items-center gap-1.5"><i
+                      class="ri-phone-line text-[var(--color-text-muted)]"></i> {{ config()?.shopPhone }}</span> }
+                  @if (config()?.shopEmail) { <span class="flex items-center gap-1.5"><i
+                      class="ri-mail-line text-[var(--color-text-muted)]"></i> {{ config()?.shopEmail }}</span> }
+                </div>
+                <p class="m-0 max-w-xl text-sm text-[var(--color-text-secondary)]">Vui lòng kiểm tra sản phẩm, điền
+                  thông tin liên hệ và gửi yêu cầu. Shop sẽ xác nhận đơn hàng qua thông tin bạn cung cấp.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-5">
+        @if (selectedProduct()) {
+        <section
+          class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <div class="flex items-start gap-4">
+              <div class="h-16 w-16 flex-shrink-0 overflow-hidden rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-white">
+                <img [src]="selectedProduct()?.images?.[0]?.url || 'assets/images/placeholder.webp'"
+                  class="h-full w-full object-cover" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Sản phẩm đã chọn</p>
+                <h4 class="m-0 mt-1 text-lg font-semibold leading-tight text-[var(--color-text-primary)] sm:text-xl">{{ selectedProduct()?.name }}</h4>
+                <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)] line-clamp-2">{{ selectedProduct()?.description || 'Không có mô tả cho sản phẩm này.' }}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-4 sm:p-5">
+            <div class="space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <label class="block text-sm font-semibold text-[var(--color-text-primary)]">1. Chọn size / phiên bản</label>
+                <span class="text-xs text-[var(--color-text-muted)]">Chạm để chọn nhanh</span>
+              </div>
+              <div class="flex flex-col gap-3">
+                @for (variant of availableVariants(); track variant.id) {
+                <label
+                  class="flex cursor-pointer items-center justify-between gap-4 rounded-[var(--radius-sm)] border px-4 py-3 transition-colors"
+                  [class.border-[var(--color-accent)]]="selectedVariant()?.id === variant.id"
+                  [class.bg-[var(--color-accent-soft)]]="selectedVariant()?.id === variant.id"
+                  [class.border-[var(--color-border)]]="selectedVariant()?.id !== variant.id">
+                  <input type="radio" name="productVariant" [value]="variant.id"
+                    [checked]="selectedVariant()?.id === variant.id" (change)="selectVariant(variant)"
+                    class="sr-only" />
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-semibold text-[var(--color-text-primary)]">{{ variant.size }}</span>
+                      @if (selectedVariant()?.id === variant.id) {
+                      <span class="rounded-full bg-[var(--color-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Đã chọn</span>
+                      }
+                    </div>
+                    <div class="mt-1 text-sm text-[var(--color-text-secondary)]">{{ formatCurrency(getVariantPrice(variant)) }}</div>
+                  </div>
+                  <div class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-2"
+                    [class.border-[var(--color-accent)]]="selectedVariant()?.id === variant.id"
+                    [class.border-[var(--color-border-hover)]]="selectedVariant()?.id !== variant.id">
+                    <div class="h-2.5 w-2.5 rounded-full bg-[var(--color-accent)] transition-transform"
+                      [class.scale-100]="selectedVariant()?.id === variant.id"
+                      [class.scale-0]="selectedVariant()?.id !== variant.id"></div>
+                  </div>
+                </label>
+                }
+              </div>
+            </div>
+
+            <div class="mt-5">
+              <app-dynamic-form-renderer [fields]="renderableCustomFields()" [values]="customFieldValues()"
+                [errors]="customFieldErrors()" [context]="'public'" [compact]="true"
+                (valuesChange)="onCustomValuesChange($event)" (fileSelected)="onCustomRendererFileSelected($event)" />
+            </div>
+          </div>
+        </section>
+        }
+
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">2. Thông tin liên hệ</h3>
+            </div>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex flex-col gap-4">
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-[var(--color-text-secondary)]">Họ và tên <span class="text-[var(--color-danger-text)]">*</span></label>
+                <input type="text" formControlName="customerName" placeholder="Nhập họ và tên..."
+                  class="h-12 w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-4 text-[15px] text-[var(--color-text-primary)] transition-colors placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2"
+                  [ngClass]="form.controls.customerName.invalid && form.controls.customerName.touched ? 'border-[var(--color-danger-text)] focus:border-[var(--color-danger-text)] focus:ring-[var(--color-danger-text)]/15' : 'border-[var(--color-border)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]/15'" />
+                @if (form.controls.customerName.invalid && form.controls.customerName.touched) {
+                  <p class="text-xs text-[var(--color-danger-text)] m-0 mt-1">Vui lòng nhập họ và tên.</p>
+                }
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-[var(--color-text-secondary)]">Số điện thoại <span class="text-[var(--color-danger-text)]">*</span></label>
+                <input type="tel" formControlName="customerPhone" (input)="onPhoneInput($event)" placeholder="Ví dụ: 0912 345 678"
+                  class="h-12 w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-4 text-[15px] text-[var(--color-text-primary)] transition-colors placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2"
+                  [ngClass]="form.controls.customerPhone.invalid && form.controls.customerPhone.touched ? 'border-[var(--color-danger-text)] focus:border-[var(--color-danger-text)] focus:ring-[var(--color-danger-text)]/15' : 'border-[var(--color-border)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]/15'" />
+                @if (form.controls.customerPhone.invalid && form.controls.customerPhone.touched) {
+                  <p class="text-xs text-[var(--color-danger-text)] m-0 mt-1">Vui lòng nhập số điện thoại.</p>
+                }
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-[var(--color-text-secondary)]">Địa chỉ nhận hàng <span class="text-[var(--color-danger-text)]">*</span></label>
+                <input type="text" formControlName="customerAddress" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành phố..."
+                  class="h-12 w-full rounded-[var(--radius-sm)] border bg-[var(--color-surface)] px-4 text-[15px] text-[var(--color-text-primary)] transition-colors placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2"
+                  [ngClass]="form.controls.customerAddress.invalid && form.controls.customerAddress.touched ? 'border-[var(--color-danger-text)] focus:border-[var(--color-danger-text)] focus:ring-[var(--color-danger-text)]/15' : 'border-[var(--color-border)] focus:border-[var(--color-accent)] focus:ring-[var(--color-accent)]/15'" />
+                @if (form.controls.customerAddress.invalid && form.controls.customerAddress.touched) {
+                  <p class="text-xs text-[var(--color-danger-text)] m-0 mt-1">Vui lòng nhập địa chỉ nhận hàng.</p>
+                }
+              </div>
+              <div class="space-y-2">
+                <label class="block text-sm font-medium text-[var(--color-text-secondary)]">Ghi chú (Tùy chọn)</label>
+                <textarea formControlName="customerNote" rows="3" placeholder="Ghi chú thêm về đơn hàng..."
+                  class="min-h-[96px] w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-3 text-[15px] text-[var(--color-text-primary)] transition-colors placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/15"></textarea>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Rent Dates -->
+        @if (isRentOrderSelected()) {
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">Thông tin thuê</h3>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-[var(--color-text-secondary)] mb-2">Chọn ngày thuê <span class="text-[var(--color-danger-text)]">*</span></label>
+              
+              <!-- Calendar Grid -->
+              <div class="grid grid-cols-7 gap-1 text-center text-xs mb-2">
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">CN</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T2</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T3</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T4</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T5</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T6</div>
+                <div class="py-1 font-medium text-[var(--color-text-muted)]">T7</div>
+                
+                @for (dayObj of rentalCalendarDays(); track dayObj.dateStr) {
+                  @if (dayObj.isPlaceholder) {
+                    <div class="h-8"></div>
+                  } @else {
+                    <button type="button" 
+                      (click)="selectRentalDate(dayObj.dateStr)"
+                      [disabled]="isRentalDayDisabled(dayObj.dateStr)"
+                      [title]="getRentalDayTitle(dayObj.dateStr)"
+                      class="relative h-8 rounded-[var(--radius-xs)] border flex items-center justify-center transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      [ngClass]="getRentalDayClass(dayObj.dateStr)">
+                      {{ dayObj.dayNum }}
+                    </button>
+                  }
+                }
+              </div>
+              
+              @if (rentalDateError()) {
+                <p class="mt-2 text-sm text-[var(--color-danger-text)]">{{ rentalDateError() }}</p>
+              }
+              
+              <div class="mt-3 flex gap-4 text-xs">
+                <div class="flex items-center gap-1.5"><div class="h-3 w-3 rounded-[var(--radius-xs)] bg-[#F0FDF4] border border-[#BBF7D0]"></div><span class="text-[var(--color-text-secondary)]">Trống</span></div>
+                <div class="flex items-center gap-1.5"><div class="h-3 w-3 rounded-[var(--radius-xs)] bg-[#111111] border border-[#111111]"></div><span class="text-[var(--color-text-secondary)]">Đang chọn</span></div>
+                <div class="flex items-center gap-1.5"><div class="h-3 w-3 rounded-[var(--radius-xs)] bg-[#FEF2F2] border border-[#FCA5A5]"></div><span class="text-[var(--color-text-secondary)]">Đã kín</span></div>
+              </div>
+            </div>
+            
+            <div class="grid gap-4">
+              <div>
+                <label class="block text-xs font-medium text-[var(--color-text-secondary)]">Ngày nhận</label>
+                <div class="mt-1 h-9 flex items-center rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 text-sm text-[var(--color-text-primary)] font-medium">
+                  {{ form.controls.rentFrom.value ? formatRentalDayLabel(form.controls.rentFrom.value) : '---' }}
+                </div>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-[var(--color-text-secondary)]">Ngày trả</label>
+                <div class="mt-1 h-9 flex items-center rounded-[var(--radius-xs)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 text-sm text-[var(--color-text-primary)] font-medium">
+                  {{ form.controls.rentTo.value ? formatRentalDayLabel(form.controls.rentTo.value) : '---' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+        }
+
+        <!-- Rental Verification -->
+        @if (shouldShowRentalVerificationFields()) {
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">Xác thực danh tính (Thuê)</h3>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="grid gap-4 sm:grid-cols-2">
+              @for (field of rentalVerificationFields; track field.key) {
+              <div class="space-y-1.5">
+                <label class="block text-sm font-medium text-[var(--color-text-secondary)]">{{ field.label }} <span class="text-[var(--color-danger-text)]">*</span></label>
+                <div class="relative flex min-h-[120px] flex-col items-center justify-center rounded-[var(--radius-sm)] border-2 border-dashed transition-colors"
+                  [class.border-[var(--color-border-hover)]]="!getRentalVerificationImageUrl(field.key)"
+                  [class.border-[var(--color-accent)]]="getRentalVerificationImageUrl(field.key)"
+                  [class.bg-[var(--color-surface-secondary)]]="!getRentalVerificationImageUrl(field.key)"
+                  [class.bg-[var(--color-surface)]]="getRentalVerificationImageUrl(field.key)">
+                  
+                  @if (getRentalVerificationImageUrl(field.key)) {
+                  <img [src]="getRentalVerificationImageUrl(field.key)" class="absolute inset-0 h-full w-full rounded-[var(--radius-sm)] object-cover" />
+                  <div class="absolute inset-0 rounded-[var(--radius-sm)] bg-black/40 opacity-0 transition-opacity hover:opacity-100 flex items-center justify-center">
+                    <span class="text-white text-sm font-medium flex items-center gap-1.5"><i class="ri-refresh-line"></i> Thay đổi ảnh</span>
+                  </div>
+                  } @else {
+                  <i class="ri-image-add-line text-2xl text-[var(--color-text-muted)] mb-2"></i>
+                  <span class="text-xs text-[var(--color-text-secondary)] font-medium">Nhấn để tải ảnh lên</span>
+                  <span class="text-[10px] text-[var(--color-text-muted)] mt-1 text-center px-4">Định dạng JPEG, PNG, WEBP</span>
+                  }
+                  
+                  <input type="file" accept="image/*" class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    (change)="onRentalVerificationFileChange(field.key, $event)" />
+                </div>
+                @if (getRentalVerificationError(field.key)) {
+                <p class="text-xs text-[var(--color-danger-text)] mt-1">{{ getRentalVerificationError(field.key) }}</p>
+                }
+              </div>
+              }
+            </div>
+          </div>
+        </section>
+        }
+
+        <!-- Payment Method -->
+        @if (availablePaymentMethods().length) {
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">3. Phương thức thanh toán</h3>
+              <span class="text-xs text-[var(--color-text-muted)]">Chọn 1 phương thức</span>
+            </div>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex flex-col gap-3">
+              @for (method of availablePaymentMethods(); track method.value) {
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border px-4 py-3 transition-colors hover:bg-[var(--color-surface-secondary)]"
+                [class.border-[var(--color-accent)]]="selectedPaymentMethod() === method.value"
+                [class.bg-[var(--color-accent-soft)]]="selectedPaymentMethod() === method.value"
+                [class.border-[var(--color-border)]]="selectedPaymentMethod() !== method.value">
+                <input type="radio" [name]="'paymentMethod'" [value]="method.value"
+                  [checked]="selectedPaymentMethod() === method.value" (change)="selectedPaymentMethod.set(method.value)"
+                  class="mt-1 h-4 w-4 accent-[var(--color-accent)]" />
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ method.label }}</div>
+                  <div class="text-xs text-[var(--color-text-secondary)]">{{ method.desc }}</div>
+                </div>
+              </label>
+              }
+            </div>
+          </div>
+        </section>
+        }
+
+        <!-- Shipping / Source -->
+        @if (config()?.shippingMethods?.length) {
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">4. Phương thức giao hàng</h3>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex flex-col gap-3">
+              @for (method of config()?.shippingMethods; track method.id) {
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border px-4 py-3 transition-colors hover:bg-[var(--color-surface-secondary)]"
+                [class.border-[var(--color-accent)]]="selectedShippingMethodId() === method.id"
+                [class.bg-[var(--color-accent-soft)]]="selectedShippingMethodId() === method.id"
+                [class.border-[var(--color-border)]]="selectedShippingMethodId() !== method.id">
+                <input type="radio" [name]="'shippingMethod'" [value]="method.id"
+                  [checked]="selectedShippingMethodId() === method.id" (change)="selectedShippingMethodId.set(method.id)"
+                  class="mt-1 h-4 w-4 accent-[var(--color-accent)]" />
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ method.name }}</div>
+                  <div class="text-xs text-[var(--color-text-secondary)]">
+                    @if (method.feePolicy === 'FIXED_FEE') {
+                    Phí: {{ formatCurrency(method.defaultFee) }}
+                    } @else {
+                    Thỏa thuận
+                    }
+                  </div>
+                </div>
+              </label>
+              }
+            </div>
+          </div>
+        </section>
+        }
+
+        @if (config()?.orderSources?.length) {
+        <section class="overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+          <div class="border-b border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+            <h3 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">5. Nguồn biết đến shop</h3>
+          </div>
+          <div class="p-4 sm:p-5">
+            <div class="flex flex-col gap-3">
+              @for (source of config()?.orderSources; track source.id) {
+              <label
+                class="flex cursor-pointer items-start gap-3 rounded-[var(--radius-sm)] border px-4 py-3 transition-colors hover:bg-[var(--color-surface-secondary)]"
+                [class.border-[var(--color-accent)]]="selectedSourceChannelId() === source.id"
+                [class.bg-[var(--color-accent-soft)]]="selectedSourceChannelId() === source.id"
+                [class.border-[var(--color-border)]]="selectedSourceChannelId() !== source.id">
+                <input type="radio" [name]="'orderSource'" [value]="source.id"
+                  [checked]="selectedSourceChannelId() === source.id" (change)="selectedSourceChannelId.set(source.id)"
+                  class="mt-1 h-4 w-4 accent-[var(--color-accent)]" />
+                <div class="min-w-0">
+                  <div class="text-sm font-semibold text-[var(--color-text-primary)]">{{ source.name }}</div>
+                </div>
+              </label>
+              }
+            </div>
+          </div>
+        </section>
+        }
+
+        <!-- Submit button -->
+        <div class="sticky bottom-0 z-20 border-t border-[var(--color-border)] bg-[var(--color-surface)] py-4 sm:static sm:border-0 sm:bg-transparent sm:py-0 mt-4">
+          <button type="submit" [disabled]="submitting() || (isRentOrderSelected() && !isRentalDateRangeValid())"
+            class="w-full rounded-[var(--radius-sm)] bg-[var(--color-accent)] py-4 text-base font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:bg-[var(--color-border)] disabled:text-[var(--color-text-muted)] disabled:opacity-100 sm:py-3.5 sm:text-lg">
+            {{ submitting() ? 'Đang xử lý...' : (selectedPaymentMethod() === 'COD' ? 'Đặt hàng' : 'Tiếp tục thanh toán') }}
+          </button>
+        </div>
+      </form>
+    </div>
+    }
+  </div>
+</div>

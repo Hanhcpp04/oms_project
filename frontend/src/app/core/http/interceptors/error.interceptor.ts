@@ -61,6 +61,8 @@ function resolveErrorMessage(error: HttpErrorResponse): string {
 }
 
 const BACKEND_MESSAGE_MAP: Record<string, string> = {
+  'shop is currently in maintenance mode': 'Shop đang bảo trì. Vui lòng quay lại sau.',
+  'shop is not active': 'Shop hiện không hoạt động.',
   'shop not found': 'Không tìm thấy cửa hàng.',
   'product not found': 'Không tìm thấy sản phẩm.',
   'unauthorized': 'Bạn chưa đăng nhập hoặc phiên đã hết hạn.',

@@ -24,6 +24,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 @Service
@@ -32,6 +33,19 @@ import java.util.regex.Pattern;
 public class OrderFormConfigService {
 
     private static final Pattern NON_FIELD_KEY = Pattern.compile("[^a-zA-Z0-9]+");
+    private static final Set<String> ALLOWED_FIELD_TYPES = Set.of(
+            "text",
+            "email",
+            "phone",
+            "textarea",
+            "number",
+            "date",
+            "time",
+            "single_choice",
+            "multi_choice",
+            "dropdown",
+            "image"
+    );
 
     private final OrderFormConfigRepository configRepository;
     private final OrderFormCustomFieldRepository fieldRepository;
@@ -87,12 +101,13 @@ public class OrderFormConfigService {
                 .orElseGet(() -> createDefaultConfig(shopId, formType));
 
         String fieldKey = generateUniqueFieldKey(config.getId(), request.fieldKey(), request.label());
+        String fieldType = normalizeFieldType(request.fieldType());
 
         OrderFormCustomField field = OrderFormCustomField.builder()
                 .config(config)
                 .fieldKey(fieldKey)
                 .label(request.label().trim())
-                .fieldType(request.fieldType().trim())
+                .fieldType(fieldType)
                 .isRequired(Boolean.TRUE.equals(request.isRequired()))
                 .isActive(true)
                 .sortOrder(request.sortOrder() == null ? resolveNextFieldOrder(config) : request.sortOrder())
@@ -147,7 +162,7 @@ public class OrderFormConfigService {
             field.setLabel(request.label().trim());
         }
         if (request.fieldType() != null && !request.fieldType().isBlank()) {
-            field.setFieldType(request.fieldType().trim());
+            field.setFieldType(normalizeFieldType(request.fieldType()));
         }
         if (request.isRequired() != null) {
             field.setIsRequired(request.isRequired());
@@ -420,6 +435,14 @@ public class OrderFormConfigService {
     private String normalizeOptionValue(String requestedValue, String fallbackLabel) {
         String normalized = normalizeNullable(requestedValue);
         return normalized == null ? fallbackLabel.trim() : normalized;
+    }
+
+    private String normalizeFieldType(String fieldType) {
+        String normalized = normalizeNullable(fieldType);
+        if (normalized == null || !ALLOWED_FIELD_TYPES.contains(normalized)) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Field type is invalid");
+        }
+        return normalized;
     }
 
     private String normalizeNullable(String value) {

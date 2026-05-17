@@ -14,6 +14,9 @@ import com.oms.module.messenger.service.MessageService;
 import com.oms.module.messenger.service.MessengerDtoMapper;
 import com.oms.module.messenger.service.MessengerOrderService;
 import com.oms.module.messenger.service.OrderDraftService;
+import com.oms.module.order.dto.OrderResponse;
+import com.oms.module.order.entity.Order;
+import com.oms.module.order.mapper.OrderMapper;
 import com.oms.security.CustomUserDetails;
 import com.oms.security.PermissionCode;
 import com.oms.security.RequirePermission;
@@ -45,6 +48,7 @@ public class MessengerStaffController {
     private final OrderDraftService orderDraftService;
     private final MessengerOrderService messengerOrderService;
     private final MessengerDtoMapper mapper;
+    private final OrderMapper orderMapper;
 
     @GetMapping("/conversations")
     @Operation(summary = "Get latest Messenger conversations")
@@ -122,9 +126,9 @@ public class MessengerStaffController {
     @PostMapping("/order-drafts/{draftId}/confirm-manually")
     @Operation(summary = "Manually confirm a Messenger order draft")
     @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
-    public ResponseEntity<ApiResponse<MessengerOrderResponse>> confirmManually(@PathVariable Long draftId) {
-        MessengerOrder order = messengerOrderService.confirmDraftManually(draftId);
-        return ResponseEntity.ok(ApiResponse.ok("Order draft confirmed", mapper.toMessengerOrderResponse(order)));
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmManually(@PathVariable Long draftId) {
+        Order order = messengerOrderService.confirmDraftManually(draftId);
+        return ResponseEntity.ok(ApiResponse.ok("Order draft confirmed", orderMapper.toResponse(order)));
     }
 
     @PostMapping("/order-drafts/{draftId}/cancel")

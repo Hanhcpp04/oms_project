@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,11 +35,11 @@ public class Order extends BaseEntity {
     private String orderCode;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "order_type", length = 20, nullable = false)
+    @Column(name = "order_type", length = 20, nullable = false, columnDefinition = "enum('RENT','SELL')")
     private OrderType orderType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20, nullable = false)
+    @Column(name = "status", length = 20, nullable = false, columnDefinition = "enum('CANCELLED','CONFIRMED','DEPOSITED','DONE','NEW','OVERDUE','PACKING','PAID','PENDING','RENTING','RETURNED','SHIPPED')")
     @Builder.Default
     private OrderStatus status = OrderStatus.NEW;
 
@@ -74,20 +75,46 @@ public class Order extends BaseEntity {
     @Builder.Default
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
+    @Column(name = "deposit_amount", precision = 15, scale = 2)
+    @Builder.Default
+    private BigDecimal depositAmount = BigDecimal.ZERO;
+
+    @Column(name = "rent_from")
+    private LocalDate rentFrom;
+
+    @Column(name = "rent_to")
+    private LocalDate rentTo;
+
+    @Column(name = "inventory_committed", nullable = false)
+    @Builder.Default
+    private Boolean inventoryCommitted = false;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_status", length = 20)
+    @Column(name = "payment_status", length = 20, columnDefinition = "enum('DEPOSITED','PAID','UNPAID')")
     @Builder.Default
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", length = 20)
+    @Column(name = "payment_method", length = 20, columnDefinition = "enum('BANK_TRANSFER','COD','VNPAY')")
     private PaymentMethod paymentMethod;
 
     @Column(name = "custom_fields_json", columnDefinition = "JSON")
     private String customFieldsJson;
 
+    @Column(name = "messenger_page_id", length = 100)
+    private String messengerPageId;
+
+    @Column(name = "messenger_customer_psid", length = 100)
+    private String messengerCustomerPsid;
+
+    @Column(name = "messenger_conversation_id")
+    private Long messengerConversationId;
+
+    @Column(name = "messenger_draft_id")
+    private Long messengerDraftId;
+
     @Enumerated(EnumType.STRING)
-    @Column(name = "source_method", length = 20)
+    @Column(name = "source_method", length = 20, columnDefinition = "enum('AI_PARSE','MANUAL','MESSENGER','PUBLIC_FORM')")
     @Builder.Default
     private SourceMethod sourceMethod = SourceMethod.MANUAL;
 
@@ -119,7 +146,7 @@ public class Order extends BaseEntity {
     }
 
     public enum SourceMethod {
-        MANUAL, AI_PARSE, PUBLIC_FORM
+        MANUAL, AI_PARSE, PUBLIC_FORM, MESSENGER
     }
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -136,5 +163,44 @@ public class Order extends BaseEntity {
     public void addCustomFieldValue(OrderCustomFieldValue cfv) {
         customFieldValues.add(cfv);
         cfv.setOrder(this);
+    }
+
+    public boolean canTransitionTo(OrderStatus targetStatus) {
+        if (targetStatus == null || status == null) {
+            return false;
+        }
+        if (status == targetStatus) {
+            return true;
+        }
+        if (status == OrderStatus.CANCELLED || status == OrderStatus.DONE || status == OrderStatus.RETURNED) {
+            return false;
+        }
+
+        return switch (orderType) {
+            case SELL -> canTransitionSellTo(targetStatus);
+            case RENT -> canTransitionRentTo(targetStatus);
+        };
+    }
+
+    private boolean canTransitionSellTo(OrderStatus targetStatus) {
+        return switch (status) {
+            case NEW, PENDING -> targetStatus == OrderStatus.CONFIRMED || targetStatus == OrderStatus.CANCELLED;
+            case CONFIRMED -> targetStatus == OrderStatus.PACKING || targetStatus == OrderStatus.CANCELLED;
+            case PACKING -> targetStatus == OrderStatus.SHIPPED || targetStatus == OrderStatus.CANCELLED;
+            case SHIPPED -> targetStatus == OrderStatus.DONE;
+            case PAID -> targetStatus == OrderStatus.CONFIRMED || targetStatus == OrderStatus.CANCELLED;
+            default -> false;
+        };
+    }
+
+    private boolean canTransitionRentTo(OrderStatus targetStatus) {
+        return switch (status) {
+            case NEW, PENDING -> targetStatus == OrderStatus.CONFIRMED || targetStatus == OrderStatus.CANCELLED;
+            case CONFIRMED -> targetStatus == OrderStatus.DEPOSITED || targetStatus == OrderStatus.RENTING || targetStatus == OrderStatus.CANCELLED;
+            case DEPOSITED -> targetStatus == OrderStatus.RENTING || targetStatus == OrderStatus.CANCELLED;
+            case RENTING -> targetStatus == OrderStatus.OVERDUE || targetStatus == OrderStatus.RETURNED || targetStatus == OrderStatus.DONE || targetStatus == OrderStatus.CANCELLED;
+            case OVERDUE -> targetStatus == OrderStatus.RETURNED || targetStatus == OrderStatus.DONE || targetStatus == OrderStatus.CANCELLED;
+            default -> false;
+        };
     }
 }

@@ -22,7 +22,7 @@ export type CreateMethod = 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM';
     <div class="space-y-6">
       
       <!-- Method Tabs -->
-      <div class="flex p-1 space-x-1 bg-[var(--color-surface-secondary)] rounded-[var(--radius-lg)] border border-[var(--color-border)]">
+      <div class="flex p-1 space-x-1 bg-[var(--color-surface-secondary)] rounded-[var(--radius-sm)] border border-[var(--color-border)]">
         <button
           *ngFor="let m of methods"
           (click)="method.set(m.id)"
@@ -32,7 +32,7 @@ export type CreateMethod = 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM';
           [class.text-[var(--color-text-secondary)]]="method() !== m.id"
           [class.hover:text-[var(--color-text-primary)]]="method() !== m.id"
           [class.hover:bg-[var(--color-surface-hover)]]="method() !== m.id"
-          class="w-full flex items-center justify-center gap-2 rounded-[var(--radius-md)] py-2.5 text-sm font-medium leading-5 transition-all duration-200 outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)]"
+          class="w-full flex items-center justify-center gap-2 rounded-[var(--radius-sm)] py-2.5 text-sm font-medium leading-5 transition-all duration-200 outline-none focus:ring-2 focus:ring-[var(--color-focus-ring)]"
         >
           <i [class]="m.icon"></i>
           {{ m.name }}

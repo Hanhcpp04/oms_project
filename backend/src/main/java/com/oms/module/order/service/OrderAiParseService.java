@@ -232,12 +232,27 @@ public class OrderAiParseService {
         productSchema.put("type", "object");
         productSchema.put("additionalProperties", false);
         productSchema.put("properties", Map.of(
+                "productId", Map.of("type", List.of("integer", "null")),
+                "variantId", Map.of("type", List.of("integer", "null")),
+                "productCode", Map.of("type", List.of("string", "null")),
+                "sku", Map.of("type", List.of("string", "null")),
                 "name", Map.of("type", "string"),
+                "color", Map.of("type", List.of("string", "null")),
                 "size", Map.of("type", List.of("string", "null")),
                 "quantity", Map.of("type", List.of("integer", "null")),
                 "unitPrice", Map.of("type", List.of("number", "null"))
         ));
-        productSchema.put("required", List.of("name", "size", "quantity", "unitPrice"));
+        productSchema.put("required", List.of(
+                "productId",
+                "variantId",
+                "productCode",
+                "sku",
+                "name",
+                "color",
+                "size",
+                "quantity",
+                "unitPrice"
+        ));
 
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("orderType", Map.of(
@@ -313,6 +328,9 @@ public class OrderAiParseService {
                 - If shippingMethod matches one of the configured shipping methods, return the exact configured name. Otherwise return null.
                 - If customFields are present, use fieldKey as the object key. For multi choice values, return an array of strings.
                 - Keep customerNote concise and only include meaningful information not already captured elsewhere.
+                - Product blocks copied from OMS are authoritative. Preserve Product ID, Variant ID and SKU exactly when present.
+                - If there are multiple OMS product blocks in the text, use the latest/last OMS product block for product data.
+                - For rental product blocks, use "Ngay nhan"/"Ngay thue tu" as rentFrom and "Ngay tra"/"Ngay thue den" as rentTo.
 
                 orderTypeHint: %s
                 configuredOrderSources: %s
@@ -357,8 +375,18 @@ public class OrderAiParseService {
                 .sourceChannel(matchConfiguredValue(rawText, context.orderSources()))
                 .shippingMethod(matchShippingMethod(rawText, context.shippingMethods()))
                 .shippingFee(findAmount(lines, List.of("phi ship", "ship", "shipping fee")))
-                .rentFrom(normalizeDateCandidate(findByPrefixes(lines, List.of("ngay nhan", "rent from", "tu ngay"))))
-                .rentTo(normalizeDateCandidate(findByPrefixes(lines, List.of("ngay tra", "rent to", "den ngay"))))
+                .rentFrom(normalizeDateCandidate(findByPrefixes(lines, List.of(
+                        "ngay nhan",
+                        "ngay thue tu",
+                        "rent from",
+                        "tu ngay"
+                ))))
+                .rentTo(normalizeDateCandidate(findByPrefixes(lines, List.of(
+                        "ngay tra",
+                        "ngay thue den",
+                        "rent to",
+                        "den ngay"
+                ))))
                 .depositPaid(findAmount(lines, List.of("tien coc", "dat coc", "deposit")))
                 .products(parseProductsFromLines(lines))
                 .customFields(parseCustomFields(lines, context.customFields()))
@@ -690,7 +718,12 @@ public class OrderAiParseService {
         return products.stream()
                 .filter(Objects::nonNull)
                 .map(product -> AiParseResponse.ProductDraft.builder()
+                        .productId(product.getProductId())
+                        .variantId(product.getVariantId())
+                        .productCode(trimToNull(product.getProductCode()))
+                        .sku(trimToNull(product.getSku()))
                         .name(trimToNull(product.getName()))
+                        .color(trimToNull(product.getColor()))
                         .size(firstNonBlank(product.getSize(), "Free"))
                         .quantity(product.getQuantity() == null ? 1 : Math.max(1, product.getQuantity()))
                         .unitPrice(toNonNegative(product.getUnitPrice()))

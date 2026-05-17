@@ -7,7 +7,7 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
   imports: [CommonModule],
   template: `
     <div
-      class="animate-pulse rounded-[var(--radius-md)] bg-[var(--color-surface-secondary)]"
+      class="animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)]"
       [ngStyle]="{ width: width, height: height }"
     ></div>
   `,

@@ -65,7 +65,7 @@ public class ProductController {
 
     @PostMapping("/{id}/qr-code")
     @Operation(summary = "Generate QR code for product")
-    @RequirePermission(PermissionCode.PRODUCT_VIEW) // Reuse view permission or add a new one
+    @RequirePermission(PermissionCode.PRODUCT_QR_CREATE)
     public ResponseEntity<ApiResponse<com.oms.module.product.dto.ProductQRCodeResponse>> generateQRCode(
             @AuthenticationPrincipal CustomUserDetails user,
             @PathVariable Long id,
@@ -111,5 +111,15 @@ public class ProductController {
             @PathVariable Long id) {
         productService.deleteProduct(user.getShopId(), id);
         return ResponseEntity.ok(ApiResponse.ok("Product deleted", null));
+    }
+
+    @PatchMapping("/{id}/restore")
+    @Operation(summary = "Restore soft deleted product")
+    @RequirePermission(PermissionCode.PRODUCT_EDIT)
+    public ResponseEntity<ApiResponse<ProductResponse>> restoreProduct(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        ProductResponse result = productService.restoreProduct(user.getShopId(), id);
+        return ResponseEntity.ok(ApiResponse.ok(result));
     }
 }

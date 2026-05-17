@@ -24,27 +24,27 @@ export class UiButtonComponent {
 
   protected get buttonClasses(): string {
     const baseClass =
-      'inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(39,93,197,1)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
+      'inline-flex items-center justify-center font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer';
 
-    const radiusClass = this.variant === 'underlined' ? '' : 'rounded-[30px]';
+    const radiusClass = this.variant === 'underlined' ? '' : 'rounded-[var(--radius-xs)]';
 
     const sizeClasses: Record<UiButtonSize, string> = {
-      sm: this.variant === 'underlined' ? 'h-10 px-0 text-xs gap-1.5' : 'h-8 px-4 text-xs gap-1.5',
-      md: this.variant === 'underlined' ? 'h-10 px-0 text-sm gap-2' : 'h-10 px-5 text-sm gap-2',
-      lg: this.variant === 'underlined' ? 'h-11 px-0 text-sm gap-2' : 'h-11 px-6 text-sm gap-2'
+      sm: this.variant === 'underlined' ? 'h-8 px-0 text-[12px] gap-1.5' : 'h-7 px-3 text-[12px] gap-1.5',
+      md: this.variant === 'underlined' ? 'h-8 px-0 text-[13px] gap-2' : 'h-8 px-4 text-[13px] gap-2',
+      lg: this.variant === 'underlined' ? 'h-10 px-0 text-[14px] gap-2' : 'h-9 px-5 text-[14px] gap-2'
     };
 
     const variantClasses: Record<UiButtonVariant, string> = {
       primary:
-        'bg-[#111111] text-white hover:bg-[#707072]',
+        'bg-[var(--color-accent)] text-[var(--color-text-inverse)] hover:bg-[var(--color-accent-hover)]',
       secondary:
-        'border-[1.5px] border-[#CACACB] bg-transparent text-[#111111] hover:border-[#707072] hover:bg-[#F5F5F5]',
+        'border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]',
       soft:
-        'bg-[#F5F5F5] text-[#111111] hover:bg-[#E5E5E5]',
+        'bg-[var(--color-surface-secondary)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-tertiary)]',
       ghost:
-        'bg-transparent text-[#707072] hover:bg-[#F5F5F5] hover:text-[#111111]',
+        'bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]',
       danger:
-        'bg-[#D30005] text-white hover:bg-[#a80004]',
+        'bg-[var(--color-danger)] text-[var(--color-text-inverse)] hover:bg-[var(--color-danger-hover)]',
       underlined:
         'bg-transparent text-[var(--color-accent)] border-b border-[var(--color-accent)] hover:text-[var(--color-accent-hover)] hover:border-[var(--color-accent-hover)]'
     };

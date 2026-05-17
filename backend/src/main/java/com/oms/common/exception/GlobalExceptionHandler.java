@@ -38,7 +38,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex,
                                                          HttpServletRequest request) {
         log.warn("Business error [{}]: {}", ex.getErrorCode().getCode(), ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage(), request);
+        HttpStatus status = ex.getErrorCode() == ErrorCode.SHOP_MAINTENANCE
+                ? HttpStatus.SERVICE_UNAVAILABLE
+                : HttpStatus.BAD_REQUEST;
+        return buildResponse(status, ex.getErrorCode(), ex.getMessage(), request);
     }
 
     // ==================== Validation Exceptions ====================

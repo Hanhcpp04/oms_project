@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { Order } from '../data-access/models/order.model';
 import { CustomFieldDisplayEntry, getOrderCustomFieldDisplayEntries } from '../utils/order-custom-fields.util';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { inject } from '@angular/core';
 
 @Component({
@@ -30,11 +31,7 @@ export class OrderPrintModalComponent {
   }
 
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected hasCustomFields(order: Order): boolean {

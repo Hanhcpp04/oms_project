@@ -5,6 +5,7 @@ import com.oms.module.order.entity.Order;
 import com.oms.module.report.dto.*;
 import com.oms.module.shop.entity.Shop;
 import com.oms.module.shop.repository.ShopRepository;
+import com.oms.module.user.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Tuple;
 import lombok.RequiredArgsConstructor;
@@ -363,35 +364,60 @@ public class ReportService {
     }
 
     /**
-     * Employee stats: top staff by revenue from all orders (excluding cancelled).
+     * Employee stats for all staff in the shop.
+     *
+     * Orders are aggregated separately and merged into the staff list so employees
+     * with no orders still appear with zero totals.
      */
     private List<EmployeeStatDto> getEmployeeStats(Long shopId) {
-        List<Tuple> results = cbf.create(em, Tuple.class)
+        List<Tuple> staffRows = cbf.create(em, Tuple.class)
+                .from(User.class, "u")
+                .select("u.id")
+                .select("u.fullName")
+                .where("u.shop.id").eq(shopId)
+                .where("u.role").eq(User.UserRole.STAFF)
+                .orderByAsc("u.fullName")
+                .getResultList();
+
+        if (staffRows.isEmpty()) {
+            return List.of();
+        }
+
+        List<Tuple> aggregateRows = cbf.create(em, Tuple.class)
                 .from(Order.class, "o")
                 .select("o.createdBy.id")
-                .select("o.createdBy.fullName")
                 .select("COUNT(o)")
                 .select("COALESCE(SUM(o.totalAmount), 0)")
                 .where("o.shop.id").eq(shopId)
                 .where("o.createdBy.id").isNotNull()
+                .where("o.createdBy.role").eq(User.UserRole.STAFF)
                 .where("o.status").notIn(Order.OrderStatus.CANCELLED)
-                .groupBy("o.createdBy.id", "o.createdBy.fullName")
-                .orderByDesc("COALESCE(SUM(o.totalAmount), 0)")
-                .setMaxResults(10)
+                .groupBy("o.createdBy.id")
                 .getResultList();
 
-        return results.stream().map(t -> {
+        Map<Long, Tuple> aggregateByStaffId = aggregateRows.stream()
+                .collect(Collectors.toMap(t -> t.get(0, Long.class), t -> t));
+
+        return staffRows.stream().map(t -> {
+            Long staffId = t.get(0, Long.class);
             String fullName = t.get(1, String.class);
             String initials = buildInitials(fullName);
+            Tuple aggregate = aggregateByStaffId.get(staffId);
+            long ordersHandled = aggregate != null ? ((Number) aggregate.get(1)).longValue() : 0L;
+            BigDecimal revenue = aggregate != null ? (BigDecimal) aggregate.get(2) : BigDecimal.ZERO;
 
             return EmployeeStatDto.builder()
-                    .id(t.get(0, Long.class))
+                    .id(staffId)
                     .name(fullName)
                     .avatarInitials(initials)
-                    .ordersHandled(((Number) t.get(2)).longValue())
-                    .revenue((BigDecimal) t.get(3))
+                    .ordersHandled(ordersHandled)
+                    .revenue(revenue)
                     .build();
-        }).collect(Collectors.toList());
+        })
+                .sorted(Comparator
+                        .comparing(EmployeeStatDto::getRevenue, Comparator.nullsLast(Comparator.reverseOrder()))
+                        .thenComparing(EmployeeStatDto::getName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .collect(Collectors.toList());
     }
 
     /**

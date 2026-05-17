@@ -43,20 +43,37 @@ export interface OrderCustomFieldValue {
   sortOrderSnapshot?: number;
 }
 
+export type FulfillmentStatus =
+  | 'PENDING_CONFIRMATION'
+  | 'READY_TO_PACK'
+  | 'READY_TO_RENT'
+  | 'PACKING'
+  | 'SHIPPED'
+  | 'DONE'
+  | 'CANCELLED'
+  | 'DEPOSITED'
+  | 'RENTING'
+  | 'OVERDUE'
+  | 'RETURNED'
+  | 'PAID';
+
 export interface Order {
   id: string;
   orderCode: string;
   orderNumber?: string;
   orderType: OrderType;
-  sourceMethod?: 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM';
+  source?: string;
+  sourceMethod?: 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM' | 'MESSENGER';
   customerName: string;
   customerPhone: string;
   customerAddress: string;
   createdAt: string;
   updatedAt?: string;
   status: OrderStatus;
+  fulfillmentStatus?: FulfillmentStatus;
   paymentStatus?: PaymentStatus;
   totalAmount: number;
+  depositAmount?: number;
   sourceChannel?: string;
   shippingMethod?: string;
   shippingFee?: number;
@@ -73,6 +90,12 @@ export interface Order {
   depositPaid?: number;
   returnStatus?: string;
   returnedAt?: string;
+  messenger?: {
+    pageId?: string;
+    customerPsid?: string;
+    conversationId?: string | number;
+    draftId?: string | number;
+  };
 }
 
 export interface OrdersQuery {
@@ -105,13 +128,25 @@ export interface CreateOrderInput {
   products: CreateOrderProductInput[];
   customFields?: Record<string, unknown>;
   customFieldValues?: OrderCustomFieldValue[]; // For v3 backend
-  sourceMethod?: 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM';
+  sourceMethod?: 'MANUAL' | 'AI_PARSE' | 'PUBLIC_FORM' | 'MESSENGER';
   paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'VNPAY';
   rentFrom?: string;
   rentTo?: string;
   depositPaid?: number;
   shippingMethodId?: number;
   sourceChannelId?: number;
+}
+
+export interface UpdateOrderInput {
+  customerName: string;
+  customerPhone: string;
+  customerAddress: string;
+  customerNote: string;
+  sourceChannel?: string;
+  shippingMethod?: string;
+  shippingFee?: number;
+  paymentStatus?: PaymentStatus;
+  paymentMethod?: 'COD' | 'BANK_TRANSFER' | 'VNPAY';
 }
 
 export interface AutoOrderDraft {

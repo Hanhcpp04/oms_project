@@ -4,6 +4,7 @@ import {
     Product,
     ProductsQuery
 } from '../data-access/models/product.model';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 
 export function toCreateProductRequest(input: CreateProductInput): CreateProductRequest {
     const customAttributes = input.customAttributes 
@@ -166,9 +167,5 @@ export function matchesProductTypeFilter(productType: Product['productType'], fi
 }
 
 export function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND',
-        maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
 }

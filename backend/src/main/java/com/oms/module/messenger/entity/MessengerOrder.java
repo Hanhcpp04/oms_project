@@ -78,7 +78,7 @@ public class MessengerOrder extends BaseEntity {
     private String note;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
+    @Column(name = "status", nullable = false, length = 30, columnDefinition = "enum('CANCELLED','COMPLETED','NEW','PROCESSING')")
     @Builder.Default
     private MessengerOrderStatus status = MessengerOrderStatus.NEW;
 }

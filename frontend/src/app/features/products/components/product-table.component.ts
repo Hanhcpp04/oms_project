@@ -4,6 +4,7 @@ import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.compone
 import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
 import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
 import { UiTableComponent } from '../../../shared/components/ui/ui-table.component';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { Product, ProductType } from '../data-access/models/product.model';
 
 import { ProductQrCodeModalComponent } from './product-qr-code-modal.component';
@@ -80,10 +81,6 @@ export class ProductTableComponent {
   }
 
   private currency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
   }
 }

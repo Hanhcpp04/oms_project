@@ -31,7 +31,7 @@ import { finalize } from 'rxjs';
         <app-ui-card>
           <div class="flex items-start justify-between gap-4">
             <div class="flex gap-4 items-start">
-              <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+              <div class="w-12 h-12 rounded-sm bg-amber-100 flex items-center justify-center shrink-0">
                 <i class="ri-money-dollar-circle-line text-2xl text-amber-600"></i>
               </div>
               <div>
@@ -50,7 +50,7 @@ import { finalize } from 'rxjs';
         <app-ui-card>
           <div class="flex items-start justify-between gap-4 mb-4">
             <div class="flex gap-4 items-start">
-              <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+              <div class="w-12 h-12 rounded-sm bg-blue-100 flex items-center justify-center shrink-0">
                 <i class="ri-bank-line text-2xl text-blue-600"></i>
               </div>
               <div>
@@ -70,7 +70,7 @@ import { finalize } from 'rxjs';
               <div class="space-y-1.5">
                 <label class="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Ngân hàng <span class="text-red-500">*</span></label>
                 <select formControlName="bankCode"
-                  class="w-full rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-sm px-3 py-2.5 text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40 focus:border-[var(--color-accent)] transition-all">
+                  class="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-sm px-3 py-2.5 text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/40 focus:border-[var(--color-accent)] transition-all">
                   <option value="">-- Chọn ngân hàng --</option>
                   @for (bank of banks; track bank.code) {
                     <option [value]="bank.code">{{ bank.name }} ({{ bank.code }})</option>
@@ -98,7 +98,7 @@ import { finalize } from 'rxjs';
                 <div class="flex flex-col items-center gap-3 pt-2">
                   <p class="text-xs font-semibold text-[var(--color-text-tertiary)] uppercase tracking-wider">Xem trước mã QR (mẫu)</p>
                   <img [src]="qrPreviewUrl()!" alt="QR Preview"
-                    class="w-48 h-48 rounded-xl border-2 border-[var(--color-border)] shadow-md object-contain bg-white p-2">
+                    class="w-48 h-48 rounded-sm border-2 border-[var(--color-border)] shadow-sm object-contain bg-white p-2">
                   <p class="text-xs text-[var(--color-text-tertiary)]">Mã QR thực tế sẽ tự động điền số tiền đơn hàng</p>
                 </div>
               }
@@ -110,7 +110,7 @@ import { finalize } from 'rxjs';
         <app-ui-card>
           <div class="flex items-start justify-between gap-4 mb-4">
             <div class="flex gap-4 items-start">
-              <div class="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+              <div class="w-12 h-12 rounded-sm bg-purple-100 flex items-center justify-center shrink-0">
                 <i class="ri-secure-payment-line text-2xl text-purple-600"></i>
               </div>
               <div>

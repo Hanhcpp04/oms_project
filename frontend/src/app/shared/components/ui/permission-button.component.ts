@@ -139,13 +139,14 @@ export class PermissionButtonComponent {
   private getPermissionName(): string {
     const names: Record<string, string> = {
       SHOP_SETTINGS: 'Quản lý cài đặt shop',
-      STAFF_MANAGE: 'Tạo/xóa nhân viên',
+      STAFF_MANAGE: 'Quản lý nhân viên và phân quyền',
       STAFF_SCHEDULE_MANAGE: 'Quản lý ca làm việc',
       STAFF_SCHEDULE_VIEW_OWN: 'Xem lịch làm của mình',
       PRODUCT_VIEW: 'Xem sản phẩm',
       PRODUCT_CREATE: 'Tạo sản phẩm',
       PRODUCT_EDIT: 'Sửa sản phẩm',
       PRODUCT_DELETE: 'Xóa sản phẩm',
+      PRODUCT_QR_CREATE: 'Tạo QR thanh toán sản phẩm',
       ORDER_VIEW: 'Xem đơn hàng',
       ORDER_CREATE: 'Tạo đơn hàng',
       ORDER_UPDATE_STATUS: 'Cập nhật trạng thái đơn',

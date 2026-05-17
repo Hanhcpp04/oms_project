@@ -190,7 +190,7 @@ function normalizeAuthSession(payload: BackendAuthSession | undefined): AuthSess
           phone: session.shop.phone,
           supportEmail: session.shop.supportEmail,
           supportPhone: session.shop.supportPhone,
-          businessMode: session.shop.businessMode,
+          businessMode: resolveBusinessMode(session.shop),
           maintenanceMode: Boolean(session.shop.maintenanceMode ?? false),
           autoAcceptOrders: Boolean(session.shop.autoAcceptOrders ?? false),
           showInventoryOnStorefront: Boolean(session.shop.showInventoryOnStorefront ?? true),
@@ -218,6 +218,17 @@ function mapToAppRole(role: string | undefined): 'SHOP_OWNER' | 'STAFF' {
     default:
       return 'STAFF';
   }
+}
+
+function resolveBusinessMode(shop: NonNullable<BackendAuthSession['shop']>): string {
+  const enableSell = Boolean(shop.enableSell ?? true);
+  const enableRent = Boolean(shop.enableRent ?? true);
+
+  if (enableSell && enableRent) {
+    return 'BOTH';
+  }
+
+  return enableSell ? 'SELL' : 'RENT';
 }
 
 function asString(value: string | number | undefined): string {

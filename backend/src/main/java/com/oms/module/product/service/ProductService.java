@@ -7,11 +7,16 @@ import com.oms.common.exception.ResourceNotFoundException;
 import com.oms.module.product.dto.ProductRequest;
 import com.oms.module.product.dto.ProductResponse;
 import com.oms.module.product.entity.Product;
+import com.oms.module.product.entity.ProductCustomAttributeValue;
 import com.oms.module.product.entity.ProductImage;
 import com.oms.module.product.entity.ProductType;
 import com.oms.module.product.entity.ProductVariant;
 import com.oms.module.product.mapper.ProductMapper;
 import com.oms.module.product.repository.ProductRepository;
+import com.oms.module.productform.entity.ProductFormConfig;
+import com.oms.module.productform.entity.ProductFormCustomField;
+import com.oms.module.productform.repository.ProductFormConfigRepository;
+import com.oms.module.productform.service.ProductFormValidator;
 import com.oms.module.shop.entity.Shop;
 import com.oms.module.shop.entity.ShopCategory;
 import com.oms.module.shop.repository.ShopCategoryRepository;
@@ -23,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.math.BigDecimal;
 
 @Service
@@ -33,8 +40,8 @@ public class ProductService {
     private final ShopRepository shopRepository;
     private final ShopCategoryRepository shopCategoryRepository;
     private final ProductMapper productMapper;
-    private final com.oms.module.productform.service.ProductFormValidator productFormValidator;
-    private final com.oms.module.productform.repository.ProductFormCustomFieldRepository fieldRepository;
+    private final ProductFormValidator productFormValidator;
+    private final ProductFormConfigRepository productFormConfigRepository;
 
 
     /**
@@ -64,6 +71,7 @@ public class ProductService {
     public ProductResponse createProduct(Long shopId, ProductRequest request) {
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop", shopId));
+        validateProductTypeAllowed(shop, request.getProductType());
 
         Product product = Product.builder()
                 .shop(shop)
@@ -109,26 +117,7 @@ public class ProductService {
             }
         }
 
-        // Add custom attributes
-        if (request.getCustomAttributes() != null) {
-            for (ProductRequest.CustomAttributeRequest ar : request.getCustomAttributes()) {
-                com.oms.module.productform.entity.ProductFormCustomField field = fieldRepository.findById(ar.getFieldId())
-                        .orElseThrow(() -> new ResourceNotFoundException("CustomField", ar.getFieldId()));
-                
-                // Validate value
-                productFormValidator.validate(ar.getValue(), field);
-
-                com.oms.module.product.entity.ProductCustomAttributeValue attrValue = com.oms.module.product.entity.ProductCustomAttributeValue.builder()
-                        .product(product)
-                        .field(field)
-                        .fieldKeySnapshot(field.getFieldKey())
-                        .labelSnapshot(field.getLabel())
-                        .formTypeSnapshot(field.getConfig().getFormType().name())
-                        .valueJson(ar.getValue())
-                        .build();
-                product.addCustomAttributeValue(attrValue);
-            }
-        }
+        applyCustomAttributes(shopId, product, request);
 
         product = productRepository.save(product);
         return productMapper.toResponse(product);
@@ -139,7 +128,11 @@ public class ProductService {
      */
     @Transactional(readOnly = true)
     public List<ProductResponse> getActiveProductsForPublicForm(Long shopId) {
-        List<Product> products = productRepository.findAllByShopIdAndIsActiveTrue(shopId);
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop", shopId));
+        List<Product> products = productRepository.findAllByShopIdAndIsActiveTrue(shopId).stream()
+                .filter(product -> isProductVisibleForShopMode(shop, product.getProductType()))
+                .toList();
         return productMapper.toResponseList(products);
     }
 
@@ -155,12 +148,27 @@ public class ProductService {
     }
 
     /**
+     * Restore soft deleted product, scoped to shop.
+     */
+    @Transactional
+    public ProductResponse restoreProduct(Long shopId, Long id) {
+        Product product = productRepository.findByIdAndShopId(id, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+        product.setIsActive(true);
+        product = productRepository.save(product);
+        return productMapper.toResponse(product);
+    }
+
+    /**
      * Update product with variants, images and custom attributes.
      */
     @Transactional
     public ProductResponse updateProduct(Long shopId, Long id, ProductRequest request) {
         Product product = productRepository.findByIdAndShopId(id, shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product", id));
+        Shop shop = shopRepository.findById(shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Shop", shopId));
+        validateProductTypeAllowed(shop, request.getProductType());
 
         product.setName(request.getName());
         product.setDescription(request.getDescription());
@@ -226,29 +234,69 @@ public class ProductService {
             }
         }
 
-        // Update custom attributes
         product.getCustomAttributeValues().clear();
-        if (request.getCustomAttributes() != null) {
-            for (ProductRequest.CustomAttributeRequest ar : request.getCustomAttributes()) {
-                com.oms.module.productform.entity.ProductFormCustomField field = fieldRepository.findById(ar.getFieldId())
-                        .orElseThrow(() -> new ResourceNotFoundException("CustomField", ar.getFieldId()));
-                
-                productFormValidator.validate(ar.getValue(), field);
-
-                com.oms.module.product.entity.ProductCustomAttributeValue attrValue = com.oms.module.product.entity.ProductCustomAttributeValue.builder()
-                        .product(product)
-                        .field(field)
-                        .fieldKeySnapshot(field.getFieldKey())
-                        .labelSnapshot(field.getLabel())
-                        .formTypeSnapshot(field.getConfig().getFormType().name())
-                        .valueJson(ar.getValue())
-                        .build();
-                product.addCustomAttributeValue(attrValue);
-            }
-        }
+        applyCustomAttributes(shopId, product, request);
 
         product = productRepository.save(product);
         return productMapper.toResponse(product);
+    }
+
+    private void applyCustomAttributes(Long shopId, Product product, ProductRequest request) {
+        ProductFormConfig config = findProductFormConfig(shopId, resolveProductFormType(product.getProductType()));
+        if (config == null) {
+            if (request.getCustomAttributes() != null && !request.getCustomAttributes().isEmpty()) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Product form config is not available for this product type");
+            }
+            return;
+        }
+
+        Map<Long, ProductFormCustomField> fieldsById = new LinkedHashMap<>();
+        config.getCustomFields().stream()
+                .filter(field -> Boolean.TRUE.equals(field.getIsEnabled()))
+                .forEach(field -> fieldsById.put(field.getId(), field));
+
+        Map<Long, ProductRequest.CustomAttributeRequest> submittedByFieldId = new LinkedHashMap<>();
+        if (request.getCustomAttributes() != null) {
+            for (ProductRequest.CustomAttributeRequest attributeRequest : request.getCustomAttributes()) {
+                if (attributeRequest.getFieldId() == null) {
+                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Custom field ID is required");
+                }
+                if (!fieldsById.containsKey(attributeRequest.getFieldId())) {
+                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Invalid custom field for this product form");
+                }
+                submittedByFieldId.put(attributeRequest.getFieldId(), attributeRequest);
+            }
+        }
+
+        for (ProductFormCustomField field : fieldsById.values()) {
+            ProductRequest.CustomAttributeRequest attributeRequest = submittedByFieldId.get(field.getId());
+            String value = attributeRequest == null ? null : attributeRequest.getValue();
+
+            productFormValidator.validate(value, field);
+            if (!productFormValidator.hasValue(value)) {
+                continue;
+            }
+
+            ProductCustomAttributeValue attrValue = ProductCustomAttributeValue.builder()
+                    .product(product)
+                    .field(field)
+                    .fieldKeySnapshot(field.getFieldKey())
+                    .labelSnapshot(field.getLabel())
+                    .formTypeSnapshot(field.getConfig().getFormType().name())
+                    .valueJson(value)
+                    .build();
+            product.addCustomAttributeValue(attrValue);
+        }
+    }
+
+    private ProductFormConfig findProductFormConfig(Long shopId, ProductType formType) {
+        return productFormConfigRepository.findAllByShopIdAndFormType(shopId, formType).stream()
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ProductType resolveProductFormType(ProductType productType) {
+        return productType == ProductType.RENT ? ProductType.RENT : ProductType.SELL;
     }
 
     private void validateVariantRequest(ProductType productType, ProductRequest.VariantRequest variant) {
@@ -286,5 +334,31 @@ public class ProductService {
 
     private BigDecimal resolveDepositAmount(ProductType productType, BigDecimal depositAmount) {
         return productType == ProductType.SELL ? null : depositAmount;
+    }
+
+    private void validateProductTypeAllowed(Shop shop, ProductType productType) {
+        if (productType == ProductType.SELL && !Boolean.TRUE.equals(shop.getEnableSell())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Sell products are disabled for this shop");
+        }
+
+        if (productType == ProductType.RENT && !Boolean.TRUE.equals(shop.getEnableRent())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rent products are disabled for this shop");
+        }
+
+        if (productType == ProductType.SELL_RENT
+                && (!Boolean.TRUE.equals(shop.getEnableSell()) || !Boolean.TRUE.equals(shop.getEnableRent()))) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Sell + rent products require both shop modes enabled");
+        }
+    }
+
+    private boolean isProductVisibleForShopMode(Shop shop, ProductType productType) {
+        boolean sellEnabled = Boolean.TRUE.equals(shop.getEnableSell());
+        boolean rentEnabled = Boolean.TRUE.equals(shop.getEnableRent());
+
+        return switch (productType) {
+            case SELL -> sellEnabled;
+            case RENT -> rentEnabled;
+            case SELL_RENT -> sellEnabled || rentEnabled;
+        };
     }
 }

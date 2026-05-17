@@ -6,11 +6,12 @@ import { FormTemplateService } from '../../../core/services/form-template.servic
 import { NotificationService } from '../../../core/services/notification.service';
 import { UsersStore } from '../../users/state/users.store';
 import { UiModalComponent } from '../../../shared/components/ui/ui-modal.component';
+import { PageTitleComponent } from '../../../shared/components/ui/page-title.component';
 
 @Component({
   selector: 'app-form-dashboard-page',
   standalone: true,
-  imports: [CommonModule, UiModalComponent],
+  imports: [CommonModule, PageTitleComponent, UiModalComponent],
   templateUrl: './form-dashboard-page.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })

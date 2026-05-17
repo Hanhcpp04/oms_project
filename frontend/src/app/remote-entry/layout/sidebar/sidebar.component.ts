@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, comput
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { LayoutNavItem, LayoutNavChildItem } from '../layout.model';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { PermissionService } from '../../../core/services/permission.service';
 import { ShopSetupStatusService, ShopSetupStepKey } from '../../../core/services/shop-setup-status.service';
 
 type SetupAwareNavItem = LayoutNavItem | LayoutNavChildItem;
@@ -35,6 +36,7 @@ export class SidebarComponent {
   protected readonly collapsedGroups = new Set<string>();
 
   private readonly authStore = inject(AuthStore);
+  private readonly permissionService = inject(PermissionService);
   private readonly shopSetupStatusService = inject(ShopSetupStatusService);
   private lastSetupShopId: string | null = null;
 
@@ -126,9 +128,16 @@ export class SidebarComponent {
 
   protected isLocked(item: LayoutNavItem | LayoutNavChildItem): boolean {
     if (!item.allowedRoles || item.allowedRoles.length === 0) {
-      return false;
+      return this.isMissingRequiredPermission(item);
     }
-    return !this.authStore.hasAnyRole(item.allowedRoles);
+
+    return !this.authStore.hasAnyRole(item.allowedRoles) || this.isMissingRequiredPermission(item);
+  }
+
+  private isMissingRequiredPermission(item: LayoutNavItem | LayoutNavChildItem): boolean {
+    const requiredPermissions = item.requiredPermissions ?? [];
+
+    return requiredPermissions.some((permission) => !this.permissionService.hasPermission(permission));
   }
 
   protected isExpanded(item: LayoutNavItem): boolean {

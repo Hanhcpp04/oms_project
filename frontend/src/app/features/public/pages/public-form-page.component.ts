@@ -13,6 +13,12 @@ import {
   readProductContextFromQuery
 } from '../utils/public-form.util';
 import { ApiEnvelope, asString, unwrapApiResponse } from '../../../core/utils/api-response.util';
+import {
+  formatVndCurrency,
+  formatVndCurrencyInput,
+  isCurrencyFieldLike,
+  normalizeVndCurrencyInput
+} from '../../../shared/utils/currency.util';
 import { formatPhoneDisplay, formatPhoneInput, normalizePhoneDigits } from '../../../shared/utils/phone-format.util';
 
 interface PublicFormApi {
@@ -97,11 +103,7 @@ export class PublicFormPageComponent implements OnInit {
   }
 
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected updateFieldValue(fieldId: string, value: string): void {
@@ -168,15 +170,24 @@ export class PublicFormPageComponent implements OnInit {
 
   protected getFieldDisplayValue(field: FormTemplateField): string {
     const value = this.getFieldValue(field.id);
-    if (field.type !== 'phone') {
-      return value;
+    if (this.isCurrencyField(field)) {
+      return formatVndCurrencyInput(value);
     }
 
-    return formatPhoneDisplay(normalizePhoneDigits(value));
+    if (field.type === 'phone') {
+      return formatPhoneDisplay(normalizePhoneDigits(value));
+    }
+
+    return value;
   }
 
   protected onFieldInput(field: FormTemplateField, event: Event): void {
     const input = event.target as HTMLInputElement;
+    if (this.isCurrencyField(field)) {
+      this.updateFieldValue(field.id, normalizeVndCurrencyInput(input.value));
+      return;
+    }
+
     if (field.type === 'phone') {
       const formatted = formatPhoneInput(input.value);
       if (input.value !== formatted.display) {
@@ -218,6 +229,10 @@ export class PublicFormPageComponent implements OnInit {
   }
 
   protected resolveInputType(field: FormTemplateField): 'text' | 'email' | 'tel' | 'number' | 'date' | 'time' {
+    if (this.isCurrencyField(field)) {
+      return 'text';
+    }
+
     switch (field.type) {
       case 'email':
         return 'email';
@@ -232,6 +247,10 @@ export class PublicFormPageComponent implements OnInit {
       default:
         return 'text';
     }
+  }
+
+  protected isCurrencyField(field: FormTemplateField): boolean {
+    return field.type === 'number' && isCurrencyFieldLike(field);
   }
 
   protected submitForm(): void {

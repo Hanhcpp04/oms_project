@@ -25,7 +25,7 @@
         </td>
         <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">{{ order.sourceChannel }}</td>
         <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-secondary)]">
-          {{ order.totalAmount | currency: 'VND' : 'symbol' : '1.0-0' }}
+          {{ formatCurrency(order.totalAmount) }}
         </td>
         <td class="border-b border-[var(--color-border)] px-4 py-2.5 text-sm text-[var(--color-text-tertiary)]">
           {{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}

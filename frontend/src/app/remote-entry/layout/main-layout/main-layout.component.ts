@@ -21,10 +21,13 @@ export class MainLayoutComponent {
   protected readonly currentUserName = computed(() => this.authStore.currentUser()?.fullName ?? 'OMS User');
   protected readonly currentShopName = computed(() => this.authStore.currentShop()?.name ?? 'OMS Shop');
 
-  protected readonly menuItems: LayoutNavItem[] = [
+  protected readonly menuItems = computed<LayoutNavItem[]>(() => this.filterMenuItemsByShopMode(this.baseMenuItems));
+
+  private readonly baseMenuItems: LayoutNavItem[] = [
     {
       label: 'Dashboard',
       icon: 'dashboard',
+      requiredPermissions: ['REPORT_REVENUE'],
       children: [
         { label: 'Thống kê tất cả', route: '/app/dashboard/all' },
         { label: 'Thống kê nhân viên', route: '/app/dashboard/employees' },
@@ -38,6 +41,7 @@ export class MainLayoutComponent {
       label: 'Đơn hàng',
       icon: 'orders',
       allowedRoles: ['SHOP_OWNER', 'STAFF'],
+      requiredPermissions: ['ORDER_VIEW'],
       children: [
         { label: 'Tất cả đơn hàng', route: '/app/orders/all' },
         { label: 'Đơn cho thuê', route: '/app/orders/rent' },
@@ -47,6 +51,7 @@ export class MainLayoutComponent {
     {
       label: 'Sản phẩm',
       icon: 'products',
+      requiredPermissions: ['PRODUCT_VIEW'],
       children: [
         { label: 'Tất cả sản phẩm', route: '/app/products/all' },
         { label: 'Sản phẩm cho thuê', route: '/app/products/rent' },
@@ -56,6 +61,7 @@ export class MainLayoutComponent {
     {
       label: 'Cấu hình form đơn hàng',
       icon: 'form-config',
+      allowedRoles: ['SHOP_OWNER'],
       setupStepKeys: ['ORDER_CONFIG'],
       children: [
         { label: 'Form đơn cho thuê', route: '/app/form-config/rent' },
@@ -95,5 +101,36 @@ export class MainLayoutComponent {
 
   protected onLogout(): void {
     this.authStore.logout();
+  }
+
+  private filterMenuItemsByShopMode(items: LayoutNavItem[]): LayoutNavItem[] {
+    return items
+      .filter((item) => this.isRouteVisibleForShopMode(item.route))
+      .map((item) => ({
+        ...item,
+        children: item.children?.filter((child) => this.isRouteVisibleForShopMode(child.route))
+      }))
+      .filter((item) => !item.children || item.children.length > 0);
+  }
+
+  private isRouteVisibleForShopMode(route: string | undefined): boolean {
+    if (!route) {
+      return true;
+    }
+
+    const shop = this.authStore.currentShop();
+    if (!shop) {
+      return true;
+    }
+
+    if (route.endsWith('/rent') || route.endsWith('/dashboard/rent')) {
+      return shop.enableRent;
+    }
+
+    if (route.endsWith('/sell') || route.endsWith('/dashboard/sell')) {
+      return shop.enableSell;
+    }
+
+    return true;
   }
 }

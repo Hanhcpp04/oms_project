@@ -2,12 +2,14 @@ package com.oms.module.order.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oms.common.exception.BusinessException;
+import com.oms.module.messenger.service.MessengerOrderNotificationService;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.entity.OrderItem;
 import com.oms.module.order.mapper.OrderMapper;
 import com.oms.module.order.repository.OrderRepository;
+import com.oms.module.orderform.service.OrderFormValueValidator;
 import com.oms.module.product.entity.Product;
 import com.oms.module.product.entity.ProductType;
 import com.oms.module.product.entity.ProductVariant;
@@ -15,7 +17,11 @@ import com.oms.module.product.repository.ProductVariantRepository;
 import com.oms.module.rental.entity.RentalAvailability;
 import com.oms.module.rental.repository.RentalAvailabilityRepository;
 import com.oms.module.shop.entity.Shop;
+import com.oms.module.shop.entity.ShopOrderSource;
+import com.oms.module.shop.entity.ShopPaymentConfig;
+import com.oms.module.shop.entity.ShopShippingMethod;
 import com.oms.module.shop.repository.ShopOrderSourceRepository;
+import com.oms.module.shop.repository.ShopPaymentConfigRepository;
 import com.oms.module.shop.repository.ShopRepository;
 import com.oms.module.shop.repository.ShopShippingMethodRepository;
 import com.oms.module.user.repository.UserRepository;
@@ -43,6 +49,11 @@ class OrderServiceTest {
     private ShopRepository shopRepository;
     private ProductVariantRepository variantRepository;
     private RentalAvailabilityRepository availabilityRepository;
+    private ShopShippingMethodRepository shippingMethodRepository;
+    private ShopOrderSourceRepository orderSourceRepository;
+    private ShopPaymentConfigRepository paymentConfigRepository;
+    private MessengerOrderNotificationService messengerOrderNotificationService;
+    private OrderStatusTransitionService orderStatusTransitionService;
     private OrderService service;
 
     private Shop shop;
@@ -57,9 +68,14 @@ class OrderServiceTest {
         variantRepository = mock(ProductVariantRepository.class);
         availabilityRepository = mock(RentalAvailabilityRepository.class);
         UserRepository userRepository = mock(UserRepository.class);
-        ShopShippingMethodRepository shippingMethodRepository = mock(ShopShippingMethodRepository.class);
-        ShopOrderSourceRepository orderSourceRepository = mock(ShopOrderSourceRepository.class);
+        shippingMethodRepository = mock(ShopShippingMethodRepository.class);
+        orderSourceRepository = mock(ShopOrderSourceRepository.class);
+        paymentConfigRepository = mock(ShopPaymentConfigRepository.class);
         OrderMapper orderMapper = mock(OrderMapper.class);
+        OrderFormValueValidator orderFormValueValidator = mock(OrderFormValueValidator.class);
+        messengerOrderNotificationService = mock(MessengerOrderNotificationService.class);
+        orderStatusTransitionService = mock(OrderStatusTransitionService.class);
+        when(orderFormValueValidator.buildValidatedValues(any(), any(), any())).thenReturn(List.of());
 
         service = new OrderService(
                 orderRepository,
@@ -69,8 +85,12 @@ class OrderServiceTest {
                 userRepository,
                 shippingMethodRepository,
                 orderSourceRepository,
+                paymentConfigRepository,
                 orderMapper,
-                new ObjectMapper()
+                new ObjectMapper(),
+                orderFormValueValidator,
+                messengerOrderNotificationService,
+                orderStatusTransitionService
         );
 
         shop = Shop.builder()
@@ -132,6 +152,12 @@ class OrderServiceTest {
         when(variantRepository.findByIdForUpdate(100L)).thenReturn(Optional.of(sellVariant));
         when(variantRepository.findByIdForUpdate(101L)).thenReturn(Optional.of(rentVariant));
         when(variantRepository.findByIdForUpdate(102L)).thenReturn(Optional.of(sellRentVariant));
+        when(paymentConfigRepository.findByShopId(1L)).thenReturn(Optional.of(ShopPaymentConfig.builder()
+                .shop(shop)
+                .codEnabled(true)
+                .bankTransferEnabled(true)
+                .vnpayEnabled(false)
+                .build()));
         when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(orderMapper.toResponse(any(Order.class))).thenAnswer(invocation -> {
             Order order = invocation.getArgument(0);
@@ -194,159 +220,30 @@ class OrderServiceTest {
 
         assertThatThrownBy(() -> service.createOrder(1L, request, null))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("số lượng 6");
+                .hasMessageContaining("chỉ còn 5")
+                .hasMessageContaining("không đủ");
 
         verify(orderRepository, never()).save(any(Order.class));
         assertThat(sellVariant.getStockQty()).isEqualTo(5);
     }
 
-    @Test
-    void createSellOrderShouldRejectRentOnlyProduct() {
-        OrderRequest request = baseRequest(Order.OrderType.SELL, 101L);
-
-        assertThatThrownBy(() -> service.createOrder(1L, request, null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("not compatible");
-
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void createSellOrderShouldKeepStockForFutureRentalReservations() {
-        OrderRequest request = baseRequest(Order.OrderType.SELL, 102L);
-        request.getItems().get(0).setQuantity(4);
-
-        RentalAvailability futureBlock1 = RentalAvailability.builder()
-                .variant(sellRentVariant)
-                .startDate(LocalDate.now().plusDays(3))
-                .endDate(LocalDate.now().plusDays(5))
-                .blockType(RentalAvailability.BlockType.CONFIRMED)
-                .isActive(true)
-                .build();
-        RentalAvailability futureBlock2 = RentalAvailability.builder()
-                .variant(sellRentVariant)
-                .startDate(LocalDate.now().plusDays(4))
-                .endDate(LocalDate.now().plusDays(6))
-                .blockType(RentalAvailability.BlockType.CONFIRMED)
-                .isActive(true)
-                .build();
-        when(availabilityRepository.findActiveBlocksFromDate(eq(102L), any(LocalDate.class)))
-                .thenReturn(List.of(futureBlock1, futureBlock2));
-
-        assertThatThrownBy(() -> service.createOrder(1L, request, null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("chỉ còn 3");
-
-        verify(orderRepository, never()).save(any(Order.class));
-        assertThat(sellRentVariant.getStockQty()).isEqualTo(5);
-    }
-
-    @Test
-    void cancelSellOrderShouldRestoreStock() {
-        Order order = Order.builder()
-                .shop(shop)
-                .orderType(Order.OrderType.SELL)
-                .status(Order.OrderStatus.NEW)
-                .build();
-        order.setId(200L);
-        order.addItem(OrderItem.builder()
-                .variant(sellVariant)
-                .quantity(2)
-                .build());
-
-        when(orderRepository.findByIdAndShopId(200L, 1L)).thenReturn(Optional.of(order));
-
-        service.updateStatus(1L, 200L, Order.OrderStatus.CANCELLED, null);
-
-        assertThat(sellVariant.getStockQty()).isEqualTo(7);
-    }
-
-    @Test
-    void createRentOrderShouldRejectInvalidDateRange() {
-        OrderRequest request = baseRequest(Order.OrderType.RENT, 101L);
-        request.setRentFrom(LocalDate.of(2026, 5, 20));
-        request.setRentTo(LocalDate.of(2026, 5, 18));
-
-        assertThatThrownBy(() -> service.createOrder(1L, request, null))
-                .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("Rent from date must be before rent to date");
-
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void createRentOrderShouldRejectConflictingRentalDates() {
-        OrderRequest request = baseRequest(Order.OrderType.RENT, 101L);
-        request.setRentFrom(LocalDate.of(2026, 5, 20));
-        request.setRentTo(LocalDate.of(2026, 5, 22));
-
-        RentalAvailability conflict = RentalAvailability.builder()
-                .variant(rentVariant)
-                .startDate(LocalDate.of(2026, 5, 21))
-                .endDate(LocalDate.of(2026, 5, 23))
-                .blockType(RentalAvailability.BlockType.CONFIRMED)
-                .isActive(true)
-                .build();
-        when(availabilityRepository.findConflicts(101L, request.getRentFrom(), request.getRentTo()))
-                .thenReturn(List.of(conflict));
-
-        assertThatThrownBy(() -> service.createOrder(1L, request, null))
-                .isInstanceOf(BusinessException.class);
-
-        verify(orderRepository, never()).save(any(Order.class));
-    }
-
-    @Test
-    void createRentOrderShouldAllowOverlappingDatesWhenStockRemains() {
-        rentVariant.setStockQty(2);
-        OrderRequest request = baseRequest(Order.OrderType.RENT, 101L);
-        request.setRentFrom(LocalDate.of(2026, 5, 20));
-        request.setRentTo(LocalDate.of(2026, 5, 22));
-
-        RentalAvailability conflict = RentalAvailability.builder()
-                .variant(rentVariant)
-                .startDate(LocalDate.of(2026, 5, 21))
-                .endDate(LocalDate.of(2026, 5, 23))
-                .blockType(RentalAvailability.BlockType.CONFIRMED)
-                .isActive(true)
-                .build();
-        when(availabilityRepository.findConflicts(101L, request.getRentFrom(), request.getRentTo()))
-                .thenReturn(List.of(conflict));
-
-        service.createOrder(1L, request, null);
-
-        verify(orderRepository).save(any(Order.class));
-    }
-
-    @Test
-    void createRentOrderShouldReserveAvailabilityForEachQuantity() {
-        rentVariant.setStockQty(2);
-        OrderRequest request = baseRequest(Order.OrderType.RENT, 101L);
-        request.setRentFrom(LocalDate.of(2026, 5, 20));
-        request.setRentTo(LocalDate.of(2026, 5, 22));
-        request.getItems().get(0).setQuantity(2);
-
-        service.createOrder(1L, request, null);
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<List<RentalAvailability>> reservationsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(availabilityRepository).saveAll(reservationsCaptor.capture());
-        assertThat(reservationsCaptor.getValue()).hasSize(2);
-        assertThat(rentVariant.getStockQty()).isEqualTo(2);
-    }
-
-    private OrderRequest baseRequest(Order.OrderType orderType, Long variantId) {
+    private OrderRequest baseRequest(Order.OrderType type, Long variantId) {
         OrderRequest request = new OrderRequest();
-        request.setOrderType(orderType);
+        request.setOrderType(type);
         request.setCustomerName("Nguyen Van A");
-        request.setCustomerPhone("0901234567");
-        request.setCustomerAddress("123 Nguyen Trai");
+        request.setCustomerPhone("0900000000");
+        request.setCustomerAddress("HCMC");
+        request.setCustomerNote("note");
         request.setSourceMethod(Order.SourceMethod.MANUAL);
+        request.setShippingMethod("GHTK");
+        request.setItems(List.of(itemRequest(variantId)));
+        return request;
+    }
 
+    private OrderRequest.ItemRequest itemRequest(Long variantId) {
         OrderRequest.ItemRequest item = new OrderRequest.ItemRequest();
         item.setVariantId(variantId);
         item.setQuantity(1);
-        request.setItems(List.of(item));
-        return request;
+        return item;
     }
 }

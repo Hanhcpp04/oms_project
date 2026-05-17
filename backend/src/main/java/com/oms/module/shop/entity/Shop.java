@@ -42,7 +42,7 @@ public class Shop extends BaseEntity {
     private String businessMode; // SELL, RENT, BOTH
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20, nullable = false)
+    @Column(name = "status", length = 20, nullable = false, columnDefinition = "enum('ACTIVE','PENDING','SUSPENDED')")
     @Builder.Default
     private ShopStatus status = ShopStatus.PENDING;
 

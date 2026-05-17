@@ -1,5 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { map, Observable, tap } from 'rxjs';
+import { finalize, map, Observable, tap } from 'rxjs';
 import { API_ENDPOINTS } from '../constants/app.constants';
 import { AuthStore } from '../auth/auth.store';
 import { HttpService } from '../http/http.service';
@@ -65,20 +65,31 @@ export class OrderFormTemplateService {
 
   loadTemplates(): void {
     this.loadingState.set(true);
-    this.loadConfig('SELL');
-    this.loadConfig('RENT');
-    this.loadingState.set(false);
+    let pending = 2;
+    const markDone = () => {
+      pending -= 1;
+      if (pending === 0) {
+        this.loadingState.set(false);
+      }
+    };
+
+    this.loadConfig('SELL', markDone);
+    this.loadConfig('RENT', markDone);
   }
 
-  loadConfig(type: OrderFormTemplateType): void {
+  loadConfig(type: OrderFormTemplateType, onDone?: () => void): void {
     this.httpService
       .get<OrderFormConfigApi | ApiEnvelope<OrderFormConfigApi>>(`${this.endpoint}/${type}`)
-      .pipe(map((response) => normalizeConfig(unwrapApiResponse(response))))
+      .pipe(
+        map((response) => normalizeConfig(unwrapApiResponse(response))),
+        finalize(() => onDone?.())
+      )
       .subscribe({
         next: (template) => {
           this.replaceTemplate(template);
           this.refreshShopSetupStatus();
-        }
+        },
+        error: (error) => console.error('Failed to load order form config', type, error)
       });
   }
 
@@ -108,6 +119,7 @@ export class OrderFormTemplateService {
     helperText?: string;
     showInOrderList?: boolean;
     showInOrderDetail?: boolean;
+    sortOrder?: number;
     options?: OrderFormFieldOption[];
     validationRulesJson?: string;
   }): Observable<OrderFormTemplateField> {
@@ -120,6 +132,7 @@ export class OrderFormTemplateService {
           placeholder: input.placeholder ?? '',
           helperText: input.helperText ?? '',
           isRequired: input.required ?? false,
+          sortOrder: input.sortOrder,
           showInOrderList: input.showInOrderList ?? false,
           showInOrderDetail: input.showInOrderDetail ?? true,
           validationRulesJson: input.validationRulesJson,

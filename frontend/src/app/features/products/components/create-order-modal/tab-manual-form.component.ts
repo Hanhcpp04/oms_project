@@ -15,13 +15,19 @@ import { parseOptionalPositiveNumber } from '../../utils/order-create-modal.util
 import { FileApiService } from '../../../../core/services/file-api.service';
 import { ShippingMethodService, ShippingMethodDto } from '../../../../core/services/shipping-method.service';
 import { OrderSourceService, OrderSourceDto } from '../../../../core/services/order-source.service';
+import { PaymentConfigService, PublicPaymentConfig } from '../../../../core/services/payment-config.service';
 import { InternationalPhoneInputComponent } from '../../../../shared/components/form/international-phone-input.component';
 import { FIXED_RENTAL_VERIFICATION_FIELDS } from '../../../orders/utils/rental-verification-fields.util';
+import { DynamicFormRendererComponent } from '../../../../shared/components/dynamic-form/dynamic-form-renderer.component';
+import { DynamicFieldValue, DynamicRenderField } from '../../../../shared/components/dynamic-form/dynamic-form.types';
+import { formatVndCurrency, normalizeVndCurrencyInput } from '../../../../shared/utils/currency.util';
+
+type PaymentMethodType = 'COD' | 'BANK_TRANSFER' | 'VNPAY';
 
 @Component({
   selector: 'app-tab-manual-form',
   standalone: true,
-  imports: [CommonModule, UiButtonComponent, UiInputComponent, UiSelectComponent, InternationalPhoneInputComponent],
+  imports: [CommonModule, UiButtonComponent, UiInputComponent, UiSelectComponent, InternationalPhoneInputComponent, DynamicFormRendererComponent],
   templateUrl: './tab-manual-form.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -46,16 +52,14 @@ export class TabManualFormComponent implements OnInit {
   private readonly fileService = inject(FileApiService);
   private readonly shippingService = inject(ShippingMethodService);
   private readonly sourceService = inject(OrderSourceService);
+  private readonly paymentConfigService = inject(PaymentConfigService);
   private readonly authStore = inject(AuthStore);
   protected readonly Number = Number;
   protected readonly rentalVerificationFields = FIXED_RENTAL_VERIFICATION_FIELDS;
   private readonly latestPrefilledDraft = signal<AutoOrderDraft | undefined>(undefined);
   
   protected formatVND(value: string | number | null | undefined): string {
-    if (!value) return '0 VNĐ';
-    const num = typeof value === 'string' ? parseInt(value.replace(/\D/g, '')) : value;
-    if (isNaN(num)) return '0 VNĐ';
-    return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ';
+    return formatVndCurrency(value, '0 ₫');
   }
 
   protected onPhoneInputWithValidation(value: string): void {
@@ -95,8 +99,7 @@ export class TabManualFormComponent implements OnInit {
   }
 
   protected onMoneyInput(value: string, setter: (val: string) => void): void {
-    const cleaned = value.replace(/\D/g, '');
-    setter(cleaned);
+    setter(normalizeVndCurrencyInput(value));
   }
 
   readonly submitting = signal(false);
@@ -121,6 +124,8 @@ export class TabManualFormComponent implements OnInit {
   protected readonly selectedShippingMethodId = signal<number | null>(null);
   protected readonly orderSources = signal<OrderSourceDto[]>([]);
   protected readonly selectedSourceChannelId = signal<number | null>(null);
+  protected readonly paymentConfig = signal<PublicPaymentConfig | null>(null);
+  protected readonly selectedPaymentMethod = signal<PaymentMethodType | null>(null);
 
   protected readonly shippingMethodOptions = computed(() =>
     this.shippingMethods().map(m => ({ label: m.name, value: m.id?.toString() || '' }))
@@ -129,6 +134,24 @@ export class TabManualFormComponent implements OnInit {
   protected readonly orderSourceOptions = computed(() =>
     this.orderSources().map(s => ({ label: s.name, value: s.id.toString() }))
   );
+  protected readonly paymentMethodOptions = computed(() => {
+    const cfg = this.paymentConfig();
+    if (!cfg) {
+      return [];
+    }
+
+    const options: Array<{ label: string; value: PaymentMethodType }> = [];
+    if (cfg.codEnabled) {
+      options.push({ label: 'Thanh toán khi nhận hàng (COD)', value: 'COD' });
+    }
+    if (cfg.bankTransferEnabled) {
+      options.push({ label: 'Chuyển khoản ngân hàng', value: 'BANK_TRANSFER' });
+    }
+    if (cfg.vnpayEnabled) {
+      options.push({ label: 'VNPay', value: 'VNPAY' });
+    }
+    return options;
+  });
   protected readonly shippingMethod = signal('');
   protected readonly shippingFee = signal('');
 
@@ -142,6 +165,14 @@ export class TabManualFormComponent implements OnInit {
   protected readonly customFields = computed(() => {
     return this.activeTemplate()?.fields || [];
   });
+
+  protected readonly renderableCustomFields = computed(() =>
+    this.customFields().filter(field => field.type !== 'image')
+  );
+
+  protected readonly imageCustomFields = computed(() =>
+    this.customFields().filter(field => field.type === 'image')
+  );
 
   protected readonly customFieldValues = signal<Record<string, string | string[]>>({});
   protected readonly customFieldErrors = signal<Record<string, string>>({});
@@ -158,14 +189,21 @@ export class TabManualFormComponent implements OnInit {
     const type: OrderFormTemplateType = this.selectedOrderType === 'RENT' ? 'RENT' : 'SELL';
     this.templateService.loadConfig(type);
 
-    this.shippingService.getAllMethods().subscribe(methods => {
-      this.shippingMethods.set(methods.filter(m => m.active));
+    this.shippingService.getActiveMethods().subscribe(methods => {
+      this.shippingMethods.set(methods);
       this.syncSelectedShippingMethodFromName();
     });
 
-    this.sourceService.getAllSources().subscribe(sources => {
-      this.orderSources.set(sources.filter(s => s.active));
+    this.sourceService.getActiveSources().subscribe(sources => {
+      this.orderSources.set(sources);
       this.syncSelectedSourceChannelFromName();
+    });
+
+    this.paymentConfigService.getAvailableConfig().subscribe(config => {
+      this.paymentConfig.set(config);
+      if (!this.selectedPaymentMethod()) {
+        this.selectedPaymentMethod.set(this.paymentMethodOptions()[0]?.value ?? null);
+      }
     });
   }
 
@@ -252,6 +290,22 @@ export class TabManualFormComponent implements OnInit {
     return this.customFieldErrors()[fieldId] ?? '';
   }
 
+  protected onCustomValuesChange(values: Record<string, DynamicFieldValue>): void {
+    const nextValues: Record<string, string | string[]> = {};
+    Object.entries(values).forEach(([fieldId, value]) => {
+      if (Array.isArray(value) || typeof value === 'string') {
+        nextValues[fieldId] = value;
+      }
+    });
+
+    this.customFieldValues.set(nextValues);
+    this.customFieldErrors.update((errors) => {
+      const next = { ...errors };
+      Object.keys(values).forEach((fieldId) => delete next[fieldId]);
+      return next;
+    });
+  }
+
   protected getRentalVerificationImageUrl(fieldKey: string): string {
     return this.rentalVerificationValues()[fieldKey] ?? '';
   }
@@ -294,6 +348,21 @@ export class TabManualFormComponent implements OnInit {
         }
       });
     }
+  }
+
+  protected onCustomRendererFileSelected(event: { field: DynamicRenderField; file: File }): void {
+    this.notificationService.info('Đang tải ảnh lên...');
+
+    this.fileService.upload(event.file).subscribe({
+      next: (url) => {
+        this.updateCustomFieldValue(event.field.id, url);
+        this.notificationService.success('Tải ảnh lên thành công!');
+      },
+      error: (err) => {
+        console.error('File upload error:', err);
+        this.notificationService.error('Lỗi khi tải ảnh lên.');
+      }
+    });
   }
 
   protected onRentalVerificationFileChange(fieldKey: string, event: Event): void {
@@ -623,6 +692,7 @@ export class TabManualFormComponent implements OnInit {
         sourceChannelId: this.selectedSourceChannelId() || undefined,
         sourceMethod: this.sourceMethod,
         shippingMethod: sMethod || undefined,
+        paymentMethod: this.selectedPaymentMethod() || undefined,
         products: this.selectedVariants.map(sv => ({
           variantId: sv.variantId, name: sv.name, size: sv.size, quantity: sv.quantity, unitPrice: sv.unitPrice
         })),
@@ -695,4 +765,3 @@ export class TabManualFormComponent implements OnInit {
       .toLowerCase();
   }
 }
-

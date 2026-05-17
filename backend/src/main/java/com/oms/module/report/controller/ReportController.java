@@ -3,7 +3,6 @@ package com.oms.module.report.controller;
 import com.oms.common.dto.ApiResponse;
 import com.oms.module.report.dto.DashboardSummaryResponse;
 import com.oms.module.report.service.ReportService;
-import com.oms.security.CustomUserDetails;
 import com.oms.security.PermissionCode;
 import com.oms.security.RequirePermission;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,7 +26,7 @@ public class ReportController {
     @Operation(summary = "Get full dashboard summary: KPIs, recent orders, order status, weekly revenue, employee stats, growth data")
     @RequirePermission(PermissionCode.REPORT_REVENUE)
     public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getDashboardSummary(
-            @AuthenticationPrincipal CustomUserDetails user) {
+            @AuthenticationPrincipal com.oms.security.CustomUserDetails user) {
         return ResponseEntity.ok(ApiResponse.ok(reportService.getSummary(user.getShopId())));
     }
 }

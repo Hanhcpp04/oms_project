@@ -1,24 +1,27 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subject, debounceTime, distinctUntilChanged, takeUntil } from 'rxjs';
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
-import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
-import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
 import { UiInputComponent } from '../../../shared/components/ui/ui-input.component';
 import { UiSelectComponent } from '../../../shared/components/ui/ui-select.component';
+import { PageTitleComponent } from '../../../shared/components/ui/page-title.component';
 import { ORDER_STATUS_OPTIONS } from '../data-access/constants/order-status.constants';
 import { Order, OrderStatus, OrderType } from '../data-access/models/order.model';
 import { OrdersStore } from '../state/orders.store';
+import { OrderRealtimeService } from '../data-access/order-realtime.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { PermissionService } from '../../../core/services/permission.service';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 
 @Component({
   selector: 'app-orders-page',
   standalone: true,
   imports: [
     CommonModule,
+    PageTitleComponent,
     UiInputComponent,
-    UiCardComponent,
     UiSelectComponent,
     UiBadgeComponent
   ],
@@ -29,8 +32,15 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notificationService = inject(NotificationService);
+  private readonly authStore = inject(AuthStore);
+  private readonly permissionService = inject(PermissionService);
+  private readonly orderRealtimeService = inject(OrderRealtimeService);
   readonly store = inject(OrdersStore);
-  readonly statusOptions = ORDER_STATUS_OPTIONS;
+  readonly statusOptions = computed(() => this.resolveStatusOptions());
+  readonly visibleOrders = computed(() =>
+    this.store.orders().filter((order) => this.isOrderTypeAllowed(order.orderType))
+  );
+  protected readonly newMessengerOrderIds = signal<ReadonlySet<string>>(new Set());
 
   searchTerm = '';
   selectedStatus: OrderStatus | '' = '';
@@ -40,9 +50,14 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
 
   private readonly searchSubject = new Subject<string>();
   private readonly destroy$ = new Subject<void>();
+  private readonly newMessengerOrderBadgeTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   ngOnInit(): void {
     this.selectedOrderType = this.normalizeOrderType(this.route.snapshot.data['orderType']);
+    if (this.redirectIfOrderViewDisabled()) {
+      return;
+    }
+
     this.store.loadOrders({ orderType: this.selectedOrderType === 'ALL' ? undefined : this.selectedOrderType });
 
     this.searchSubject.pipe(
@@ -52,11 +67,15 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     ).subscribe(() => {
       this.applyFilters();
     });
+
+    this.connectRealtime();
   }
 
   ngOnDestroy(): void {
     this.destroy$.next();
     this.destroy$.complete();
+    this.newMessengerOrderBadgeTimers.forEach((timerId) => window.clearTimeout(timerId));
+    this.newMessengerOrderBadgeTimers.clear();
   }
 
   onSearchChange(value: string): void {
@@ -99,6 +118,28 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     });
   }
 
+  protected getTitle(): string {
+    switch (this.selectedOrderType) {
+      case 'RENT':
+        return 'Đơn cho thuê';
+      case 'SELL':
+        return 'Đơn bán hàng';
+      default:
+        return 'Quản lý đơn hàng';
+    }
+  }
+
+  protected getDescription(): string {
+    switch (this.selectedOrderType) {
+      case 'RENT':
+        return 'Theo dõi đơn thuê, trạng thái thanh toán, lịch thuê và quá trình trả hàng.';
+      case 'SELL':
+        return 'Theo dõi đơn bán, thanh toán, vận chuyển và trạng thái xử lý.';
+      default:
+        return 'Quản lý tất cả đơn hàng bán và cho thuê trong shop.';
+    }
+  }
+
   openDetail(order: Order): void {
     this.store.selectOrder(order);
     this.router.navigate(['/app/orders', order.id], {
@@ -109,6 +150,12 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
   async updateOrderStatus(order: Order, status: string, event?: Event): Promise<void> {
     if (event) {
       event.stopPropagation();
+    }
+
+    if (!this.canUpdateOrderStatus()) {
+      this.notificationService.error('Bạn không có quyền cập nhật trạng thái đơn hàng.');
+      this.store.refresh();
+      return;
     }
     
     try {
@@ -136,6 +183,48 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
       case 'OVERDUE': return 'danger';
       case 'RETURNED': return 'success';
       default: return 'primary';
+    }
+  }
+
+  getFulfillmentStatusVariant(status?: string): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    switch (status) {
+      case 'PENDING_CONFIRMATION':
+      case 'READY_TO_PACK':
+      case 'READY_TO_RENT':
+        return 'warning';
+      case 'PACKING':
+      case 'SHIPPED':
+      case 'RENTING':
+        return 'info';
+      case 'DONE':
+      case 'RETURNED':
+      case 'PAID':
+        return 'success';
+      case 'CANCELLED':
+      case 'OVERDUE':
+        return 'danger';
+      case 'DEPOSITED':
+        return 'warning';
+      default:
+        return 'primary';
+    }
+  }
+
+  getFulfillmentStatusLabel(status?: string): string {
+    switch (status) {
+      case 'PENDING_CONFIRMATION': return 'Chờ xác nhận';
+      case 'READY_TO_PACK': return 'Sẵn sàng đóng gói';
+      case 'READY_TO_RENT': return 'Sẵn sàng bàn giao';
+      case 'PACKING': return 'Đang đóng gói';
+      case 'SHIPPED': return 'Đang giao';
+      case 'DONE': return 'Hoàn thành';
+      case 'CANCELLED': return 'Đã hủy';
+      case 'DEPOSITED': return 'Đã cọc';
+      case 'RENTING': return 'Đang thuê';
+      case 'OVERDUE': return 'Quá hạn';
+      case 'RETURNED': return 'Đã trả';
+      case 'PAID': return 'Đã thanh toán';
+      default: return 'Chưa xác định';
     }
   }
 
@@ -192,7 +281,7 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
   }
 
   formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
+    return formatVndCurrency(value);
   }
 
   formatDate(dateStr: string | undefined): string {
@@ -221,5 +310,85 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     }
 
     return 'all';
+  }
+
+  private redirectIfOrderViewDisabled(): boolean {
+    if (this.selectedOrderType === 'RENT' && !this.canUseRent()) {
+      void this.router.navigate(['/app/orders', this.canUseSell() ? 'sell' : 'all']);
+      return true;
+    }
+
+    if (this.selectedOrderType === 'SELL' && !this.canUseSell()) {
+      void this.router.navigate(['/app/orders', this.canUseRent() ? 'rent' : 'all']);
+      return true;
+    }
+
+    return false;
+  }
+
+  private canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  private canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
+  }
+
+  private isOrderTypeAllowed(type: OrderType): boolean {
+    return type === 'SELL' ? this.canUseSell() : this.canUseRent();
+  }
+
+  private resolveStatusOptions(): typeof ORDER_STATUS_OPTIONS {
+    if (this.canUseRent()) {
+      return ORDER_STATUS_OPTIONS;
+    }
+
+    return ORDER_STATUS_OPTIONS.filter((option) => !['RENTING', 'OVERDUE', 'RETURNED', 'DEPOSITED'].includes(option.value));
+  }
+
+  private connectRealtime(): void {
+    this.orderRealtimeService.stream()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((event) => {
+        if (event.type !== 'ORDER_CREATED_FROM_MESSENGER' || !event.orderId) {
+          return;
+        }
+
+        this.markNewMessengerOrder(event.orderId);
+        this.store.refresh();
+        this.notificationService.success(`Có đơn mới từ Messenger #${event.orderId}`);
+      });
+  }
+
+  private markNewMessengerOrder(rawOrderId: number): void {
+    const orderId = String(rawOrderId);
+    const existingTimer = this.newMessengerOrderBadgeTimers.get(orderId);
+
+    if (existingTimer) {
+      window.clearTimeout(existingTimer);
+    }
+
+    this.newMessengerOrderIds.update((ids) => {
+      const next = new Set(ids);
+      next.add(orderId);
+      return next;
+    });
+
+    const timerId = window.setTimeout(() => {
+      this.newMessengerOrderIds.update((ids) => {
+        const next = new Set(ids);
+        next.delete(orderId);
+        return next;
+      });
+      this.newMessengerOrderBadgeTimers.delete(orderId);
+    }, 60000);
+
+    this.newMessengerOrderBadgeTimers.set(orderId, timerId);
+  }
+
+  protected canUpdateOrderStatus(): boolean {
+    return this.permissionService.hasPermission('ORDER_UPDATE_STATUS');
   }
 }
