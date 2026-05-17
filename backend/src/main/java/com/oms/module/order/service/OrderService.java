@@ -41,6 +41,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -168,6 +169,11 @@ public class OrderService {
         validateOrderTypeCompatibility(request.getOrderType(), variantsById);
         validateVariantPrices(request.getOrderType(), variantsById);
         validateStockAvailability(request.getOrderType(), variantsById, quantitiesByVariantId);
+        int rentalDays = 1;
+        if (request.getOrderType() == Order.OrderType.RENT) {
+            validateRentalDates(request, variantsById, quantitiesByVariantId);
+            rentalDays = resolveRentalDays(request.getRentFrom(), request.getRentTo());
+        }
         if (commitInventoryOnCreate) {
             deductSellStockIfNeeded(request.getOrderType(), variantsById, quantitiesByVariantId);
         }
@@ -208,7 +214,9 @@ public class OrderService {
                         : variant.getPriceRentPerDay();
                 if (unitPrice == null) unitPrice = BigDecimal.ZERO;
 
-                BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
+                BigDecimal lineTotal = unitPrice
+                        .multiply(BigDecimal.valueOf(qty))
+                        .multiply(BigDecimal.valueOf(rentalDays));
                 itemsTotal = itemsTotal.add(lineTotal);
 
                 String imageUrl = null;
@@ -241,9 +249,7 @@ public class OrderService {
         orderFormValueValidator.buildValidatedValues(shopId, request.getOrderType(), request.getCustomFieldValues())
                 .forEach(order::addCustomFieldValue);
 
-        // Handle rental validation
         if (request.getOrderType() == Order.OrderType.RENT) {
-            validateRentalDates(request, variantsById, quantitiesByVariantId);
             validateRentalVerificationDocuments(shop, request);
         }
 
@@ -488,6 +494,11 @@ public class OrderService {
                 throw new BusinessException(ErrorCode.RENTAL_DATE_CONFLICT);
             }
         }
+    }
+
+    private int resolveRentalDays(LocalDate rentFrom, LocalDate rentTo) {
+        long days = ChronoUnit.DAYS.between(rentFrom, rentTo) + 1;
+        return days > 0 && days <= Integer.MAX_VALUE ? (int) days : 1;
     }
 
     private Map<Long, Integer> collectItemQuantities(OrderRequest request) {

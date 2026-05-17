@@ -122,12 +122,14 @@ public class MessengerWebhookService {
 
         String normalized = normalize(text.trim());
         if (senderType == MessageSenderType.CUSTOMER) {
-            handleCustomerMessage(conversation, normalized, text);
+            handleCustomerMessage(conversation, message, normalized, text);
             return;
         }
 
         if (senderType == MessageSenderType.STAFF) {
-            if (!isOmsOrderCopyBlock(normalized)) {
+            boolean omsOrderCopyBlock = isOmsOrderCopyBlock(normalized);
+            boolean rentalVariantCheckMessage = isRentalVariantCheckMessage(normalized);
+            if (!omsOrderCopyBlock && !rentalVariantCheckMessage) {
                 return;
             }
 
@@ -138,20 +140,29 @@ public class MessengerWebhookService {
                 return;
             }
             try {
-                orderDraftService.createOrderDraftFromSellerMessage(conversation, message, shop.get());
+                if (omsOrderCopyBlock) {
+                    orderDraftService.createOrderDraftFromSellerMessage(conversation, message, shop.get());
+                } else {
+                    orderDraftService.checkRentalAvailabilityFromSellerMessage(conversation, message, shop.get());
+                }
             } catch (BusinessException ex) {
-                log.info("OMS order copy block rejected. conversationId={}, reason={}",
+                log.info("Messenger seller command rejected. conversationId={}, reason={}",
                         conversation.getId(), ex.getMessage());
                 messengerSendService.sendSystemMessage(
                         conversation.getPageId(),
                         conversation.getSenderId(),
-                        "Shop chưa thể tạo đơn tạm: " + ex.getMessage()
+                        (omsOrderCopyBlock ? "Shop chưa thể tạo đơn tạm: " : "Shop chưa thể kiểm tra lịch thuê: ")
+                                + ex.getMessage()
                 );
             }
         }
     }
 
-    private void handleCustomerMessage(Conversation conversation, String normalized, String originalText) {
+    private void handleCustomerMessage(
+            Conversation conversation,
+            Message message,
+            String normalized,
+            String originalText) {
         if (isCancelCommand(normalized)) {
             orderDraftService.findLatestActiveDraft(conversation.getId())
                     .ifPresent(draft -> {
@@ -174,8 +185,39 @@ public class MessengerWebhookService {
         if (activeDraft.isPresent()
                 && orderDraftService.canReceiveCustomerUpdates(activeDraft.get())
                 && shouldTreatAsDraftUpdate(normalized, activeDraft.get())) {
-            orderDraftService.applyCustomerUpdate(conversation, stripUpdatePrefix(originalText),
-                    activeDraft.get().getShop() != null ? activeDraft.get().getShop().getId() : null);
+            try {
+                orderDraftService.applyCustomerUpdate(conversation, stripUpdatePrefix(originalText),
+                        activeDraft.get().getShop() != null ? activeDraft.get().getShop().getId() : null);
+            } catch (BusinessException ex) {
+                log.info("Customer draft update rejected. conversationId={}, reason={}",
+                        conversation.getId(), ex.getMessage());
+                messengerSendService.sendSystemMessage(
+                        conversation.getPageId(),
+                        conversation.getSenderId(),
+                        "Shop chưa thể cập nhật đơn tạm: " + ex.getMessage()
+                );
+            }
+            return;
+        }
+
+        if (activeDraft.isPresent()) {
+            return;
+        }
+
+        Optional<Shop> shop = messengerPageResolver.resolveShop(conversation.getPageId());
+        if (shop.isEmpty()) {
+            return;
+        }
+        try {
+            orderDraftService.checkRentalAvailabilityFromCustomerMessage(conversation, message, shop.get());
+        } catch (BusinessException ex) {
+            log.info("Customer rental availability check rejected. conversationId={}, reason={}",
+                    conversation.getId(), ex.getMessage());
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    "Shop chưa thể kiểm tra lịch thuê: " + ex.getMessage()
+            );
         }
     }
 
@@ -213,7 +255,7 @@ public class MessengerWebhookService {
             messengerSendService.sendSystemMessage(
                     conversation.getPageId(),
                     conversation.getSenderId(),
-                    orderDraftService.buildConfirmMessage(draft)
+                    "Shop chưa thể tạo đơn: " + ex.getMessage()
             );
         }
     }
@@ -227,10 +269,12 @@ public class MessengerWebhookService {
                 || normalizedText.contains("tao don tu oms")
                 || normalizedText.contains("tao don cho khach");
         return hasOmsHeader
-                && normalizedText.contains("product id")
-                && normalizedText.contains("variant id")
-                && normalizedText.contains("so luong")
-                && normalizedText.contains("loai don");
+                && normalizedText.contains("variant id");
+    }
+
+    private boolean isRentalVariantCheckMessage(String normalizedText) {
+        return normalizedText.contains("variant id")
+                && (normalizedText.contains("thue") || normalizedText.contains("rent"));
     }
 
     private boolean isConfirmCommand(String normalizedText) {

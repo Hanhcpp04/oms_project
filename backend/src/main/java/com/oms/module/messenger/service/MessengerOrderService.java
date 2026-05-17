@@ -100,8 +100,10 @@ public class MessengerOrderService {
                     "Cannot confirm Messenger draft because shop is not resolved for page " + draft.getPageId());
         }
 
+        orderDraftService.validateDraftCanCreateOrder(draft);
+
         Order savedOrder = orderService.createOrderEntity(shop.getId(), toOrderRequest(draft), null);
-        savedOrder.setPaymentStatus(resolvePaymentStatus(draft));
+        savedOrder.setPaymentStatus(Order.PaymentStatus.UNPAID);
         savedOrder.setMessengerPageId(draft.getPageId());
         savedOrder.setMessengerCustomerPsid(draft.getCustomerPsid());
         savedOrder.setMessengerConversationId(draft.getConversation() != null ? draft.getConversation().getId() : null);
@@ -146,7 +148,7 @@ public class MessengerOrderService {
         request.setSourceMethod(Order.SourceMethod.MESSENGER);
         request.setRentFrom(draft.getRentFrom());
         request.setRentTo(draft.getRentTo());
-        request.setDepositPaid(draft.getDepositAmount());
+        request.setDepositPaid(BigDecimal.ZERO);
         request.setItems(draftItems.stream()
                 .map(item -> toOrderItemRequest(draft, item))
                 .toList());
@@ -204,12 +206,6 @@ public class MessengerOrderService {
                 .status(MessengerOrderStatus.NEW)
                 .build();
         messengerOrderRepository.save(order);
-    }
-
-    private Order.PaymentStatus resolvePaymentStatus(OrderDraft draft) {
-        return draft.getDepositAmount() != null && draft.getDepositAmount().compareTo(BigDecimal.ZERO) > 0
-                ? Order.PaymentStatus.DEPOSITED
-                : Order.PaymentStatus.UNPAID;
     }
 
 }

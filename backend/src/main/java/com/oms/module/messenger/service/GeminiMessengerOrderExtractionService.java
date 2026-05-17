@@ -78,7 +78,7 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
         AiParseResponse.ProductDraft product = firstProduct(aiResponse);
         List<OrderInfoExtractedDto.ItemDto> items = mapItems(aiResponse, fallback);
         String productName = firstNonBlank(product != null ? product.getName() : null, fallback.getProductName());
-        Integer quantity = product != null && product.getQuantity() != null ? product.getQuantity() : fallback.getQuantity();
+        Integer quantity = fallback.getQuantity();
         String size = firstNonBlank(product != null ? product.getSize() : null, fallback.getSize());
 
         var price = product != null && product.getUnitPrice() != null
@@ -151,7 +151,7 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
                             .variant(product.getSize())
                             .size(product.getSize())
                             .color(firstNonBlank(product.getColor(), fallback.getColor()))
-                            .quantity(product.getQuantity())
+                            .quantity(resolveMessengerQuantity(fallback))
                             .rentalDays(fallback.getRentalDays())
                             .price(product.getUnitPrice())
                             .deposit(aiResponse.getDepositPaid())
@@ -176,11 +176,15 @@ public class GeminiMessengerOrderExtractionService implements OrderExtractionSer
                 .variant(fallback.getSize())
                 .size(fallback.getSize())
                 .color(fallback.getColor())
-                .quantity(fallback.getQuantity())
+                .quantity(resolveMessengerQuantity(fallback))
                 .rentalDays(fallback.getRentalDays())
                 .price(fallback.getPrice())
                 .deposit(fallback.getDepositAmount())
                 .build());
+    }
+
+    private Integer resolveMessengerQuantity(OrderInfoExtractedDto fallback) {
+        return fallback != null ? fallback.getQuantity() : null;
     }
 
     private List<String> findMissingFields(

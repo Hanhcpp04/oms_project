@@ -227,6 +227,26 @@ class OrderServiceTest {
         assertThat(sellVariant.getStockQty()).isEqualTo(5);
     }
 
+    @Test
+    void createRentOrderShouldCalculateTotalForEveryRentalDay() {
+        OrderRequest request = baseRequest(Order.OrderType.RENT, 101L);
+        request.setRentFrom(LocalDate.of(2026, 5, 20));
+        request.setRentTo(LocalDate.of(2026, 5, 22));
+        request.setShippingFee(new BigDecimal("50000"));
+
+        OrderResponse response = service.createOrder(1L, request, null);
+
+        assertThat(response.getTotalAmount()).isEqualByComparingTo("800000");
+
+        ArgumentCaptor<Order> orderCaptor = ArgumentCaptor.forClass(Order.class);
+        verify(orderRepository).save(orderCaptor.capture());
+        Order savedOrder = orderCaptor.getValue();
+        assertThat(savedOrder.getItems()).hasSize(1);
+        assertThat(savedOrder.getItems().get(0).getUnitPrice()).isEqualByComparingTo("250000");
+        assertThat(savedOrder.getItems().get(0).getLineTotal()).isEqualByComparingTo("750000");
+        assertThat(savedOrder.getTotalAmount()).isEqualByComparingTo("800000");
+    }
+
     private OrderRequest baseRequest(Order.OrderType type, Long variantId) {
         OrderRequest request = new OrderRequest();
         request.setOrderType(type);

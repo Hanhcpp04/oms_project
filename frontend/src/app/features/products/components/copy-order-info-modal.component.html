@@ -99,10 +99,16 @@
                   </p>
                 </div>
                 <div>
-                  <p class="m-0 text-xs text-[#6b7280]">Giá DB</p>
-                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">
-                    {{ orderType === 'SELL' ? formatCurrency(variant.priceSell) : formatCurrency(variant.priceRentPerDay) }}
-                  </p>
+                  <p class="m-0 text-xs text-[#6b7280]">Giá bán</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ formatCurrency(variant.priceSell) }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Giá thuê/ngày</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ formatCurrency(variant.priceRentPerDay) }}</p>
+                </div>
+                <div>
+                  <p class="m-0 text-xs text-[#6b7280]">Tiền cọc</p>
+                  <p class="m-0 mt-1 text-sm font-bold text-[#111827]">{{ formatCurrency(variant.depositAmount) }}</p>
                 </div>
               </div>
 
@@ -113,95 +119,6 @@
               }
             }
           </div>
-
-          <div class="grid gap-4 sm:grid-cols-2">
-            <div class="grid gap-2">
-              <span class="text-sm font-semibold text-[#111827]">Loại đơn</span>
-              <div class="grid grid-cols-2 gap-2 rounded-sm bg-[#f3f4f6] p-1">
-                <button
-                  type="button"
-                  class="h-10 rounded-sm text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                  [disabled]="!supportsSell"
-                  [ngClass]="orderType === 'SELL' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6b7280] hover:text-[#111827]'"
-                  (click)="selectOrderType('SELL')"
-                >
-                  Bán
-                </button>
-                <button
-                  type="button"
-                  class="h-10 rounded-sm text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
-                  [disabled]="!supportsRent"
-                  [ngClass]="orderType === 'RENT' ? 'bg-white text-[#111827] shadow-sm' : 'text-[#6b7280] hover:text-[#111827]'"
-                  (click)="selectOrderType('RENT')"
-                >
-                  Thuê
-                </button>
-              </div>
-            </div>
-
-            <label class="grid gap-2">
-              <span class="text-sm font-semibold text-[#111827]">Số lượng</span>
-              <input
-                type="number"
-                min="1"
-                class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
-                [(ngModel)]="quantity"
-              />
-            </label>
-          </div>
-
-          @if (orderType === 'SELL') {
-            <label class="grid gap-2">
-              <span class="text-sm font-semibold text-[#111827]">Đơn giá</span>
-              <input
-                type="text"
-                inputmode="numeric"
-                readonly
-                class="h-11 rounded-sm border border-[#d1d5db] bg-[#f9fafb] px-3 text-sm text-[#111827] outline-none"
-                [value]="formatCurrencyInput(unitPrice)"
-              />
-            </label>
-          } @else {
-            <div class="grid gap-4 sm:grid-cols-2">
-              <label class="grid gap-2">
-                <span class="text-sm font-semibold text-[#111827]">Số ngày thuê</span>
-                <input
-                  type="number"
-                  min="1"
-                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
-                  [(ngModel)]="rentalDays"
-                />
-              </label>
-              <label class="grid gap-2">
-                <span class="text-sm font-semibold text-[#111827]">Ngày nhận</span>
-                <input
-                  type="date"
-                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
-                  [(ngModel)]="deliveryDate"
-                />
-              </label>
-              <label class="grid gap-2">
-                <span class="text-sm font-semibold text-[#111827]">Tiền cọc</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
-                  [value]="formatCurrencyInput(depositAmount)"
-                  (input)="setMoneyField('depositAmount', $any($event.target).value)"
-                />
-              </label>
-              <label class="grid gap-2">
-                <span class="text-sm font-semibold text-[#111827]">Giá thuê</span>
-                <input
-                  type="text"
-                  inputmode="numeric"
-                  class="h-11 rounded-sm border border-[#d1d5db] px-3 text-sm text-[#111827] outline-none focus:border-[#111827] focus:ring-2 focus:ring-[#111827]/10"
-                  [value]="formatCurrencyInput(rentalPrice)"
-                  (input)="setMoneyField('rentalPrice', $any($event.target).value)"
-                />
-              </label>
-            </div>
-          }
 
           @if (validationMessage; as message) {
             <div class="rounded-sm border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">

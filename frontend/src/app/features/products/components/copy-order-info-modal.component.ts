@@ -2,14 +2,8 @@ import { CommonModule, NgClass } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { NotificationService } from '../../../core/services/notification.service';
-import {
-  formatVndCurrency,
-  formatVndCurrencyInput,
-  parseVndCurrencyInput
-} from '../../../shared/utils/currency.util';
-import { Product, ProductType, ProductVariant } from '../data-access/models/product.model';
-
-type CopyOrderType = 'SELL' | 'RENT';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
+import { Product, ProductVariant } from '../data-access/models/product.model';
 
 @Component({
   selector: 'app-copy-order-info-modal',
@@ -26,13 +20,6 @@ export class CopyOrderInfoModalComponent implements OnChanges {
   @Output() close = new EventEmitter<void>();
 
   protected selectedVariantId = '';
-  protected orderType: CopyOrderType = 'SELL';
-  protected quantity = 1;
-  protected rentalDays = 1;
-  protected deliveryDate = this.todayIso();
-  protected unitPrice: number | null = null;
-  protected rentalPrice: number | null = null;
-  protected depositAmount: number | null = null;
 
   ngOnChanges(changes: SimpleChanges): void {
     if ((changes['product'] || changes['isOpen']) && this.isOpen && this.product) {
@@ -48,52 +35,10 @@ export class CopyOrderInfoModalComponent implements OnChanges {
     return this.resolveProductCode(this.product);
   }
 
-  protected get supportsSell(): boolean {
-    return this.supportsProductType(this.product?.productType, 'SELL');
-  }
-
-  protected get supportsRent(): boolean {
-    return this.supportsProductType(this.product?.productType, 'RENT');
-  }
-
-  protected get selectedVariantSupportsSell(): boolean {
-    const variant = this.selectedVariant;
-    return Boolean(variant && this.supportsSell && this.isPositive(variant.priceSell));
-  }
-
-  protected get selectedVariantSupportsRent(): boolean {
-    const variant = this.selectedVariant;
-    return Boolean(variant && this.supportsRent && this.isPositive(variant.priceRentPerDay));
-  }
-
-  protected get rentalEndDate(): string {
-    return this.calculateRentalEndDate(this.deliveryDate, this.rentalDays);
-  }
-
   protected get validationMessage(): string | null {
     const variant = this.selectedVariant;
     if (!variant) {
       return 'Vui lòng chọn biến thể/SKU trước khi copy.';
-    }
-
-    if (!Number.isFinite(Number(this.quantity)) || Number(this.quantity) <= 0) {
-      return 'Số lượng phải lớn hơn 0.';
-    }
-
-    if (this.orderType === 'SELL' && !this.selectedVariantSupportsSell) {
-      return 'Biến thể này không hỗ trợ đơn bán.';
-    }
-
-    if (this.orderType === 'RENT' && !this.selectedVariantSupportsRent) {
-      return 'Biến thể này không hỗ trợ đơn thuê.';
-    }
-
-    if (this.orderType === 'RENT' && (!Number.isFinite(Number(this.rentalDays)) || Number(this.rentalDays) <= 0)) {
-      return 'Số ngày thuê phải lớn hơn 0.';
-    }
-
-    if (this.orderType === 'RENT' && !this.deliveryDate) {
-      return 'Vui lòng chọn ngày nhận.';
     }
 
     return null;
@@ -111,32 +56,7 @@ export class CopyOrderInfoModalComponent implements OnChanges {
     this.close.emit();
   }
 
-  protected onVariantChange(): void {
-    const variant = this.selectedVariant;
-    if (!variant) {
-      this.unitPrice = null;
-      this.rentalPrice = null;
-      this.depositAmount = null;
-      return;
-    }
-
-    if (this.orderType === 'SELL' && !this.selectedVariantSupportsSell && this.selectedVariantSupportsRent) {
-      this.orderType = 'RENT';
-    }
-
-    if (this.orderType === 'RENT' && !this.selectedVariantSupportsRent && this.selectedVariantSupportsSell) {
-      this.orderType = 'SELL';
-    }
-
-    this.unitPrice = variant.priceSell;
-    this.rentalPrice = variant.priceRentPerDay;
-    this.depositAmount = variant.depositAmount ?? 0;
-  }
-
-  protected selectOrderType(type: CopyOrderType): void {
-    this.orderType = type;
-    this.onVariantChange();
-  }
+  protected onVariantChange(): void {}
 
   protected async copy(): Promise<void> {
     if (this.validationMessage) {
@@ -163,70 +83,19 @@ export class CopyOrderInfoModalComponent implements OnChanges {
     return formatVndCurrency(value);
   }
 
-  protected formatCurrencyInput(value: number | null | undefined): string {
-    return formatVndCurrencyInput(value);
-  }
-
-  protected setMoneyField(field: 'unitPrice' | 'rentalPrice' | 'depositAmount', value: string): void {
-    const amount = parseVndCurrencyInput(value) ?? 0;
-
-    if (field === 'unitPrice') {
-      this.unitPrice = amount;
-      return;
-    }
-
-    if (field === 'rentalPrice') {
-      this.rentalPrice = amount;
-      return;
-    }
-
-    this.depositAmount = amount;
-  }
-
   private initializeForm(): void {
     const variants = this.product?.variants ?? [];
     const defaultVariant = variants.find((variant) => variant.active && variant.stockQty > 0) ?? variants[0] ?? null;
 
     this.selectedVariantId = defaultVariant?.id ?? '';
-    this.orderType = this.supportsSell ? 'SELL' : 'RENT';
-    this.quantity = 1;
-    this.rentalDays = 1;
-    this.deliveryDate = this.todayIso();
-    this.unitPrice = defaultVariant?.priceSell ?? null;
-    this.rentalPrice = defaultVariant?.priceRentPerDay ?? null;
-    this.depositAmount = defaultVariant?.depositAmount ?? 0;
-    this.onVariantChange();
   }
 
   private buildCopyText(): string {
-    const product = this.product;
     const variant = this.selectedVariant;
-    const lines = [
+    return [
       'Tạo đơn Messenger từ OMS:',
-      `- Product ID: ${product?.id ?? ''}`,
-      `- Variant ID: ${variant?.id ?? ''}`,
-      `- Mã sản phẩm: ${this.productCode}`,
-      `- Tên sản phẩm: ${product?.name ?? ''}`,
-      `- SKU: ${variant?.sku ?? ''}`,
-      `- Size: ${variant?.size ?? ''}`,
-      `- Màu: ${variant?.color ?? ''}`,
-      `- Số lượng: ${this.quantity || ''}`,
-      `- Loại đơn: ${this.orderType}`
-    ];
-
-    if (this.orderType === 'SELL') {
-      lines.push(`- Đơn giá: ${this.toCopyMoney(this.unitPrice)}`);
-    } else {
-      lines.push(
-        `- Giá thuê: ${this.toCopyMoney(this.rentalPrice)}`,
-        `- Tiền cọc: ${this.toCopyMoney(this.depositAmount)}`,
-        `- Số ngày thuê: ${this.rentalDays || ''}`,
-        `- Ngày nhận: ${this.deliveryDate || ''}`,
-        `- Ngày trả: ${this.rentalEndDate || ''}`
-      );
-    }
-
-    return lines.join('\n');
+      `- Variant ID: ${variant?.id ?? ''}`
+    ].join('\n');
   }
 
   private async writeClipboard(text: string): Promise<void> {
@@ -290,36 +159,6 @@ export class CopyOrderInfoModalComponent implements OnChanges {
       || normalized.includes('ma hang');
   }
 
-  private supportsProductType(productType: ProductType | undefined, orderType: CopyOrderType): boolean {
-    if (!productType) {
-      return false;
-    }
-
-    if (orderType === 'SELL') {
-      return productType === 'SELL' || productType === 'SELL_RENT';
-    }
-
-    return productType === 'RENT' || productType === 'SELL_RENT';
-  }
-
-  private toCopyMoney(value: number | null | undefined): string {
-    return value === null || value === undefined ? '' : formatVndCurrency(value, '');
-  }
-
-  private calculateRentalEndDate(startDate: string, days: number): string {
-    if (!startDate || !Number.isFinite(Number(days)) || Number(days) <= 0) {
-      return '';
-    }
-
-    const date = new Date(`${startDate}T00:00:00`);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-
-    date.setDate(date.getDate() + Math.max(0, Number(days) - 1));
-    return date.toISOString().slice(0, 10);
-  }
-
   private toScalarString(value: unknown): string {
     if (value === null || value === undefined) {
       return '';
@@ -330,14 +169,6 @@ export class CopyOrderInfoModalComponent implements OnChanges {
     }
 
     return '';
-  }
-
-  private isPositive(value: number | null | undefined): boolean {
-    return typeof value === 'number' && value > 0;
-  }
-
-  private todayIso(): string {
-    return new Date().toISOString().slice(0, 10);
   }
 
   private normalizeLookup(value: string): string {

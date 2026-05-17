@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -124,5 +125,66 @@ class RuleBasedOrderExtractionServiceTest {
         assertThat(result.getVariantId()).isEqualTo(8L);
         assertThat(result.getProductName()).isEqualTo("váy cưới áo dài truyền thống việt nam");
         assertThat(result.getPrice()).isEqualByComparingTo(new BigDecimal("1121231"));
+    }
+
+    @Test
+    void shouldExtractMinimalOmsCopiedVariantBlock() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now())
+                .text("""
+                        Tạo đơn Messenger từ OMS:
+                        - Variant ID: 8
+                        """)
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+
+        assertThat(result.getVariantId()).isEqualTo(8L);
+        assertThat(result.getProductId()).isNull();
+        assertThat(result.getQuantity()).isNull();
+        assertThat(result.getOrderType()).isNull();
+    }
+
+    @Test
+    void shouldExtractInlineRentalVariantCheckMessage() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.STAFF)
+                .senderId("staff")
+                .messageTime(LocalDateTime.now())
+                .text("san pham ban dang muon thue co ma la Variant ID: 1 a ban cho chut he thong kiem tra a")
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+
+        assertThat(result.getOrderType()).isEqualTo(Order.OrderType.RENT);
+        assertThat(result.getVariantId()).isEqualTo(1L);
+        assertThat(result.getQuantity()).isNull();
+    }
+
+    @Test
+    void shouldExtractRentalQuantityWordAndDateRangeWithoutYear() {
+        Message message = Message.builder()
+                .senderType(MessageSenderType.CUSTOMER)
+                .senderId("customer")
+                .messageTime(LocalDateTime.now())
+                .text("mình muốn thuê một chiếc ạ từ ngày 18/5 đến ngày 20/5 có trống lịch không ạ")
+                .build();
+
+        OrderInfoExtractedDto result = service.extractOrderInfo(List.of(message), 1L);
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        LocalDate expectedFrom = LocalDate.of(today.getYear(), 5, 18);
+        LocalDate expectedTo = LocalDate.of(today.getYear(), 5, 20);
+        if (expectedFrom.isBefore(today.minusDays(1))) {
+            expectedFrom = expectedFrom.plusYears(1);
+            expectedTo = expectedTo.plusYears(1);
+        }
+
+        assertThat(result.getOrderType()).isEqualTo(Order.OrderType.RENT);
+        assertThat(result.getQuantity()).isEqualTo(1);
+        assertThat(result.getRentFrom()).isEqualTo(expectedFrom);
+        assertThat(result.getRentTo()).isEqualTo(expectedTo);
+        assertThat(result.getRentalDays()).isEqualTo(3);
     }
 }

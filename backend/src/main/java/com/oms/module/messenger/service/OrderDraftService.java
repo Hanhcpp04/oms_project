@@ -21,10 +21,13 @@ import com.oms.module.product.entity.ProductType;
 import com.oms.module.product.entity.ProductVariant;
 import com.oms.module.product.repository.ProductRepository;
 import com.oms.module.product.repository.ProductVariantRepository;
+import com.oms.module.rental.entity.RentalAvailability;
+import com.oms.module.rental.repository.RentalAvailabilityRepository;
 import com.oms.module.shop.entity.Shop;
 import com.oms.module.shop.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -33,13 +36,18 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.text.Normalizer;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -47,15 +55,15 @@ import java.util.Optional;
 public class OrderDraftService {
 
     private static final int MAX_CONTEXT_MESSAGES = 200;
+    private static final Pattern PHONE_FRAGMENT_PATTERN =
+            Pattern.compile("(?<!\\d)(?:\\+?84|0)(?:[\\s.\\-]?\\d){8,10}(?!\\d)");
     public static final EnumSet<OrderDraftStatus> ACTIVE_DRAFT_STATUSES = EnumSet.of(
             OrderDraftStatus.WAITING_CONFIRM,
             OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION,
-            OrderDraftStatus.NEED_MORE_INFO
-    );
+            OrderDraftStatus.NEED_MORE_INFO);
     public static final EnumSet<OrderDraftStatus> CONFIRMABLE_DRAFT_STATUSES = EnumSet.of(
             OrderDraftStatus.WAITING_CONFIRM,
-            OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION
-    );
+            OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION);
 
     private final OrderDraftRepository orderDraftRepository;
     private final ConversationService conversationService;
@@ -68,6 +76,10 @@ public class OrderDraftService {
     private final ShopRepository shopRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final RentalAvailabilityRepository availabilityRepository;
+
+    @Value("${app.public.frontend-base-url:http://localhost:4200}")
+    private String publicFrontendBaseUrl = "http://localhost:4200";
 
     @Transactional
     public CreateOrderDraftResponse createOrderDraftFromConversation(Long conversationId) {
@@ -86,8 +98,7 @@ public class OrderDraftService {
         boolean messengerSent = messengerSendService.sendSystemMessage(
                 conversation.getPageId(),
                 conversation.getSenderId(),
-                saved.getConfirmMessage()
-        ).isSent();
+                saved.getConfirmMessage()).isSent();
 
         log.info("Created Messenger order draft: draftId={}, conversationId={}, contextMessageCount={}",
                 saved.getId(), conversationId, contextMessages.size());
@@ -103,8 +114,7 @@ public class OrderDraftService {
     public Optional<CreateOrderDraftResponse> createOrderDraftFromSellerMessage(
             Conversation conversation,
             Message sourceMessage,
-            Shop shop
-    ) {
+            Shop shop) {
         if (sourceMessage == null || !StringUtils.hasText(sourceMessage.getText())) {
             return Optional.empty();
         }
@@ -124,23 +134,22 @@ public class OrderDraftService {
         List<Message> contextMessages = getContextMessagesIncludingSource(conversation, sourceMessage);
         OrderInfoExtractedDto contextExtracted = orderExtractionService.extractOrderInfo(
                 contextMessages,
-                parserShopId
-        );
+                parserShopId);
         OrderInfoExtractedDto sourceExtracted = orderExtractionService.extractOrderInfo(
                 List.of(sourceMessage),
-                parserShopId
-        );
+                parserShopId);
         OrderInfoExtractedDto extracted = mergeSellerSourceProduct(contextExtracted, sourceExtracted);
-        OrderDraft saved = saveDraftWithCode(buildDraft(conversation, sourceMessage, shop, sourceMessage.getText(), extracted));
+        OrderDraft saved = saveDraftWithCode(
+                buildDraft(conversation, sourceMessage, shop, sourceMessage.getText(), extracted));
         conversationService.updateLastOrderMarkerTime(conversation, LocalDateTime.now());
 
         boolean messengerSent = messengerSendService.sendSystemMessage(
                 conversation.getPageId(),
                 conversation.getSenderId(),
-                saved.getConfirmMessage()
-        ).isSent();
+                saved.getConfirmMessage()).isSent();
 
-        log.info("Created Messenger order draft from seller echo: draftId={}, conversationId={}, sourceMid={}, status={}",
+        log.info(
+                "Created Messenger order draft from seller echo: draftId={}, conversationId={}, sourceMid={}, status={}",
                 saved.getId(), conversation.getId(), sourceMessage.getMid(), saved.getStatus());
 
         return Optional.of(CreateOrderDraftResponse.builder()
@@ -150,16 +159,129 @@ public class OrderDraftService {
                 .build());
     }
 
+    @Transactional
+    public Optional<String> checkRentalAvailabilityFromSellerMessage(
+            Conversation conversation,
+            Message sourceMessage,
+            Shop shop) {
+        return checkRentalAvailabilityFromMessage(conversation, sourceMessage, shop, false);
+    }
+
+    @Transactional
+    public Optional<String> checkRentalAvailabilityFromCustomerMessage(
+            Conversation conversation,
+            Message sourceMessage,
+            Shop shop) {
+        return checkRentalAvailabilityFromMessage(conversation, sourceMessage, shop, true);
+    }
+
+    private Optional<String> checkRentalAvailabilityFromMessage(
+            Conversation conversation,
+            Message sourceMessage,
+            Shop shop,
+            boolean requireRentalCheckContext) {
+        if (sourceMessage == null || !StringUtils.hasText(sourceMessage.getText())) {
+            return Optional.empty();
+        }
+
+        Long parserShopId = shop != null ? shop.getId() : null;
+        List<Message> contextMessages = getContextMessagesIncludingSource(conversation, sourceMessage);
+        if (requireRentalCheckContext && !hasRentalVariantCheckContext(contextMessages)) {
+            return Optional.empty();
+        }
+
+        OrderInfoExtractedDto contextExtracted = orderExtractionService.extractOrderInfo(
+                contextMessages,
+                parserShopId);
+        OrderInfoExtractedDto sourceExtracted = orderExtractionService.extractOrderInfo(
+                List.of(sourceMessage),
+                parserShopId);
+        if (requireRentalCheckContext && !hasRentalCheckReplySignal(sourceExtracted)) {
+            return Optional.empty();
+        }
+
+        OrderInfoExtractedDto extracted = mergeSellerSourceProduct(contextExtracted, sourceExtracted);
+        ResolvedDraftProduct resolvedProduct = resolveDraftProduct(
+                shop,
+                copyForRentalProductResolution(extracted));
+
+        Integer quantity = extracted.getQuantity();
+        LocalDate rentFrom = extracted.getRentFrom();
+        LocalDate rentTo = extracted.getRentTo();
+        List<String> missingFields = new ArrayList<>();
+        if (quantity == null || quantity <= 0) {
+            missingFields.add("quantity");
+        }
+        if (rentFrom == null || rentTo == null) {
+            missingFields.add("rentDates");
+        }
+
+        String replyMessage;
+        if (!missingFields.isEmpty()) {
+            replyMessage = buildRentalCheckMissingInfoMessage(missingFields);
+        } else {
+            ProductVariant variant = resolvedProduct.variant();
+            int availableQty = resolveAvailableQuantity(variant, Order.OrderType.RENT, rentFrom, rentTo);
+            replyMessage = availableQty >= quantity
+                    ? buildRentalAvailableMessage(variant, rentFrom, rentTo)
+                    : buildRentalUnavailableMessage(variant, rentFrom, rentTo);
+            log.info(
+                    "Checked Messenger rental availability: conversationId={}, sourceMid={}, variantId={}, rentFrom={}, rentTo={}, requestedQty={}, availableQty={}",
+                    conversation.getId(),
+                    sourceMessage.getMid(),
+                    variant.getId(),
+                    rentFrom,
+                    rentTo,
+                    quantity,
+                    availableQty);
+        }
+
+        messengerSendService.sendSystemMessage(
+                conversation.getPageId(),
+                conversation.getSenderId(),
+                replyMessage);
+        return Optional.of(replyMessage);
+    }
+
+    private boolean hasRentalVariantCheckContext(List<Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return false;
+        }
+
+        return messages.stream()
+                .filter(Objects::nonNull)
+                .filter(message -> message.getSenderType() == MessageSenderType.STAFF)
+                .map(Message::getText)
+                .filter(StringUtils::hasText)
+                .anyMatch(this::isRentalVariantCheckText);
+    }
+
+    private boolean hasRentalCheckReplySignal(OrderInfoExtractedDto extracted) {
+        return extracted != null
+                && (extracted.getQuantity() != null
+                        || extracted.getRentFrom() != null
+                        || extracted.getRentTo() != null
+                        || extracted.getRentalDays() != null);
+    }
+
+    private boolean isRentalVariantCheckText(String text) {
+        String normalized = normalizeLookup(text);
+        boolean omsOrderCopyBlock = normalized.contains("tao don messenger tu oms")
+                || normalized.contains("tao don tu oms")
+                || normalized.contains("tao don cho khach");
+        return !omsOrderCopyBlock
+                && normalized.contains("variant id")
+                && (normalized.contains("thue") || normalized.contains("rent"));
+    }
+
     private List<Message> getContextMessagesIncludingSource(Conversation conversation, Message sourceMessage) {
         List<Message> contextMessages = new ArrayList<>(
-                messageService.getDraftContextMessages(conversation, MAX_CONTEXT_MESSAGES)
-        );
+                messageService.getDraftContextMessages(conversation, MAX_CONTEXT_MESSAGES));
 
-        boolean containsSource = contextMessages.stream().anyMatch(message ->
-                Objects.equals(message.getId(), sourceMessage.getId())
+        boolean containsSource = contextMessages.stream()
+                .anyMatch(message -> Objects.equals(message.getId(), sourceMessage.getId())
                         || (StringUtils.hasText(message.getMid())
-                        && Objects.equals(message.getMid(), sourceMessage.getMid()))
-        );
+                                && Objects.equals(message.getMid(), sourceMessage.getMid())));
         if (!containsSource) {
             contextMessages.add(sourceMessage);
         }
@@ -168,8 +290,7 @@ public class OrderDraftService {
 
     private OrderInfoExtractedDto mergeSellerSourceProduct(
             OrderInfoExtractedDto contextExtracted,
-            OrderInfoExtractedDto sourceExtracted
-    ) {
+            OrderInfoExtractedDto sourceExtracted) {
         OrderInfoExtractedDto context = contextExtracted == null
                 ? OrderInfoExtractedDto.builder().build()
                 : contextExtracted;
@@ -200,10 +321,27 @@ public class OrderDraftService {
                 .rentTo(rentOrder ? firstNonNull(source.getRentTo(), context.getRentTo()) : null)
                 .note(firstNonBlank(context.getNote(), source.getNote()))
                 .confidence(firstNonNull(source.getConfidence(), context.getConfidence()))
-                .missingFields(context.getMissingFields() != null ? context.getMissingFields() : source.getMissingFields())
+                .missingFields(
+                        context.getMissingFields() != null ? context.getMissingFields() : source.getMissingFields())
                 .items(source.getItems() != null && !source.getItems().isEmpty()
                         ? source.getItems()
                         : context.getItems())
+                .build();
+    }
+
+    private OrderInfoExtractedDto copyForRentalProductResolution(OrderInfoExtractedDto extracted) {
+        OrderInfoExtractedDto safeExtracted = extracted == null
+                ? OrderInfoExtractedDto.builder().build()
+                : extracted;
+        return OrderInfoExtractedDto.builder()
+                .orderType(Order.OrderType.RENT)
+                .productId(safeExtracted.getProductId())
+                .variantId(safeExtracted.getVariantId())
+                .productName(safeExtracted.getProductName())
+                .productCode(safeExtracted.getProductCode())
+                .sku(safeExtracted.getSku())
+                .color(safeExtracted.getColor())
+                .size(safeExtracted.getSize())
                 .build();
     }
 
@@ -211,16 +349,14 @@ public class OrderDraftService {
     public Optional<OrderDraft> findLatestWaitingConfirm(Long conversationId) {
         return orderDraftRepository.findTopByConversationIdAndStatusInOrderByCreatedAtDesc(
                 conversationId,
-                CONFIRMABLE_DRAFT_STATUSES
-        );
+                CONFIRMABLE_DRAFT_STATUSES);
     }
 
     @Transactional(readOnly = true)
     public Optional<OrderDraft> findLatestActiveDraft(Long conversationId) {
         return orderDraftRepository.findTopByConversationIdAndStatusInOrderByCreatedAtDesc(
                 conversationId,
-                ACTIVE_DRAFT_STATUSES
-        );
+                ACTIVE_DRAFT_STATUSES);
     }
 
     @Transactional
@@ -240,7 +376,8 @@ public class OrderDraftService {
         if (draft.getStatus() != OrderDraftStatus.NEED_MORE_INFO
                 && draft.getStatus() != OrderDraftStatus.PENDING_CUSTOMER_CONFIRMATION
                 && draft.getStatus() != OrderDraftStatus.DRAFT) {
-            log.info("Customer update ignored because draft status is not editable. conversationId={}, draftId={}, status={}",
+            log.info(
+                    "Customer update ignored because draft status is not editable. conversationId={}, draftId={}, status={}",
                     conversation.getId(), draft.getId(), draft.getStatus());
             return Optional.of(draft);
         }
@@ -255,9 +392,10 @@ public class OrderDraftService {
                         .text(normalizedUpdate)
                         .messageTime(LocalDateTime.now())
                         .build()),
-                parserShopId
-        );
+                parserShopId);
         applyExtractedUpdate(draft, extracted);
+        applyContextualCustomerUpdate(draft, normalizedUpdate);
+        refreshResolvedProductData(draft);
 
         String updateNote = "Customer update: " + normalizedUpdate;
         draft.setNote(appendNote(draft.getNote(), updateNote));
@@ -265,7 +403,8 @@ public class OrderDraftService {
         refreshDraftStatusAndMessage(draft);
 
         OrderDraft saved = orderDraftRepository.save(draft);
-        messengerSendService.sendSystemMessage(conversation.getPageId(), conversation.getSenderId(), saved.getConfirmMessage());
+        messengerSendService.sendSystemMessage(conversation.getPageId(), conversation.getSenderId(),
+                saved.getConfirmMessage());
 
         log.info("Updated Messenger order draft from customer message: draftId={}, conversationId={}",
                 saved.getId(), conversation.getId());
@@ -307,17 +446,17 @@ public class OrderDraftService {
         lines.add("Shop đã tạo đơn tạm cho bạn:");
         lines.add("");
         lines.add("Mã đơn tạm: " + valueOrPlaceholder(draft.getDraftCode()));
+        lines.add("Khách hàng: " + valueOrPlaceholder(draft.getCustomerName()));
         lines.add("Sản phẩm: " + valueOrPlaceholder(draft.getProductName()) + buildVariantText(draft));
+        lines.add("Số lượng: " + valueOrPlaceholder(draft.getQuantity()));
         lines.add("Loại đơn: " + valueOrPlaceholder(draft.getOrderType()));
         if (draft.getOrderType() == Order.OrderType.RENT) {
-            lines.add("Thoi gian thue: " + buildRentalPeriodText(draft));
-            lines.add("Tien coc: " + valueOrPlaceholder(draft.getDepositAmount()));
+            lines.add("Thời gian thuê: " + buildRentalPeriodText(draft));
+            lines.add("Tiền cọc: " + valueOrPlaceholder(draft.getDepositAmount()));
         }
         lines.add("Tổng tiền: " + valueOrPlaceholder(draft.getTotalAmount()));
         lines.add("Địa chỉ giao hàng: " + valueOrPlaceholder(draft.getAddress()));
         lines.add("Số điện thoại: " + valueOrPlaceholder(draft.getPhone()));
-        lines.add("");
-        lines.add("Vui lòng nhắn \"Xác nhận đơn\" để hoàn tất đơn hàng.");
         if (draft.getStatus() == OrderDraftStatus.NEED_MORE_INFO) {
             lines.add("");
             lines.add("Đơn tạm đang thiếu thông tin. Vui lòng bổ sung các mục còn thiếu ở trên trước khi xác nhận.");
@@ -334,16 +473,13 @@ public class OrderDraftService {
         if (!StringUtils.hasText(draft.getCustomerName())) {
             missingFields.add("customerName");
         }
-        if (!StringUtils.hasText(draft.getCustomerName())) {
-            missingFields.add("customerName");
-        }
         if (!StringUtils.hasText(draft.getProductName())) {
             missingFields.add("productName");
         }
         if (draft.getShop() != null && !hasResolvedVariant(draft)) {
             missingFields.add("variantId");
         }
-        if (draft.getQuantity() == null) {
+        if (draft.getQuantity() == null || draft.getQuantity() <= 0) {
             missingFields.add("quantity");
         }
         if (!StringUtils.hasText(draft.getPhone())) {
@@ -370,20 +506,47 @@ public class OrderDraftService {
         return draft.getExpiresAt() != null && draft.getExpiresAt().isBefore(LocalDateTime.now());
     }
 
+    public void validateDraftCanCreateOrder(OrderDraft draft) {
+        if (draft == null || draft.getShop() == null) {
+            throw validationException("Shop chưa xác định được thông tin shop của đơn Messenger.");
+        }
+        if (draft.getItems() == null || draft.getItems().isEmpty()) {
+            throw validationException("Shop cần kiểm tra lại thông tin sản phẩm trước khi tạo đơn.");
+        }
+
+        List<String> blockingMissing = findBlockingMissingFields(draft);
+        if (!blockingMissing.isEmpty()) {
+            throw validationException(buildMissingInfoMessage(blockingMissing));
+        }
+
+        Long shopId = draft.getShop().getId();
+        for (OrderDraftItem item : draft.getItems()) {
+            ProductVariant variant = resolveDraftItemVariantForValidation(draft, item);
+            validateResolvedVariant(
+                    shopId,
+                    variant,
+                    draft.getOrderType(),
+                    draft.getQuantity(),
+                    draft.getRentFrom(),
+                    draft.getRentTo());
+        }
+    }
+
     private OrderDraft buildDraft(
             Conversation conversation,
             Message sourceMessage,
             Shop shop,
             String rawSellerMessage,
-            OrderInfoExtractedDto extracted
-    ) {
+            OrderInfoExtractedDto extracted) {
         OrderInfoExtractedDto safeExtracted = extracted == null ? OrderInfoExtractedDto.builder().build() : extracted;
         ResolvedDraftProduct resolvedProduct = shop != null ? resolveDraftProduct(shop, safeExtracted) : null;
         ProductVariant resolvedVariant = resolvedProduct != null ? resolvedProduct.variant() : null;
         Product product = resolvedProduct != null ? resolvedProduct.product() : null;
-        String resolvedSku = firstNonBlank(safeExtracted.getSku(), resolvedVariant != null ? resolvedVariant.getSku() : null);
-        BigDecimal resolvedPrice = resolveDraftPrice(safeExtracted, resolvedVariant);
-        BigDecimal resolvedDeposit = resolveDraftDeposit(safeExtracted, resolvedVariant);
+        Order.OrderType resolvedOrderType = resolveDraftOrderType(safeExtracted.getOrderType(), product);
+        String resolvedSku = firstNonBlank(safeExtracted.getSku(),
+                resolvedVariant != null ? resolvedVariant.getSku() : null);
+        BigDecimal resolvedPrice = resolveDraftPrice(safeExtracted, resolvedVariant, resolvedOrderType);
+        BigDecimal resolvedDeposit = resolveDraftDeposit(safeExtracted, resolvedVariant, resolvedOrderType);
         OrderDraft draft = OrderDraft.builder()
                 .shop(shop)
                 .conversation(conversation)
@@ -395,7 +558,7 @@ public class OrderDraftService {
                 .customerName(safeExtracted.getCustomerName())
                 .phone(safeExtracted.getPhone())
                 .address(safeExtracted.getAddress())
-                .orderType(safeExtracted.getOrderType())
+                .orderType(resolvedOrderType)
                 .productName(product != null ? product.getName() : safeExtracted.getProductName())
                 .productCode(safeExtracted.getProductCode())
                 .quantity(safeExtracted.getQuantity())
@@ -409,7 +572,8 @@ public class OrderDraftService {
                 .rentTo(safeExtracted.getRentTo())
                 .confidence(safeExtracted.getConfidence())
                 .note(safeExtracted.getNote())
-                .missingFields(safeExtracted.getMissingFields() != null ? safeExtracted.getMissingFields() : new ArrayList<>())
+                .missingFields(
+                        safeExtracted.getMissingFields() != null ? safeExtracted.getMissingFields() : new ArrayList<>())
                 .expiresAt(LocalDateTime.now().plusHours(Math.max(1, messengerProperties.getDraftTtlHours())))
                 .build();
 
@@ -431,7 +595,6 @@ public class OrderDraftService {
     }
 
     private ResolvedDraftProduct resolveDraftProduct(Shop shop, OrderInfoExtractedDto extracted) {
-        int quantity = resolveDraftQuantity(extracted.getQuantity());
         Long shopId = shop.getId();
         ProductVariant variant = null;
 
@@ -440,9 +603,8 @@ public class OrderDraftService {
                     .orElseThrow(() -> validationException("Variant ID không hợp lệ hoặc không thuộc shop hiện tại."));
         } else if (StringUtils.hasText(extracted.getSku())) {
             variant = productVariantRepository.findFirstBySkuIgnoreCaseAndProductShopIdAndIsActiveTrue(
-                            extracted.getSku().trim(),
-                            shopId
-                    )
+                    extracted.getSku().trim(),
+                    shopId)
                     .orElseThrow(() -> validationException("SKU không hợp lệ hoặc không thuộc shop hiện tại."));
         } else if (extracted.getProductId() != null) {
             Product product = productRepository.findByIdAndShopId(extracted.getProductId(), shopId)
@@ -454,7 +616,14 @@ public class OrderDraftService {
             variant = resolveVariantByProductName(shopId, extracted);
         }
 
-        validateResolvedVariant(shopId, variant, extracted.getOrderType(), quantity);
+        Order.OrderType resolvedOrderType = resolveDraftOrderType(extracted.getOrderType(), variant.getProduct());
+        validateResolvedVariant(
+                shopId,
+                variant,
+                resolvedOrderType,
+                extracted.getQuantity(),
+                extracted.getRentFrom(),
+                extracted.getRentTo());
         return new ResolvedDraftProduct(variant.getProduct(), variant);
     }
 
@@ -493,7 +662,8 @@ public class OrderDraftService {
             return exactMatches.get(0);
         }
         if (exactMatches.size() > 1) {
-            throw validationException("Thông tin sản phẩm/size/màu chưa đủ duy nhất. Vui lòng gửi Variant ID hoặc SKU.");
+            throw validationException(
+                    "Thông tin sản phẩm/size/màu chưa đủ duy nhất. Vui lòng gửi Variant ID hoặc SKU.");
         }
 
         List<ProductVariant> fuzzyMatches = productRepository.findAllByShopIdAndIsActiveTrue(shopId).stream()
@@ -545,8 +715,9 @@ public class OrderDraftService {
             Long shopId,
             ProductVariant variant,
             Order.OrderType orderType,
-            int quantity
-    ) {
+            Integer quantity,
+            LocalDate rentFrom,
+            LocalDate rentTo) {
         if (variant == null || variant.getProduct() == null) {
             throw validationException("Không xác định được biến thể sản phẩm.");
         }
@@ -556,26 +727,34 @@ public class OrderDraftService {
                 || !Boolean.TRUE.equals(product.getIsActive())
                 || product.getShop() == null
                 || !product.getShop().getId().equals(shopId)) {
-            throw validationException("Bien the khong ton tai, khong active hoac khong thuoc shop hien tai.");
+            throw validationException("Biến thể không tồn tại, không active hoặc không thuộc shop hiện tại.");
         }
 
         if (orderType != null && !supportsOrderType(product.getProductType(), orderType)) {
             throw validationException(orderType == Order.OrderType.RENT
-                    ? "Bien the nay khong ho tro don thue."
-                    : "Bien the nay khong ho tro don ban.");
+                    ? "Biến thể này không hỗ trợ đơn thuê."
+                    : "Biến thể này không hỗ trợ đơn bán.");
         }
 
         BigDecimal price = orderType == Order.OrderType.RENT ? variant.getPriceRentPerDay() : variant.getPriceSell();
         if (orderType != null && (price == null || price.compareTo(BigDecimal.ZERO) <= 0)) {
             throw validationException(orderType == Order.OrderType.RENT
-                    ? "Bien the nay chua co gia thue hop le."
-                    : "Bien the nay chua co gia ban hop le.");
+                    ? "Biến thể này chưa có giá thuê hợp lệ."
+                    : "Biến thể này chưa có giá bán hợp lệ.");
         }
 
         int stockQty = variant.getStockQty() != null ? variant.getStockQty() : 0;
-        if (stockQty < quantity) {
-            throw validationException("Bien the chi con " + Math.max(stockQty, 0) + ", khong du so luong " + quantity + ".");
+        if (stockQty <= 0) {
+            throw outOfStockException();
         }
+        if (quantity == null) {
+            return;
+        }
+        if (quantity <= 0) {
+            throw validationException("Số lượng phải lớn hơn 0.");
+        }
+
+        validateDraftStockAvailability(variant, orderType, quantity, rentFrom, rentTo);
     }
 
     private boolean supportsOrderType(ProductType productType, Order.OrderType orderType) {
@@ -588,15 +767,11 @@ public class OrderDraftService {
         };
     }
 
-    private int resolveDraftQuantity(Integer quantity) {
-        if (quantity == null || quantity <= 0) {
-            throw validationException("So luong phai lon hon 0.");
-        }
-        return quantity;
-    }
-
-    private BigDecimal resolveDraftPrice(OrderInfoExtractedDto extracted, ProductVariant variant) {
-        if (variant == null || extracted.getOrderType() == null) {
+    private BigDecimal resolveDraftPrice(
+            OrderInfoExtractedDto extracted,
+            ProductVariant variant,
+            Order.OrderType orderType) {
+        if (variant == null || orderType == null) {
             return extracted.getPrice();
         }
 
@@ -605,13 +780,16 @@ public class OrderDraftService {
             return extractedPrice;
         }
 
-        return extracted.getOrderType() == Order.OrderType.RENT
+        return orderType == Order.OrderType.RENT
                 ? variant.getPriceRentPerDay()
                 : variant.getPriceSell();
     }
 
-    private BigDecimal resolveDraftDeposit(OrderInfoExtractedDto extracted, ProductVariant variant) {
-        if (extracted.getOrderType() != Order.OrderType.RENT) {
+    private BigDecimal resolveDraftDeposit(
+            OrderInfoExtractedDto extracted,
+            ProductVariant variant,
+            Order.OrderType orderType) {
+        if (orderType != Order.OrderType.RENT) {
             return null;
         }
 
@@ -638,6 +816,163 @@ public class OrderDraftService {
             return null;
         }
         return variant.getDepositAmount();
+    }
+
+    private Order.OrderType resolveDraftOrderType(Order.OrderType extractedType, Product product) {
+        if (extractedType != null || product == null || product.getProductType() == null) {
+            return extractedType;
+        }
+
+        return switch (product.getProductType()) {
+            case SELL -> Order.OrderType.SELL;
+            case RENT -> Order.OrderType.RENT;
+            case SELL_RENT -> null;
+        };
+    }
+
+    private void validateDraftStockAvailability(
+            ProductVariant variant,
+            Order.OrderType orderType,
+            int quantity,
+            LocalDate rentFrom,
+            LocalDate rentTo) {
+        int availableQty = resolveAvailableQuantity(variant, orderType, rentFrom, rentTo);
+        if (availableQty < quantity) {
+            if (orderType == Order.OrderType.RENT && rentFrom != null && rentTo != null) {
+                throw validationException(buildRentalUnavailableMessage(variant, rentFrom, rentTo));
+            }
+            throw validationException("Sản phẩm/size màu này hiện chỉ còn "
+                    + Math.max(availableQty, 0)
+                    + ", không đủ số lượng "
+                    + quantity
+                    + ". Shop sẽ kiểm tra lại và báo bạn sớm.");
+        }
+    }
+
+    private int resolveAvailableQuantity(
+            ProductVariant variant,
+            Order.OrderType orderType,
+            LocalDate rentFrom,
+            LocalDate rentTo) {
+        int stockQty = variant.getStockQty() != null ? variant.getStockQty() : 0;
+        if (stockQty <= 0) {
+            return 0;
+        }
+
+        if (orderType == Order.OrderType.RENT && rentFrom != null && rentTo != null) {
+            if (rentFrom.isAfter(rentTo)) {
+                throw validationException("Ngày thuê không hợp lệ.");
+            }
+
+            List<RentalAvailability> conflicts = availabilityRepository.findConflicts(
+                    variant.getId(),
+                    rentFrom,
+                    rentTo);
+            return stockQty - maxConcurrentRentalBlocks(conflicts, rentFrom, rentTo);
+        }
+
+        if (orderType == Order.OrderType.SELL) {
+            List<RentalAvailability> activeBlocks = availabilityRepository.findActiveBlocksFromDate(
+                    variant.getId(),
+                    LocalDate.now());
+            return stockQty - maxConcurrentRentalBlocks(activeBlocks, LocalDate.now(), null);
+        }
+
+        return stockQty;
+    }
+
+    private String buildRentalAvailableMessage(
+            ProductVariant variant,
+            LocalDate rentFrom,
+            LocalDate rentTo) {
+        return "Shop đã kiểm tra: "
+                + buildProductVariantLabel(variant)
+                + " còn lịch trống cho thời gian thuê "
+                + rentFrom
+                + " đến "
+                + rentTo
+                + ".";
+    }
+
+    private String buildRentalUnavailableMessage(ProductVariant variant, LocalDate rentFrom, LocalDate rentTo) {
+        String formLink = buildPublicRentalFormLink(variant);
+        String message = "Thời gian thuê bạn chọn hiện không còn đủ lịch trống cho sản phẩm/size màu này"
+                + " (" + rentFrom + " đến " + rentTo + ").";
+        if (!StringUtils.hasText(formLink)) {
+            return message + " Bạn vui lòng chọn ngày khác hoặc liên hệ shop để được hỗ trợ.";
+        }
+        return message
+                + "\nBạn vui lòng mở form thuê đồ để tự xem lịch trống và đặt trên form:\n"
+                + formLink;
+    }
+
+    private String buildPublicRentalFormLink(ProductVariant variant) {
+        if (variant == null || variant.getProduct() == null || variant.getProduct().getShop() == null) {
+            return null;
+        }
+        Product product = variant.getProduct();
+        Shop shop = product.getShop();
+        if (!StringUtils.hasText(shop.getSlug()) || product.getId() == null || variant.getId() == null) {
+            return null;
+        }
+
+        String baseUrl = StringUtils.hasText(publicFrontendBaseUrl)
+                ? publicFrontendBaseUrl.trim().replaceAll("/+$", "")
+                : "http://localhost:4200";
+        return baseUrl
+                + "/f/" + shop.getSlug()
+                + "?p=" + product.getId()
+                + "&v=" + variant.getId()
+                + "&orderType=RENT";
+    }
+
+    private String buildProductVariantLabel(ProductVariant variant) {
+        if (variant == null) {
+            return "sản phẩm này";
+        }
+
+        String productName = variant.getProduct() != null && StringUtils.hasText(variant.getProduct().getName())
+                ? variant.getProduct().getName()
+                : "sản phẩm này";
+        String variantText = buildItemVariantText(variant.getSize(), variant.getColor());
+        return StringUtils.hasText(variantText) ? productName + " (" + variantText + ")" : productName;
+    }
+
+    private int maxConcurrentRentalBlocks(
+            List<RentalAvailability> blocks,
+            LocalDate windowStart,
+            LocalDate windowEnd) {
+        if (blocks == null || blocks.isEmpty()) {
+            return 0;
+        }
+
+        TreeMap<LocalDate, Integer> deltas = new TreeMap<>();
+        for (RentalAvailability block : blocks) {
+            if (block.getStartDate() == null || block.getEndDate() == null) {
+                continue;
+            }
+
+            LocalDate start = block.getStartDate().isBefore(windowStart) ? windowStart : block.getStartDate();
+            LocalDate end = windowEnd != null && block.getEndDate().isAfter(windowEnd) ? windowEnd : block.getEndDate();
+            if (end.isBefore(start)) {
+                continue;
+            }
+
+            deltas.merge(start, 1, Integer::sum);
+            deltas.merge(end.plusDays(1), -1, Integer::sum);
+        }
+
+        int current = 0;
+        int max = 0;
+        for (Integer delta : deltas.values()) {
+            current += delta;
+            max = Math.max(max, current);
+        }
+        return max;
+    }
+
+    private BusinessException outOfStockException() {
+        return validationException("Sản phẩm/size màu này hiện đã hết hàng. Shop sẽ kiểm tra lại và báo bạn sớm.");
     }
 
     private BusinessException validationException(String message) {
@@ -718,8 +1053,7 @@ public class OrderDraftService {
             Shop shop,
             Product product,
             ProductVariant variant,
-            String sku
-    ) {
+            String sku) {
         if (items == null || items.isEmpty()) {
             return;
         }
@@ -743,12 +1077,13 @@ public class OrderDraftService {
                     .sku(itemSku)
                     .variant(firstNonBlank(item.getVariant(), buildItemVariantText(
                             itemVariant != null ? itemVariant.getSize() : item.getSize(),
-                            itemVariant != null ? itemVariant.getColor() : item.getColor()
-                    )))
+                            itemVariant != null ? itemVariant.getColor() : item.getColor())))
                     .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
                     .rentalDays(item.getRentalDays())
-                    .price(item.getPrice() != null ? item.getPrice() : resolveVariantPrice(draft.getOrderType(), itemVariant))
-                    .deposit(item.getDeposit() != null ? item.getDeposit() : resolveVariantDeposit(draft.getOrderType(), itemVariant))
+                    .price(item.getPrice() != null ? item.getPrice()
+                            : resolveVariantPrice(draft.getOrderType(), itemVariant))
+                    .deposit(item.getDeposit() != null ? item.getDeposit()
+                            : resolveVariantDeposit(draft.getOrderType(), itemVariant))
                     .build());
         }
     }
@@ -758,8 +1093,7 @@ public class OrderDraftService {
             OrderDraft draft,
             OrderInfoExtractedDto.ItemDto item,
             Product fallbackProduct,
-            ProductVariant fallbackVariant
-    ) {
+            ProductVariant fallbackVariant) {
         if (shop == null) {
             return null;
         }
@@ -786,6 +1120,9 @@ public class OrderDraftService {
     }
 
     private void refreshAmounts(OrderDraft draft) {
+        if (draft.getOrderType() == Order.OrderType.RENT && draft.getRentalDays() == null) {
+            draft.setRentalDays(calculateRentalDays(draft.getRentFrom(), draft.getRentTo()));
+        }
         addPrimaryItem(draft);
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal deposit = BigDecimal.ZERO;
@@ -794,7 +1131,12 @@ public class OrderDraftService {
             for (OrderDraftItem item : draft.getItems()) {
                 BigDecimal price = item.getPrice() != null ? item.getPrice() : BigDecimal.ZERO;
                 int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
-                subtotal = subtotal.add(price.multiply(BigDecimal.valueOf(quantity)));
+                int rentalDays = draft.getOrderType() == Order.OrderType.RENT
+                        ? resolveRentalDays(item.getRentalDays(), draft.getRentalDays())
+                        : 1;
+                subtotal = subtotal.add(price
+                        .multiply(BigDecimal.valueOf(quantity))
+                        .multiply(BigDecimal.valueOf(rentalDays)));
                 if (item.getDeposit() != null) {
                     deposit = deposit.add(item.getDeposit().multiply(BigDecimal.valueOf(quantity)));
                 }
@@ -814,24 +1156,76 @@ public class OrderDraftService {
         }
     }
 
+    private int resolveRentalDays(Integer itemRentalDays, Integer draftRentalDays) {
+        Integer rentalDays = draftRentalDays != null ? draftRentalDays : itemRentalDays;
+        return rentalDays != null && rentalDays > 0 ? rentalDays : 1;
+    }
+
+    private Integer calculateRentalDays(LocalDate rentFrom, LocalDate rentTo) {
+        if (rentFrom == null || rentTo == null || rentTo.isBefore(rentFrom)) {
+            return null;
+        }
+        long days = ChronoUnit.DAYS.between(rentFrom, rentTo) + 1;
+        return days > 0 && days <= Integer.MAX_VALUE ? (int) days : null;
+    }
+
     private String buildMissingInfoMessage(List<String> missingFields) {
+        List<String> customerMissingFields = missingFields == null
+                ? List.of()
+                : missingFields.stream()
+                        .filter(this::isCustomerSuppliedMissingField)
+                        .distinct()
+                        .toList();
+
+        if (customerMissingFields.isEmpty()) {
+            return "Shop cần kiểm tra lại thông tin sản phẩm trước khi tạo đơn. Shop sẽ báo bạn sớm.";
+        }
+
         return "Shop cần thêm thông tin để tạo đơn:\n"
-                + missingFields.stream()
-                .map(this::missingFieldLabel)
-                .map(label -> "- " + label)
-                .reduce((left, right) -> left + "\n" + right)
-                .orElse("- Thông tin đơn hàng")
+                + customerMissingFields.stream()
+                        .map(this::missingFieldLabel)
+                        .map(label -> "- " + label)
+                        .reduce((left, right) -> left + "\n" + right)
+                        .orElse("- Thông tin đơn hàng")
                 + "\n\nBạn vui lòng bổ sung giúp shop nhé.";
+    }
+
+    private String buildRentalCheckMissingInfoMessage(List<String> missingFields) {
+        List<String> customerMissingFields = missingFields == null
+                ? List.of()
+                : missingFields.stream()
+                        .filter(field -> "quantity".equals(field) || "rentDates".equals(field))
+                        .distinct()
+                        .toList();
+
+        return "Shop cần thêm thông tin để kiểm tra lịch thuê:\n"
+                + customerMissingFields.stream()
+                        .map(this::missingFieldLabel)
+                        .map(label -> "- " + label)
+                        .reduce((left, right) -> left + "\n" + right)
+                        .orElse("- Thông tin lịch thuê")
+                + "\n\nBạn vui lòng bổ sung giúp shop nhé.";
+    }
+
+    private boolean isCustomerSuppliedMissingField(String field) {
+        return "customerName".equals(field)
+                || "quantity".equals(field)
+                || "phone".equals(field)
+                || "address".equals(field)
+                || "orderType".equals(field)
+                || "rentalDays".equals(field)
+                || "rentDates".equals(field);
     }
 
     private String missingFieldLabel(String field) {
         return switch (field) {
+            case "customerName" -> "Họ và tên người nhận";
             case "phone" -> "Số điện thoại nhận hàng";
             case "address" -> "Địa chỉ giao hàng";
             case "productName" -> "Sản phẩm";
             case "variantId" -> "Biến thể/SKU sản phẩm";
             case "quantity" -> "Số lượng";
-            case "orderType" -> "Loại đơn bán/thue";
+            case "orderType" -> "Loại đơn bán/thuê";
             case "rentalDays" -> "Số ngày thuê";
             case "rentDates" -> "Ngày nhận/ngày thuê";
             default -> field;
@@ -987,6 +1381,228 @@ public class OrderDraftService {
         }
         if (extracted.getRentTo() != null) {
             draft.setRentTo(extracted.getRentTo());
+        }
+    }
+
+    private void applyContextualCustomerUpdate(OrderDraft draft, String updateContent) {
+        parseStandaloneQuantityUpdate(draft, updateContent).ifPresent(draft::setQuantity);
+        parseExplicitAddressUpdate(updateContent).ifPresent(draft::setAddress);
+        applyUnlabeledContactUpdate(draft, updateContent);
+    }
+
+    private Optional<Integer> parseStandaloneQuantityUpdate(OrderDraft draft, String updateContent) {
+        if (draft == null
+                || (draft.getQuantity() != null && draft.getQuantity() > 0)
+                || !StringUtils.hasText(updateContent)) {
+            return Optional.empty();
+        }
+        if (!findBlockingMissingFields(draft).contains("quantity")) {
+            return Optional.empty();
+        }
+
+        String normalizedUpdate = updateContent.trim();
+        if (!normalizedUpdate.matches("\\d{1,4}")) {
+            return Optional.empty();
+        }
+
+        int quantity = Integer.parseInt(normalizedUpdate);
+        return quantity > 0 ? Optional.of(quantity) : Optional.empty();
+    }
+
+    private Optional<String> parseExplicitAddressUpdate(String updateContent) {
+        if (!StringUtils.hasText(updateContent)) {
+            return Optional.empty();
+        }
+
+        Matcher matcher = Pattern.compile(
+                "(?iu)^\\s*(?:sua|sửa|cap\\s*nhat|cập\\s*nhật|doi|đổi)\\s+"
+                        + "(?:dia\\s*chi|địa\\s*chỉ)"
+                        + "(?:\\s+(?:thanh|thành|la|là))?\\s*[:\\-]?\\s*(.+)$")
+                .matcher(updateContent);
+        if (!matcher.find()) {
+            return Optional.empty();
+        }
+
+        String address = cleanCustomerProvidedValue(matcher.group(1));
+        return looksLikeAddress(address) ? Optional.of(address) : Optional.empty();
+    }
+
+    private void applyUnlabeledContactUpdate(OrderDraft draft, String updateContent) {
+        if (draft == null || !StringUtils.hasText(updateContent)) {
+            return;
+        }
+
+        boolean missingName = !StringUtils.hasText(draft.getCustomerName())
+                && findBlockingMissingFields(draft).contains("customerName");
+        boolean missingAddress = !StringUtils.hasText(draft.getAddress())
+                && findBlockingMissingFields(draft).contains("address");
+        if (!missingName && !missingAddress) {
+            return;
+        }
+
+        String cleaned = removePhoneFragments(updateContent)
+                .replaceAll("(?iu)\\b(day\\s*a|day|đây|a|ạ|nhe|nhé|shop|minh|mình)\\b", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+        if (!StringUtils.hasText(cleaned)) {
+            return;
+        }
+
+        int addressStart = firstDigitIndex(cleaned);
+        if (addressStart <= 0) {
+            return;
+        }
+
+        String name = cleaned.substring(0, addressStart).trim();
+        String address = cleaned.substring(addressStart).trim();
+        if (missingName && looksLikeCustomerName(name)) {
+            draft.setCustomerName(name);
+        }
+        if (missingAddress && looksLikeAddress(address)) {
+            draft.setAddress(address);
+        }
+    }
+
+    private String cleanCustomerProvidedValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        return removePhoneFragments(value)
+                .replaceAll("(?iu)\\b(day\\s*a|day|đây|a|ạ|nhe|nhé|shop)\\b", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private String removePhoneFragments(String value) {
+        Matcher matcher = PHONE_FRAGMENT_PATTERN.matcher(value);
+        return matcher.replaceAll(" ");
+    }
+
+    private int firstDigitIndex(String value) {
+        for (int i = 0; i < value.length(); i++) {
+            if (Character.isDigit(value.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private boolean looksLikeCustomerName(String value) {
+        if (!StringUtils.hasText(value) || value.length() < 2 || value.length() > 80) {
+            return false;
+        }
+        return value.chars().noneMatch(Character::isDigit);
+    }
+
+    private boolean looksLikeAddress(String value) {
+        return StringUtils.hasText(value) && value.length() >= 5 && value.chars().anyMatch(Character::isDigit);
+    }
+
+    private void refreshResolvedProductData(OrderDraft draft) {
+        if (draft == null || draft.getShop() == null || !hasDraftProductLookup(draft)) {
+            return;
+        }
+
+        ProductVariant variant = findFirstResolvedVariant(draft).orElse(null);
+        Product product = variant != null ? variant.getProduct() : null;
+        if (variant == null) {
+            ResolvedDraftProduct resolved = resolveDraftProduct(draft.getShop(), toExtractedProductLookup(draft));
+            variant = resolved.variant();
+            product = resolved.product();
+        }
+
+        Order.OrderType resolvedOrderType = resolveDraftOrderType(draft.getOrderType(), product);
+        draft.setOrderType(resolvedOrderType);
+        if (product != null) {
+            draft.setProductName(product.getName());
+        }
+        if (variant != null) {
+            draft.setColor(variant.getColor());
+            draft.setSize(variant.getSize());
+            BigDecimal price = resolveVariantPrice(resolvedOrderType, variant);
+            if (price != null) {
+                draft.setPrice(price);
+            }
+            draft.setDepositAmount(resolveVariantDeposit(resolvedOrderType, variant));
+            syncPrimaryItemProductData(draft, product, variant);
+            validateResolvedVariant(
+                    draft.getShop().getId(),
+                    variant,
+                    resolvedOrderType,
+                    draft.getQuantity(),
+                    draft.getRentFrom(),
+                    draft.getRentTo());
+        }
+    }
+
+    private boolean hasDraftProductLookup(OrderDraft draft) {
+        return findFirstResolvedVariant(draft).isPresent()
+                || StringUtils.hasText(draft.getProductCode())
+                || StringUtils.hasText(draft.getProductName());
+    }
+
+    private Optional<ProductVariant> findFirstResolvedVariant(OrderDraft draft) {
+        if (draft.getItems() == null) {
+            return Optional.empty();
+        }
+        return draft.getItems().stream()
+                .filter(Objects::nonNull)
+                .map(OrderDraftItem::getProductVariant)
+                .filter(Objects::nonNull)
+                .findFirst();
+    }
+
+    private ProductVariant resolveDraftItemVariantForValidation(OrderDraft draft, OrderDraftItem item) {
+        if (item != null && item.getProductVariant() != null) {
+            return item.getProductVariant();
+        }
+
+        Long shopId = draft.getShop() != null ? draft.getShop().getId() : null;
+        if (shopId == null) {
+            throw validationException("Shop chưa xác định được thông tin shop của đơn Messenger.");
+        }
+
+        String sku = item != null && StringUtils.hasText(item.getSku()) ? item.getSku() : null;
+        if (!StringUtils.hasText(sku) && item != null && StringUtils.hasText(item.getProductCode())) {
+            sku = item.getProductCode();
+        }
+        if (StringUtils.hasText(sku)) {
+            return productVariantRepository.findFirstBySkuIgnoreCaseAndProductShopIdAndIsActiveTrue(sku, shopId)
+                    .orElseThrow(
+                            () -> validationException("Shop cần kiểm tra lại thông tin sản phẩm trước khi tạo đơn."));
+        }
+
+        throw validationException("Shop cần kiểm tra lại thông tin sản phẩm trước khi tạo đơn.");
+    }
+
+    private OrderInfoExtractedDto toExtractedProductLookup(OrderDraft draft) {
+        Long variantId = findFirstResolvedVariant(draft)
+                .map(ProductVariant::getId)
+                .orElse(null);
+        return OrderInfoExtractedDto.builder()
+                .orderType(draft.getOrderType())
+                .variantId(variantId)
+                .productName(draft.getProductName())
+                .productCode(draft.getProductCode())
+                .quantity(draft.getQuantity())
+                .color(draft.getColor())
+                .size(draft.getSize())
+                .rentFrom(draft.getRentFrom())
+                .rentTo(draft.getRentTo())
+                .build();
+    }
+
+    private void syncPrimaryItemProductData(OrderDraft draft, Product product, ProductVariant variant) {
+        if (draft.getItems() == null || draft.getItems().isEmpty()) {
+            addPrimaryItem(draft, product, variant, variant != null ? variant.getSku() : null);
+            return;
+        }
+
+        OrderDraftItem item = draft.getItems().get(0);
+        item.setProduct(product);
+        item.setProductVariant(variant);
+        if (variant != null) {
+            item.setSku(variant.getSku());
         }
     }
 

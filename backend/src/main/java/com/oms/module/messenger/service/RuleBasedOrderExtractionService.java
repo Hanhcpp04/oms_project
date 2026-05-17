@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -32,6 +33,10 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
     private static final Pattern QUANTITY_BY_UNIT_PATTERN = Pattern.compile("(?iu)\\b(\\d{1,4})\\s*(?:cái|cai|chiếc|chiec|sp|sản\\s*phẩm|san\\s*pham|bộ|bo)\\b");
     private static final Pattern RENTAL_DAYS_PATTERN = Pattern.compile("(?iu)\\b(\\d{1,3})\\s*(?:ngay|ngÃ y|day|days)\\b");
     private static final Pattern SIZE_PATTERN = Pattern.compile("(?iu)\\b(XXL|XL|L|M|S)\\b");
+    private static final Pattern WORD_QUANTITY_BY_UNIT_PATTERN = Pattern.compile("(?iu)\\b(mot|hai|ba|bon|nam|sau|bay|tam|chin|muoi)\\s*(?:cai|chiec|sp|san\\s*pham|bo)\\b");
+    private static final Pattern PRODUCT_ID_INLINE_PATTERN = Pattern.compile("(?iu)\\bproduct\\s*id\\b\\s*[:#\\-]?\\s*(\\d{1,18})");
+    private static final Pattern VARIANT_ID_INLINE_PATTERN = Pattern.compile("(?iu)\\bvariant\\s*id\\b\\s*[:#\\-]?\\s*(\\d{1,18})");
+    private static final Pattern DATE_TOKEN_PATTERN = Pattern.compile("\\b(\\d{1,2})/(\\d{1,2})(?:/(\\d{2,4}))?\\b");
     private static final Pattern PRODUCT_CODE_PATTERN = Pattern.compile("(?iu)(?:mã\\s*sản\\s*phẩm|ma\\s*san\\s*pham|product\\s*code|code)\\s*[:#\\-]?\\s*([A-Za-z0-9_\\-]+)");
     private static final Pattern SKU_PATTERN = Pattern.compile("(?iu)\\bsku\\b\\s*[:#\\-]?\\s*([A-Za-z0-9_\\-]+)");
     private static final Pattern PRICE_PATTERN = Pattern.compile("(?iu)(?:giá|gia|price)?\\s*[:\\-]?\\s*\\b(\\d{2,3}(?:[\\.,]\\d{3})*|\\d{2,3})\\s*(k|nghìn|nghin|đ|d|vnd)?\\b");
@@ -69,8 +74,12 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
         String productName = findProductName(lines);
         String productCode = findProductCode(combinedText);
         String sku = firstNonBlank(findStructuredValue(lines, "SKU"), findSku(combinedText));
-        Long productId = parseLong(findStructuredValue(lines, "Product ID", "ProductId"));
-        Long variantId = parseLong(findStructuredValue(lines, "Variant ID", "VariantId"));
+        Long productId = firstNonNull(
+                parseLong(findStructuredValue(lines, "Product ID", "ProductId")),
+                findInlineLong(combinedText, PRODUCT_ID_INLINE_PATTERN));
+        Long variantId = firstNonNull(
+                parseLong(findStructuredValue(lines, "Variant ID", "VariantId")),
+                findInlineLong(combinedText, VARIANT_ID_INLINE_PATTERN));
         String address = findAddress(lines);
         String customerName = findCustomerName(combinedText);
         BigDecimal price = firstNonNull(
@@ -97,14 +106,16 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
                 )),
                 findDeliveryDate(combinedText)
         );
-        LocalDate explicitRentTo = parseDate(findStructuredValue(lines,
+        LocalDate explicitRentTo = firstNonNull(
+                parseDate(findStructuredValue(lines,
                 "Ngày trả",
                 "Ngay tra",
                 "Ngày thuê đến",
                 "Ngay thue den",
                 "Rent to",
                 "Return date"
-        ));
+        )),
+                findReturnDate(combinedText));
         LocalDate rentFrom = orderType == Order.OrderType.RENT ? deliveryDate : null;
         LocalDate derivedRentTo = rentFrom != null && rentalDays != null
                 ? rentFrom.plusDays(Math.max(rentalDays - 1, 0))
@@ -230,6 +241,19 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
         }
     }
 
+    private Long findInlineLong(String text, Pattern pattern) {
+        if (!StringUtils.hasText(text)) {
+            return null;
+        }
+
+        Long matched = null;
+        Matcher matcher = pattern.matcher(text);
+        while (matcher.find()) {
+            matched = parseLong(matcher.group(1));
+        }
+        return matched;
+    }
+
     private Integer parsePositiveInteger(String value) {
         Long parsed = parseLong(value);
         if (parsed == null || parsed <= 0 || parsed > Integer.MAX_VALUE) {
@@ -313,7 +337,28 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
             return Integer.parseInt(byUnit.group(1));
         }
 
+        Matcher byWordUnit = WORD_QUANTITY_BY_UNIT_PATTERN.matcher(normalize(text));
+        if (byWordUnit.find()) {
+            return parseVietnameseQuantityWord(byWordUnit.group(1));
+        }
+
         return null;
+    }
+
+    private Integer parseVietnameseQuantityWord(String value) {
+        return switch (value) {
+            case "mot" -> 1;
+            case "hai" -> 2;
+            case "ba" -> 3;
+            case "bon" -> 4;
+            case "nam" -> 5;
+            case "sau" -> 6;
+            case "bay" -> 7;
+            case "tam" -> 8;
+            case "chin" -> 9;
+            case "muoi" -> 10;
+            default -> null;
+        };
     }
 
     private Integer findRentalDays(String text) {
@@ -396,20 +441,54 @@ public class RuleBasedOrderExtractionService implements OrderExtractionService {
             return today.plusDays(1);
         }
 
+        List<LocalDate> dates = findDateCandidates(text);
+        return dates.isEmpty() ? null : dates.get(0);
+    }
+
+    private LocalDate findReturnDate(String text) {
+        List<LocalDate> dates = findDateCandidates(text);
+        return dates.size() >= 2 ? dates.get(1) : null;
+    }
+
+    private List<LocalDate> findDateCandidates(String text) {
+        if (!StringUtils.hasText(text)) {
+            return List.of();
+        }
+
+        List<LocalDate> dates = new ArrayList<>();
         Matcher isoMatcher = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b").matcher(text);
-        if (isoMatcher.find()) {
-            return LocalDate.parse(isoMatcher.group());
+        while (isoMatcher.find()) {
+            dates.add(LocalDate.parse(isoMatcher.group()));
         }
 
-        Matcher dmyMatcher = Pattern.compile("\\b(\\d{1,2})/(\\d{1,2})/(\\d{4})\\b").matcher(text);
-        if (dmyMatcher.find()) {
-            int day = Integer.parseInt(dmyMatcher.group(1));
-            int month = Integer.parseInt(dmyMatcher.group(2));
-            int year = Integer.parseInt(dmyMatcher.group(3));
-            return LocalDate.of(year, month, day);
+        Matcher dmyMatcher = DATE_TOKEN_PATTERN.matcher(text);
+        while (dmyMatcher.find()) {
+            parseDateToken(dmyMatcher).ifPresent(dates::add);
         }
+        return dates;
+    }
 
-        return null;
+    private Optional<LocalDate> parseDateToken(Matcher matcher) {
+        try {
+            int day = Integer.parseInt(matcher.group(1));
+            int month = Integer.parseInt(matcher.group(2));
+            String rawYear = matcher.group(3);
+            LocalDate today = LocalDate.now(DEFAULT_ZONE);
+            int year = StringUtils.hasText(rawYear)
+                    ? Integer.parseInt(rawYear)
+                    : today.getYear();
+            if (year < 100) {
+                year += 2000;
+            }
+
+            LocalDate date = LocalDate.of(year, month, day);
+            if (!StringUtils.hasText(rawYear) && date.isBefore(today.minusDays(1))) {
+                date = date.plusYears(1);
+            }
+            return Optional.of(date);
+        } catch (Exception ignored) {
+            return Optional.empty();
+        }
     }
 
     private BigDecimal findAmountAfterKeywords(String text, List<String> keywords) {
