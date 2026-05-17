@@ -1,6 +1,7 @@
 package com.oms.module.order.service;
 
 import com.oms.module.messenger.service.MessengerSendService;
+import com.oms.module.notification.service.NotificationService;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class OrderPaymentTimeoutScheduler {
     private final OrderRepository orderRepository;
     private final OrderService orderService;
     private final MessengerSendService messengerSendService;
+    private final NotificationService notificationService;
 
     @Value("${app.payment.timeout.cancel-minutes:30}")
     private int cancelMinutes;
@@ -58,6 +60,7 @@ public class OrderPaymentTimeoutScheduler {
             try {
                 // Cancel the order
                 orderService.updateStatus(order.getShop().getId(), order.getId(), Order.OrderStatus.CANCELLED, (Long) null);
+                notificationService.notifyPaymentTimeoutCancelled(order, cancelMinutes);
                 log.info("Auto-cancelled unpaid order: {}", order.getOrderCode());
 
                 // Notify via Messenger if applicable
@@ -94,6 +97,7 @@ public class OrderPaymentTimeoutScheduler {
             try {
                 order.setPaymentReminderSent(true);
                 orderRepository.save(order);
+                notificationService.notifyPaymentTimeoutReminder(order, Math.max(cancelMinutes - reminderMinutes, 0));
                 log.info("Sending payment reminder for order: {}", order.getOrderCode());
 
                 int remainingTime = cancelMinutes - reminderMinutes;

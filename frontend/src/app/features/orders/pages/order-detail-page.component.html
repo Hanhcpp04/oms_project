@@ -33,8 +33,8 @@
             Đơn hàng #{{ getDisplayOrderNumber(detailOrder) }}
           </h1>
           <app-ui-badge [variant]="detailOrder.orderType === 'RENT' ? 'info' : 'success'" size="md">{{ getOrderTypeLabel(detailOrder.orderType) }}</app-ui-badge>
-          <app-ui-badge [variant]="getStatusVariant(detailOrder.status)" size="md">{{ getStatusLabel(detailOrder.status) }}</app-ui-badge>
-          <app-ui-badge [variant]="'primary'" size="md">{{ getFulfillmentStatusLabel(detailOrder.fulfillmentStatus) }}</app-ui-badge>
+          <app-ui-badge [variant]="getOrderStatusVariant(detailOrder)" size="md">{{ getOrderStatusLabel(detailOrder) }}</app-ui-badge>
+          <app-ui-badge [variant]="getFulfillmentStatusVariant(detailOrder)" size="md">{{ getFulfillmentStatusLabel(detailOrder.fulfillmentStatus, detailOrder) }}</app-ui-badge>
         </div>
 
         <p class="m-0 mt-1.5 max-w-3xl text-sm leading-6 text-[var(--color-text-secondary)]">{{ getPageDescription() }}</p>
@@ -67,7 +67,7 @@
       </div>
       <div class="od-summary-cell">
         <span class="od-label">Thanh toán</span>
-        <strong [class]="getPaymentStatusTextClass(getResolvedPaymentStatus(detailOrder))">{{ getPaymentStatusLabel(getResolvedPaymentStatus(detailOrder)) }}</strong>
+        <strong [class]="getPaymentStatusDisplayTextClass(detailOrder)">{{ getPaymentStatusDisplayLabel(detailOrder) }}</strong>
       </div>
       <div class="od-summary-cell od-summary-total">
         <span class="od-label">Tổng tiền</span>
@@ -113,12 +113,12 @@
               <h3 class="od-section-title"><i class="od-icon ri-settings-3-line"></i>Vận hành</h3>
               <dl class="od-info-list">
                 <div><dt>Loại đơn</dt><dd><app-ui-badge [variant]="detailOrder.orderType === 'RENT' ? 'info' : 'success'" size="md">{{ getOrderTypeLabel(detailOrder.orderType) }}</app-ui-badge></dd></div>
-                <div><dt>Trạng thái đơn</dt><dd><app-ui-badge [variant]="getStatusVariant(detailOrder.status)" size="md">{{ getStatusLabel(detailOrder.status) }}</app-ui-badge></dd></div>
-                <div><dt>Trạng thái xử lý</dt><dd><app-ui-badge [variant]="'primary'" size="md">{{ getFulfillmentStatusLabel(detailOrder.fulfillmentStatus) }}</app-ui-badge></dd></div>
+                <div><dt>Trạng thái đơn</dt><dd><app-ui-badge [variant]="getOrderStatusVariant(detailOrder)" size="md">{{ getOrderStatusLabel(detailOrder) }}</app-ui-badge></dd></div>
+                <div><dt>Trạng thái xử lý</dt><dd><app-ui-badge [variant]="getFulfillmentStatusVariant(detailOrder)" size="md">{{ getFulfillmentStatusLabel(detailOrder.fulfillmentStatus, detailOrder) }}</app-ui-badge></dd></div>
                 <div><dt>Người tạo</dt><dd>{{ detailOrder.createdByFullName || detailOrder.createdByUsername || 'Hệ thống' }}</dd></div>
                 <div><dt>Kênh bán</dt><dd>{{ detailOrder.sourceChannel || 'Chưa có' }}</dd></div>
                 <div><dt>Vận chuyển</dt><dd><span>{{ detailOrder.shippingMethod || 'Chưa chọn' }}</span><span class="od-muted-value">{{ formatCurrency(getShippingFee(detailOrder)) }}</span></dd></div>
-                <div><dt>Thanh toán</dt><dd><span>{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</span><span class="od-muted-value" [ngClass]="getPaymentStatusTextClass(getResolvedPaymentStatus(detailOrder))">{{ getPaymentStatusLabel(getResolvedPaymentStatus(detailOrder)) }}</span></dd></div>
+                <div><dt>Thanh toán</dt><dd><span>{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</span><span class="od-muted-value" [ngClass]="getPaymentStatusDisplayTextClass(detailOrder)">{{ getPaymentStatusDisplayLabel(detailOrder) }}</span></dd></div>
                 @if (detailOrder.orderType === 'RENT') {
                 <div><dt>Lịch thuê</dt><dd>{{ formatDate(detailOrder.rentFrom) || 'Chưa có' }} - {{ formatDate(detailOrder.rentTo) || 'Chưa có' }}</dd></div>
                 }
@@ -167,7 +167,7 @@
             <section>
               <h3 class="od-section-title">Thanh toán</h3>
               <div class="grid gap-3">
-                <label class="od-field"><span>Trạng thái thanh toán</span><select [ngModel]="editForm().paymentStatus" (ngModelChange)="updateEditForm({ paymentStatus: $event })">@for (option of paymentStatusOptions; track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>
+                <label class="od-field"><span>Trạng thái thanh toán</span><select [ngModel]="editForm().paymentStatus" (ngModelChange)="updateEditForm({ paymentStatus: $event })">@for (option of getPaymentStatusOptions(detailOrder); track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>
                 <label class="od-field"><span>Phương thức thanh toán</span><select [ngModel]="editForm().paymentMethod" (ngModelChange)="updateEditForm({ paymentMethod: $event || undefined })"><option [ngValue]="undefined">Chưa chọn</option>@for (option of paymentMethodOptions; track option.value) {<option [value]="option.value">{{ option.label }}</option>}</select></label>
               </div>
             </section>
@@ -215,6 +215,9 @@
 
             <div class="od-money-list">
               <div><span>Tạm tính</span><strong>{{ formatCurrency(getSubtotal(detailOrder)) }}</strong></div>
+              @if (detailOrder.orderType === 'RENT') {
+              <div><span>Tiền cọc</span><strong>{{ formatCurrency(getDepositAmount(detailOrder)) }}</strong></div>
+              }
               <div><span>Phí vận chuyển</span><strong>{{ formatCurrency(getShippingFee(detailOrder)) }}</strong></div>
               <div><span>Giảm giá</span><strong>{{ formatCurrency(getDiscountAmount()) }}</strong></div>
             </div>
@@ -224,40 +227,77 @@
               <strong class="text-right text-xl font-bold leading-none text-[var(--color-text-primary)]">{{ formatCurrency(detailOrder.totalAmount) }}</strong>
             </div>
 
-            <div class="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <div class="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h3 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Hành động xử lý</h3>
-                  <p class="m-0 mt-0.5 text-xs text-[var(--color-text-secondary)]">{{ getActionStateLabel(detailOrder) }}</p>
-                </div>
-              </div>
+          </section>
 
+          <section class="od-side-section">
+            <div class="mb-3 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="od-title">{{ getWorkflowTitle(detailOrder) }}</h2>
+                <p class="od-subtitle">{{ getWorkflowSubtitle(detailOrder) }}</p>
+              </div>
+              <app-ui-badge [variant]="getOrderStatusVariant(detailOrder)" size="md">{{ getOrderStatusLabel(detailOrder) }}</app-ui-badge>
+            </div>
+
+            @if (hasOrderStatusMismatch(detailOrder)) {
+            <div class="mb-3 border-l-4 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--color-danger-text)]">
+              Đơn bán đang có trạng thái chỉ dùng cho đơn thuê. Cần rà lại dữ liệu trạng thái đơn.
+            </div>
+            }
+
+            @if (getActionButtons(detailOrder); as actions) {
+              @if (actions.length > 0) {
               <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                @for (action of getActionButtons(detailOrder); track action.label) {
+                @for (action of actions; track action.label) {
                 <app-ui-button [variant]="action.variant" size="sm" [block]="true" [disabled]="action.disabled" (clicked)="action.onClick()">
+                  <i class="od-icon" [ngClass]="action.icon"></i>
                   {{ action.label }}
                 </app-ui-button>
                 }
               </div>
+              } @else {
+              <div class="border border-dashed border-[var(--color-border-strong)] px-3 py-2 text-center text-xs font-semibold leading-5 text-[var(--color-text-secondary)]">Không còn hành động xử lý cho trạng thái hiện tại.</div>
+              }
+            }
+          </section>
+
+          <section class="od-side-section">
+            <div class="mb-3 flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <h2 class="od-title">Thanh toán</h2>
+                <p class="od-subtitle">{{ getPaymentSubtitle(detailOrder) }}</p>
+              </div>
+              <app-ui-badge [variant]="getPaymentStatusDisplayVariant(detailOrder)" size="md">{{ getPaymentStatusDisplayLabel(detailOrder) }}</app-ui-badge>
             </div>
 
-            <div class="mt-4 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface)] p-3">
-              <div class="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h3 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Thanh toán</h3>
-                  <p class="m-0 mt-0.5 text-xs text-[var(--color-text-secondary)]">Cập nhật riêng trạng thái thanh toán.</p>
-                </div>
-              </div>
-              @if (canShowPaymentActions(detailOrder)) {
-              <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                @if (canSetUnpaid(detailOrder)) {<app-ui-button variant="secondary" size="sm" [block]="true" (clicked)="setPaymentStatus('UNPAID')">Chưa thanh toán</app-ui-button>}
-                @if (canSetDeposited(detailOrder)) {<app-ui-button variant="secondary" size="sm" [block]="true" (clicked)="setPaymentStatus('DEPOSITED')">Đã đặt cọc</app-ui-button>}
-                @if (canSetPaid(detailOrder)) {<app-ui-button variant="primary" size="sm" [block]="true" (clicked)="setPaymentStatus('PAID')">Đã thanh toán</app-ui-button>}
-              </div>
-              } @else {
-              <p class="m-0 text-sm text-[var(--color-text-secondary)]">Không thể chỉnh thanh toán ở trạng thái hiện tại.</p>
-              }
+            @if (hasPaymentStatusMismatch(detailOrder)) {
+            <div class="mb-3 border-l-4 border-[var(--color-danger)] bg-[var(--color-danger-soft)] px-3 py-2 text-xs font-semibold leading-5 text-[var(--color-danger-text)]">
+              Đơn bán đang lưu trạng thái cọc cũ. Cập nhật lại thanh toán để chuẩn hóa dữ liệu.
             </div>
+            }
+
+            <div class="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-[var(--color-border)] pt-2">
+              <span class="text-xs font-semibold text-[var(--color-text-muted)]">Phương thức</span>
+              <strong class="min-w-0 text-right text-[13px] font-bold text-[var(--color-text-primary)] [overflow-wrap:anywhere]">{{ getPaymentMethodLabel(detailOrder.paymentMethod) }}</strong>
+            </div>
+
+            @if (canShowPaymentActions(detailOrder)) {
+              @if (getPaymentActionButtons(detailOrder); as paymentActions) {
+                @if (paymentActions.length > 0) {
+                <div class="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                  @for (action of paymentActions; track action.label) {
+                  <app-ui-button [variant]="action.variant" size="sm" [block]="true" [disabled]="action.disabled" (clicked)="action.onClick()">
+                    <i class="od-icon" [ngClass]="action.icon"></i>
+                    {{ action.label }}
+                  </app-ui-button>
+                  }
+                </div>
+                } @else {
+                <div class="mt-3 border border-dashed border-[var(--color-border-strong)] px-3 py-2 text-center text-xs font-semibold leading-5 text-[var(--color-text-secondary)]">Trạng thái thanh toán đã đúng với đơn hiện tại.</div>
+                }
+              }
+            } @else {
+            <p class="m-0 text-sm text-[var(--color-text-secondary)]">Không thể chỉnh thanh toán ở trạng thái hiện tại.</p>
+            }
           </section>
 
           <section class="od-side-section">

@@ -9,8 +9,8 @@ import { PageTitleComponent } from '../../../shared/components/ui/page-title.com
 import { ORDER_STATUS_OPTIONS } from '../data-access/constants/order-status.constants';
 import { Order, OrderStatus, OrderType } from '../data-access/models/order.model';
 import { OrdersStore } from '../state/orders.store';
-import { OrderRealtimeService } from '../data-access/order-realtime.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { AppNotificationService } from '../../../core/services/app-notification.service';
 import { AuthStore } from '../../../core/auth/auth.store';
 import { PermissionService } from '../../../core/services/permission.service';
 import { formatVndCurrency } from '../../../shared/utils/currency.util';
@@ -32,9 +32,9 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly notificationService = inject(NotificationService);
+  private readonly appNotificationService = inject(AppNotificationService);
   private readonly authStore = inject(AuthStore);
   private readonly permissionService = inject(PermissionService);
-  private readonly orderRealtimeService = inject(OrderRealtimeService);
   readonly store = inject(OrdersStore);
   readonly statusOptions = computed(() => this.resolveStatusOptions());
   readonly visibleOrders = computed(() =>
@@ -68,7 +68,7 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
       this.applyFilters();
     });
 
-    this.connectRealtime();
+    this.connectNotifications();
   }
 
   ngOnDestroy(): void {
@@ -348,17 +348,19 @@ export class OrdersPageComponent implements OnInit, OnDestroy {
     return ORDER_STATUS_OPTIONS.filter((option) => !['RENTING', 'OVERDUE', 'RETURNED', 'DEPOSITED'].includes(option.value));
   }
 
-  private connectRealtime(): void {
-    this.orderRealtimeService.stream()
+  private connectNotifications(): void {
+    this.appNotificationService.events$
       .pipe(takeUntil(this.destroy$))
-      .subscribe((event) => {
-        if (event.type !== 'ORDER_CREATED_FROM_MESSENGER' || !event.orderId) {
+      .subscribe((notification) => {
+        if (notification.entityType !== 'ORDER' || !notification.entityId) {
           return;
         }
 
-        this.markNewMessengerOrder(event.orderId);
+        if (notification.type === 'ORDER_CREATED_MESSENGER') {
+          this.markNewMessengerOrder(notification.entityId);
+        }
+
         this.store.refresh();
-        this.notificationService.success(`Có đơn mới từ Messenger #${event.orderId}`);
       });
   }
 

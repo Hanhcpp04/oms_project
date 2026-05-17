@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { AppNotificationService } from '../../../core/services/app-notification.service';
 
 import { HeaderComponent } from '../header/header.component';
 import { LayoutNavItem } from '../layout.model';
@@ -13,8 +14,9 @@ import { SidebarComponent } from '../sidebar/sidebar.component';
   templateUrl: './main-layout.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class MainLayoutComponent {
+export class MainLayoutComponent implements OnInit, OnDestroy {
   private readonly authStore = inject(AuthStore);
+  private readonly appNotificationService = inject(AppNotificationService);
 
   protected readonly sidebarCollapsed = signal(false);
   protected readonly mobileSidebarOpen = signal(false);
@@ -86,6 +88,16 @@ export class MainLayoutComponent {
       ]
     }
   ];
+
+  ngOnInit(): void {
+    this.appNotificationService.loadLatest();
+    this.appNotificationService.loadUnreadCount();
+    this.appNotificationService.connect();
+  }
+
+  ngOnDestroy(): void {
+    this.appNotificationService.disconnect();
+  }
 
   protected onToggleSidebar(): void {
     this.sidebarCollapsed.update((state) => !state);

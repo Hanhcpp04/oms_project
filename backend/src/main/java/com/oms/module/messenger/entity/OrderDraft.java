@@ -86,6 +86,16 @@ public class OrderDraft extends BaseEntity {
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
 
+    @Column(name = "shipping_method_id")
+    private Long shippingMethodId;
+
+    @Column(name = "shipping_method", length = 100)
+    private String shippingMethod;
+
+    @Column(name = "shipping_fee", precision = 12, scale = 0)
+    @Builder.Default
+    private BigDecimal shippingFee = BigDecimal.ZERO;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type", length = 20, columnDefinition = "enum('RENT','SELL')")
     private Order.OrderType orderType;

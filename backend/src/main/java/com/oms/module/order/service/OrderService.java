@@ -6,6 +6,7 @@ import com.oms.common.exception.BusinessException;
 import com.oms.common.exception.ErrorCode;
 import com.oms.common.exception.ResourceNotFoundException;
 import com.oms.module.messenger.service.MessengerOrderNotificationService;
+import com.oms.module.notification.service.NotificationService;
 import com.oms.module.order.dto.OrderPaymentUpdateRequest;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
@@ -71,6 +72,7 @@ public class OrderService {
     private final OrderFormValueValidator orderFormValueValidator;
     private final MessengerOrderNotificationService messengerOrderNotificationService;
     private final OrderStatusTransitionService orderStatusTransitionService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getOrders(Long shopId, Order.OrderStatus status,
@@ -258,6 +260,7 @@ public class OrderService {
             reserveRentalAvailabilityIfNeeded(order);
             order.setInventoryCommitted(true);
         }
+        notificationService.notifyOrderCreated(order);
         return order;
     }
 
@@ -376,10 +379,19 @@ public class OrderService {
         Order order = orderRepository.findByIdAndShopId(orderId, shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
+        if (request.getPaymentStatus() == Order.PaymentStatus.DEPOSITED
+                && order.getOrderType() != Order.OrderType.RENT) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "Deposited payment status is only available for rental orders");
+        }
+
+        Order.PaymentStatus previousPaymentStatus = order.getPaymentStatus();
         order.setPaymentStatus(request.getPaymentStatus());
         order.setPaymentMethod(request.getPaymentMethod());
 
-        return orderMapper.toResponse(orderRepository.save(order));
+        Order savedOrder = orderRepository.save(order);
+        notificationService.notifyOrderPaymentUpdated(savedOrder, previousPaymentStatus);
+        return orderMapper.toResponse(savedOrder);
     }
 
     // ==================== Private Helpers ====================

@@ -24,6 +24,7 @@ import com.oms.module.product.repository.ProductVariantRepository;
 import com.oms.module.rental.entity.RentalAvailability;
 import com.oms.module.rental.repository.RentalAvailabilityRepository;
 import com.oms.module.shop.entity.Shop;
+import com.oms.module.shop.entity.ShopShippingMethod;
 import com.oms.module.shop.repository.ShopRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -457,6 +458,10 @@ public class OrderDraftService {
         lines.add("Tổng tiền: " + valueOrPlaceholder(draft.getTotalAmount()));
         lines.add("Địa chỉ giao hàng: " + valueOrPlaceholder(draft.getAddress()));
         lines.add("Số điện thoại: " + valueOrPlaceholder(draft.getPhone()));
+        if (StringUtils.hasText(draft.getShippingMethod())) {
+            lines.add("Phương thức vận chuyển: " + valueOrPlaceholder(draft.getShippingMethod()));
+            lines.add("Phí vận chuyển: " + valueOrPlaceholder(draft.getShippingFee()));
+        }
         if (draft.getStatus() == OrderDraftStatus.NEED_MORE_INFO) {
             lines.add("");
             lines.add("Đơn tạm đang thiếu thông tin. Vui lòng bổ sung các mục còn thiếu ở trên trước khi xác nhận.");
@@ -530,6 +535,28 @@ public class OrderDraftService {
                     draft.getRentFrom(),
                     draft.getRentTo());
         }
+    }
+
+    public OrderDraft applyShippingMethodSelection(OrderDraft draft, ShopShippingMethod method) {
+        if (draft == null || draft.getShop() == null || draft.getShop().getId() == null) {
+            throw validationException("Shop chưa xác định được thông tin shop của đơn Messenger.");
+        }
+        if (method == null || method.getId() == null) {
+            throw validationException("Phương thức vận chuyển không hợp lệ.");
+        }
+        if (method.getShop() == null || !draft.getShop().getId().equals(method.getShop().getId())) {
+            throw validationException("Phương thức vận chuyển không thuộc shop hiện tại.");
+        }
+        if (!Boolean.TRUE.equals(method.getIsActive())) {
+            throw validationException("Phương thức vận chuyển đã bị tắt.");
+        }
+
+        draft.setShippingMethodId(method.getId());
+        draft.setShippingMethod(method.getName());
+        draft.setShippingFee(resolveShippingFee(method));
+        refreshAmounts(draft);
+        draft.setConfirmMessage(buildConfirmMessage(draft));
+        return orderDraftRepository.save(draft);
     }
 
     private OrderDraft buildDraft(
@@ -1147,7 +1174,7 @@ public class OrderDraftService {
         }
 
         draft.setSubtotal(subtotal);
-        draft.setTotalAmount(subtotal);
+        draft.setTotalAmount(subtotal.add(draft.getShippingFee() != null ? draft.getShippingFee() : BigDecimal.ZERO));
         if (draft.getOrderType() == Order.OrderType.RENT) {
             draft.setDepositAmount(deposit.compareTo(BigDecimal.ZERO) > 0 ? deposit : draft.getDepositAmount());
         } else {
@@ -1157,6 +1184,16 @@ public class OrderDraftService {
             draft.setRentFrom(null);
             draft.setRentTo(null);
         }
+    }
+
+    private BigDecimal resolveShippingFee(ShopShippingMethod method) {
+        if (method == null || method.getFeePolicy() == null) {
+            return BigDecimal.ZERO;
+        }
+        if (method.getFeePolicy() == ShopShippingMethod.FeePolicy.FIXED_FEE && method.getDefaultFee() != null) {
+            return method.getDefaultFee();
+        }
+        return BigDecimal.ZERO;
     }
 
     private int resolveRentalDays(Integer itemRentalDays, Integer draftRentalDays) {

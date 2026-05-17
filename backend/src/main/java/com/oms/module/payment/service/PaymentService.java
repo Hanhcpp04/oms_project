@@ -6,6 +6,7 @@ import com.oms.common.exception.BusinessException;
 import com.oms.common.exception.ErrorCode;
 import com.oms.common.exception.ResourceNotFoundException;
 import com.oms.config.PayosProperties;
+import com.oms.module.notification.service.NotificationService;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.entity.OrderItem;
 import com.oms.module.order.repository.OrderRepository;
@@ -51,6 +52,7 @@ public class PaymentService {
     private final PayosProperties payosProperties;
     private final ObjectMapper objectMapper;
     private final OrderService orderService;
+    private final NotificationService notificationService;
 
     public boolean canCreatePayosCheckout() {
         return payosProperties.isConfigured();
@@ -279,6 +281,7 @@ public class PaymentService {
             order.setPaymentStatus(Order.PaymentStatus.PAID);
         }
         advanceOrderAfterSuccessfulPayment(order, payment.getPurpose());
+        notificationService.notifyPaymentReceived(order, payment.getPurpose(), payment.getAmount());
     }
 
     private Payment findPayosPayment(Long providerOrderCode, String paymentLinkId) {

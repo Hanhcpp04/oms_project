@@ -3,6 +3,7 @@ package com.oms.module.order.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oms.common.exception.BusinessException;
 import com.oms.module.messenger.service.MessengerOrderNotificationService;
+import com.oms.module.notification.service.NotificationService;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
 import com.oms.module.order.entity.Order;
@@ -54,6 +55,7 @@ class OrderServiceTest {
     private ShopPaymentConfigRepository paymentConfigRepository;
     private MessengerOrderNotificationService messengerOrderNotificationService;
     private OrderStatusTransitionService orderStatusTransitionService;
+    private NotificationService notificationService;
     private OrderService service;
 
     private Shop shop;
@@ -75,6 +77,7 @@ class OrderServiceTest {
         OrderFormValueValidator orderFormValueValidator = mock(OrderFormValueValidator.class);
         messengerOrderNotificationService = mock(MessengerOrderNotificationService.class);
         orderStatusTransitionService = mock(OrderStatusTransitionService.class);
+        notificationService = mock(NotificationService.class);
         when(orderFormValueValidator.buildValidatedValues(any(), any(), any())).thenReturn(List.of());
 
         service = new OrderService(
@@ -90,7 +93,8 @@ class OrderServiceTest {
                 new ObjectMapper(),
                 orderFormValueValidator,
                 messengerOrderNotificationService,
-                orderStatusTransitionService
+                orderStatusTransitionService,
+                notificationService
         );
 
         shop = Shop.builder()
@@ -173,14 +177,14 @@ class OrderServiceTest {
     }
 
     @Test
-    void createSellOrderShouldCalculateTotalAndUseNewStatus() {
+    void createSellOrderShouldCalculateTotalAndUseConfirmedStatusForManualOrder() {
         OrderRequest request = baseRequest(Order.OrderType.SELL, 100L);
         request.setShippingFee(new BigDecimal("30000"));
         request.getItems().get(0).setQuantity(2);
 
         OrderResponse response = service.createOrder(1L, request, null);
 
-        assertThat(response.getStatus()).isEqualTo(Order.OrderStatus.NEW);
+        assertThat(response.getStatus()).isEqualTo(Order.OrderStatus.CONFIRMED);
         assertThat(response.getSourceMethod()).isEqualTo(Order.SourceMethod.MANUAL);
         assertThat(response.getShippingFee()).isEqualByComparingTo("30000");
         assertThat(response.getTotalAmount()).isEqualByComparingTo("270000");

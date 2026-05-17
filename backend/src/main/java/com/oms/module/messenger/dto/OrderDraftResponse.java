@@ -24,6 +24,9 @@ public class OrderDraftResponse {
     private String customerName;
     private String phone;
     private String address;
+    private Long shippingMethodId;
+    private String shippingMethod;
+    private BigDecimal shippingFee;
     private Order.OrderType orderType;
     private String productName;
     private String productCode;

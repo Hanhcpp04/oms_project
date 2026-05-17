@@ -22,6 +22,7 @@ export const API_ENDPOINTS = {
   productFormTemplates: '/product-form-configs',
   orderFormTemplates: '/order-form-configs',
   publicForms: '/public/forms',
+  notifications: '/notifications',
   orders: '/orders',
   orderAutoClean: '/orders/ai-parse',
   products: '/products',
