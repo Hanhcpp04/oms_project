@@ -149,7 +149,9 @@ public class MessengerOrderService {
         request.setCustomerAddress(draft.getAddress());
         request.setCustomerNote(draft.getNote());
         request.setSourceChannel("MESSENGER");
-        request.setShippingFee(BigDecimal.ZERO);
+        request.setShippingMethodId(draft.getShippingMethodId());
+        request.setShippingMethod(draft.getShippingMethod());
+        request.setShippingFee(draft.getShippingFee() != null ? draft.getShippingFee() : BigDecimal.ZERO);
         request.setSourceMethod(Order.SourceMethod.MESSENGER);
         request.setPaymentMethod(paymentMethod);
         request.setRentFrom(draft.getRentFrom());

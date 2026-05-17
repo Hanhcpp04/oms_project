@@ -86,6 +86,9 @@ class MessengerOrderServiceTest {
                 .customerName("Nguyen Van A")
                 .phone("0395253054")
                 .address("123 Ha Noi")
+                .shippingMethodId(5L)
+                .shippingMethod("GHN")
+                .shippingFee(new BigDecimal("30000"))
                 .productName("Dress")
                 .quantity(1)
                 .orderType(Order.OrderType.RENT)
@@ -124,6 +127,9 @@ class MessengerOrderServiceTest {
         ArgumentCaptor<OrderRequest> requestCaptor = ArgumentCaptor.forClass(OrderRequest.class);
         verify(orderService).createOrderEntity(eq(1L), requestCaptor.capture(), isNull());
         assertThat(requestCaptor.getValue().getDepositPaid()).isEqualByComparingTo("0");
+        assertThat(requestCaptor.getValue().getShippingMethodId()).isEqualTo(5L);
+        assertThat(requestCaptor.getValue().getShippingMethod()).isEqualTo("GHN");
+        assertThat(requestCaptor.getValue().getShippingFee()).isEqualByComparingTo("30000");
         assertThat(savedOrder.getDepositAmount()).isEqualByComparingTo("0");
         assertThat(savedOrder.getPaymentStatus()).isEqualTo(Order.PaymentStatus.UNPAID);
         verify(eventPublisher).publishEvent(any(OrderCreatedFromMessengerEvent.class));

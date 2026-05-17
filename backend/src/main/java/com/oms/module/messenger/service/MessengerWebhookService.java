@@ -14,7 +14,9 @@ import com.oms.module.payment.entity.Payment;
 import com.oms.module.payment.service.PaymentService;
 import com.oms.module.shop.entity.Shop;
 import com.oms.module.shop.entity.ShopPaymentConfig;
+import com.oms.module.shop.entity.ShopShippingMethod;
 import com.oms.module.shop.repository.ShopPaymentConfigRepository;
+import com.oms.module.shop.repository.ShopShippingMethodRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,6 +29,8 @@ import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -47,6 +51,7 @@ public class MessengerWebhookService {
     private final MessengerPageResolver messengerPageResolver;
     private final PaymentService paymentService;
     private final ShopPaymentConfigRepository paymentConfigRepository;
+    private final ShopShippingMethodRepository shippingMethodRepository;
     private final PublicOrderTrackingTokenService trackingTokenService;
 
     @Value("${app.public.frontend-base-url:http://localhost:4200}")
@@ -197,6 +202,12 @@ public class MessengerWebhookService {
 
         Optional<OrderDraft> activeDraft = orderDraftService.findLatestActiveDraft(conversation.getId());
         if (activeDraft.isPresent()) {
+            Optional<ShippingSelection> shippingSelection = resolveShippingSelection(normalized, activeDraft.get());
+            if (shippingSelection.isPresent()) {
+                applyCustomerShippingSelection(conversation, activeDraft.get(), shippingSelection.get());
+                return;
+            }
+
             Optional<PaymentSelection> paymentSelection = resolvePaymentSelection(normalized, activeDraft.get());
             if (paymentSelection.isPresent()) {
                 confirmCustomerDraftWithPayment(conversation, activeDraft.get(), paymentSelection.get());
@@ -264,6 +275,15 @@ public class MessengerWebhookService {
         }
 
         try {
+            if (needsShippingSelection(draft)) {
+                messengerSendService.sendSystemMessage(
+                        conversation.getPageId(),
+                        conversation.getSenderId(),
+                        buildShippingSelectionMessage(draft)
+                );
+                return;
+            }
+
             messengerSendService.sendSystemMessage(
                     conversation.getPageId(),
                     conversation.getSenderId(),
@@ -290,6 +310,15 @@ public class MessengerWebhookService {
                     conversation.getPageId(),
                     conversation.getSenderId(),
                     orderDraftService.buildConfirmMessage(draft)
+            );
+            return;
+        }
+
+        if (needsShippingSelection(draft)) {
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    buildShippingSelectionMessage(draft)
             );
             return;
         }
@@ -366,6 +395,74 @@ public class MessengerWebhookService {
         );
     }
 
+    private void applyCustomerShippingSelection(
+            Conversation conversation,
+            OrderDraft draft,
+            ShippingSelection selection
+    ) {
+        var missingFields = orderDraftService.findBlockingMissingFields(draft);
+        if (!missingFields.isEmpty()) {
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    orderDraftService.buildConfirmMessage(draft)
+            );
+            return;
+        }
+
+        try {
+            OrderDraft updatedDraft = orderDraftService.applyShippingMethodSelection(draft, selection.method());
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    buildPaymentSelectionMessage(updatedDraft)
+            );
+        } catch (BusinessException ex) {
+            log.info("Customer shipping selection rejected. conversationId={}, reason={}",
+                    conversation.getId(), ex.getMessage());
+            messengerSendService.sendSystemMessage(
+                    conversation.getPageId(),
+                    conversation.getSenderId(),
+                    "Shop chưa thể chọn phương thức vận chuyển: " + ex.getMessage()
+            );
+        }
+    }
+
+    private boolean needsShippingSelection(OrderDraft draft) {
+        List<ShopShippingMethod> shippingMethods = findActiveShippingMethods(draft);
+        return !shippingMethods.isEmpty() && !hasActiveShippingSelection(draft, shippingMethods);
+    }
+
+    private boolean hasActiveShippingSelection(OrderDraft draft, List<ShopShippingMethod> shippingMethods) {
+        if (draft == null || draft.getShippingMethodId() == null || shippingMethods == null) {
+            return false;
+        }
+        return shippingMethods.stream()
+                .anyMatch(method -> draft.getShippingMethodId().equals(method.getId()));
+    }
+
+    private String buildShippingSelectionMessage(OrderDraft draft) {
+        List<ShopShippingMethod> shippingMethods = findActiveShippingMethods(draft);
+        if (shippingMethods.isEmpty()) {
+            return buildPaymentSelectionMessage(draft);
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("Thông tin đơn đã được xác nhận. Bạn vui lòng chọn phương thức vận chuyển:\n");
+        for (int i = 0; i < shippingMethods.size(); i++) {
+            ShopShippingMethod method = shippingMethods.get(i);
+            builder.append("- Nhấn \"")
+                    .append(i + 1)
+                    .append("\" - ")
+                    .append(method.getName())
+                    .append(" (")
+                    .append(formatShippingMethodFee(method))
+                    .append(").\n");
+        }
+        builder.append("\nSau khi chọn vận chuyển, shop sẽ gửi lựa chọn thanh toán.");
+        return builder.toString().trim();
+    }
+
     private String buildPaymentSelectionMessage(OrderDraft draft) {
         ShopPaymentConfig config = draft.getShop() != null && draft.getShop().getId() != null
                 ? paymentConfigRepository.findByShopId(draft.getShop().getId()).orElse(null)
@@ -417,6 +514,86 @@ public class MessengerWebhookService {
                 .append(".\n");
         builder.append("\nHệ thống sẽ gửi QR payOS sau khi bạn chọn.");
         return builder.toString().trim();
+    }
+
+    private Optional<ShippingSelection> resolveShippingSelection(String normalized, OrderDraft draft) {
+        if (!StringUtils.hasText(normalized) || draft == null) {
+            return Optional.empty();
+        }
+        if (!orderDraftService.findBlockingMissingFields(draft).isEmpty()) {
+            return Optional.empty();
+        }
+
+        List<ShopShippingMethod> shippingMethods = findActiveShippingMethods(draft);
+        if (shippingMethods.isEmpty() || hasActiveShippingSelection(draft, shippingMethods)) {
+            return Optional.empty();
+        }
+
+        Optional<ShopShippingMethod> byIndex = resolveShippingMethodByIndex(normalized, shippingMethods);
+        if (byIndex.isPresent()) {
+            return Optional.of(new ShippingSelection(byIndex.get()));
+        }
+
+        String normalizedText = normalize(normalized);
+        List<ShopShippingMethod> exactMatches = shippingMethods.stream()
+                .filter(method -> normalize(method.getName()).equals(normalizedText))
+                .toList();
+        if (exactMatches.size() == 1) {
+            return Optional.of(new ShippingSelection(exactMatches.get(0)));
+        }
+
+        List<ShopShippingMethod> containsMatches = shippingMethods.stream()
+                .filter(method -> {
+                    String methodName = normalize(method.getName());
+                    return StringUtils.hasText(methodName) && normalizedText.contains(methodName);
+                })
+                .toList();
+        return containsMatches.size() == 1
+                ? Optional.of(new ShippingSelection(containsMatches.get(0)))
+                : Optional.empty();
+    }
+
+    private Optional<ShopShippingMethod> resolveShippingMethodByIndex(
+            String normalized,
+            List<ShopShippingMethod> shippingMethods
+    ) {
+        String digits = normalized.replaceAll("\\D+", "");
+        if (!StringUtils.hasText(digits) || digits.length() > 2) {
+            return Optional.empty();
+        }
+
+        int selectedIndex;
+        try {
+            selectedIndex = Integer.parseInt(digits);
+        } catch (NumberFormatException ex) {
+            return Optional.empty();
+        }
+
+        if (selectedIndex < 1 || selectedIndex > shippingMethods.size()) {
+            return Optional.empty();
+        }
+        return Optional.of(shippingMethods.get(selectedIndex - 1));
+    }
+
+    private List<ShopShippingMethod> findActiveShippingMethods(OrderDraft draft) {
+        if (draft == null || draft.getShop() == null || draft.getShop().getId() == null) {
+            return List.of();
+        }
+
+        return shippingMethodRepository.findByShopIdAndIsActiveTrue(draft.getShop().getId()).stream()
+                .sorted(Comparator.comparing(method -> method.getId() == null ? Long.MAX_VALUE : method.getId()))
+                .toList();
+    }
+
+    private String formatShippingMethodFee(ShopShippingMethod method) {
+        if (method == null || method.getFeePolicy() == null) {
+            return "phí 0 VND";
+        }
+        return switch (method.getFeePolicy()) {
+            case FREESHIP -> "miễn phí";
+            case CUSTOMER_PAYS_SHIPPER -> "khách thanh toán trực tiếp cho shipper";
+            case FIXED_FEE -> "phí " + formatMoney(method.getDefaultFee() != null ? method.getDefaultFee() : BigDecimal.ZERO);
+        };
     }
 
     private Optional<PaymentSelection> resolvePaymentSelection(String normalized, OrderDraft draft) {
@@ -596,6 +773,9 @@ public class MessengerWebhookService {
     }
 
     private String normalize(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
         String normalized = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .replace('\u0111', 'd')
@@ -608,5 +788,8 @@ public class MessengerWebhookService {
             Payment.Purpose paymentPurpose,
             String label
     ) {
+    }
+
+    private record ShippingSelection(ShopShippingMethod method) {
     }
 }
