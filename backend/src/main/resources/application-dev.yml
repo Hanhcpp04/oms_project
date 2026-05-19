@@ -26,7 +26,7 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}
+    access-token-expiration: ${JWT_ACCESS_EXPIRATION:8640000  0}
     refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   ai:
     gemini:
