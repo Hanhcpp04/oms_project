@@ -13,8 +13,8 @@ spring:
       enabled: false
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:oms_db}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -26,7 +26,7 @@ spring:
 app:
   jwt:
     secret: ${JWT_SECRET}
-    access-token-expiration: ${JWT_ACCESS_EXPIRATION:8640000  0}
+    access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}
     refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   ai:
     gemini:

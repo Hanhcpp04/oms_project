@@ -62,17 +62,23 @@ public class MessengerOrderService {
     }
 
     @Transactional
-    public Order confirmDraftManually(Long draftId) {
-        return confirmDraftOrder(draftId, null);
+    public Order confirmDraftManually(Long shopId, Long draftId) {
+        return confirmDraftOrder(draftId, null, shopId);
     }
 
     @Transactional(readOnly = true)
-    public Page<MessengerOrder> getOrders(Pageable pageable) {
-        return messengerOrderRepository.findAll(pageable);
+    public Page<MessengerOrder> getOrders(Long shopId, Pageable pageable) {
+        return messengerOrderRepository.findAllByOrderDraftShopId(shopId, pageable);
     }
 
     private Order confirmDraftOrder(Long draftId, Order.PaymentMethod paymentMethod) {
-        OrderDraft draft = orderDraftRepository.findByIdForUpdate(draftId)
+        return confirmDraftOrder(draftId, paymentMethod, null);
+    }
+
+    private Order confirmDraftOrder(Long draftId, Order.PaymentMethod paymentMethod, Long expectedShopId) {
+        OrderDraft draft = (expectedShopId == null
+                ? orderDraftRepository.findByIdForUpdate(draftId)
+                : orderDraftRepository.findByIdAndShopIdForUpdate(draftId, expectedShopId))
                 .orElseThrow(() -> new ResourceNotFoundException("OrderDraft", draftId));
 
         if (draft.getStatus() == OrderDraftStatus.CONVERTED_TO_ORDER && draft.getConvertedOrder() != null) {

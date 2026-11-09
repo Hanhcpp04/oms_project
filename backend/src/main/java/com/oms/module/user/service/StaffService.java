@@ -58,7 +58,6 @@ public class StaffService {
                 .email(email)
                 .username(username)
                 .password(passwordEncoder.encode(tempPassword))
-                .temporaryPassword(tempPassword)
                 .fullName(request.getFullName())
                 .phone(normalizeOptionalField(request.getPhone()))
                 .role(User.UserRole.STAFF)
@@ -167,7 +166,6 @@ public class StaffService {
                 .forceChangePassword(user.getForceChangePassword())
                 .createdAt(user.getCreatedAt())
                 .lastLogin(user.getLastLogin())
-                 .temporaryPassword(user.getForceChangePassword() ? user.getTemporaryPassword() : null)
                 .ordersToday(generateOrdersToday(user))
                 .ordersThisMonth(generateOrdersThisMonth(user))
                 .build();

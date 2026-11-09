@@ -33,7 +33,7 @@ try {
 }
 
 const runtimeEnv = {
-  googleClientId: env.NG_APP_GOOGLE_CLIENT_ID ?? env.GOOGLE_CLIENT_ID ?? ''
+  googleClientId: process.env.NG_APP_GOOGLE_CLIENT_ID ?? process.env.GOOGLE_CLIENT_ID ?? env.NG_APP_GOOGLE_CLIENT_ID ?? env.GOOGLE_CLIENT_ID ?? ''
 };
 
 mkdirSync(dirname(outputPath), { recursive: true });

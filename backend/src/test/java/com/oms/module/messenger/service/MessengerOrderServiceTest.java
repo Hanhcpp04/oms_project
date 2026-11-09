@@ -113,7 +113,7 @@ class MessengerOrderServiceTest {
                 .depositAmount(BigDecimal.ZERO)
                 .build();
 
-        when(orderDraftRepository.findByIdForUpdate(99L)).thenReturn(Optional.of(draft));
+        when(orderDraftRepository.findByIdAndShopIdForUpdate(99L, 1L)).thenReturn(Optional.of(draft));
         when(orderDraftService.isExpired(draft)).thenReturn(false);
         when(orderDraftService.findBlockingMissingFields(draft)).thenReturn(List.of());
         when(orderService.createOrderEntity(eq(1L), any(OrderRequest.class), isNull())).thenReturn(createdOrder);
@@ -122,7 +122,7 @@ class MessengerOrderServiceTest {
         when(messengerOrderRepository.findByOrderDraftId(99L))
                 .thenReturn(Optional.of(MessengerOrder.builder().build()));
 
-        Order savedOrder = service.confirmDraftManually(99L);
+        Order savedOrder = service.confirmDraftManually(1L, 99L);
 
         ArgumentCaptor<OrderRequest> requestCaptor = ArgumentCaptor.forClass(OrderRequest.class);
         verify(orderService).createOrderEntity(eq(1L), requestCaptor.capture(), isNull());

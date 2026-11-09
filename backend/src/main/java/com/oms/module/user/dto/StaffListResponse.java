@@ -19,5 +19,4 @@ public class StaffListResponse {
     private LocalDateTime lastLogin;
     private Integer ordersToday;
     private Integer ordersThisMonth;
-    private String temporaryPassword;
 }

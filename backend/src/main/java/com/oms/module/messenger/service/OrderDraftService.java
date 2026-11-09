@@ -89,7 +89,9 @@ public class OrderDraftService {
 
     @Transactional
     public CreateOrderDraftResponse createOrderDraftFromConversation(Long conversationId, Long shopId) {
-        Conversation conversation = conversationService.getById(conversationId);
+        Conversation conversation = shopId == null
+                ? conversationService.getById(conversationId)
+                : conversationService.getByIdForShop(conversationId, shopId);
         List<Message> contextMessages = messageService.getDraftContextMessages(conversation, MAX_CONTEXT_MESSAGES);
         OrderInfoExtractedDto extracted = orderExtractionService.extractOrderInfo(contextMessages, shopId);
         Shop shop = shopId == null ? null : shopRepository.findById(shopId).orElse(null);
@@ -413,8 +415,8 @@ public class OrderDraftService {
     }
 
     @Transactional(readOnly = true)
-    public Page<OrderDraft> getOrderDrafts(Pageable pageable) {
-        return orderDraftRepository.findAll(pageable);
+    public Page<OrderDraft> getOrderDrafts(Long shopId, Pageable pageable) {
+        return orderDraftRepository.findAllByShopId(shopId, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -423,9 +425,24 @@ public class OrderDraftService {
                 .orElseThrow(() -> new ResourceNotFoundException("OrderDraft", draftId));
     }
 
+    @Transactional(readOnly = true)
+    public OrderDraft getByIdForShop(Long draftId, Long shopId) {
+        return orderDraftRepository.findByIdAndShopId(draftId, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("OrderDraft", draftId));
+    }
+
     @Transactional
     public OrderDraft cancel(Long draftId) {
-        OrderDraft draft = getById(draftId);
+        return cancelDraft(getById(draftId));
+    }
+
+    @Transactional
+    public OrderDraft cancelForShop(Long draftId, Long shopId) {
+        OrderDraft draft = getByIdForShop(draftId, shopId);
+        return cancelDraft(draft);
+    }
+
+    private OrderDraft cancelDraft(OrderDraft draft) {
         if (draft.getStatus() == OrderDraftStatus.CONFIRMED
                 || draft.getStatus() == OrderDraftStatus.CONVERTED_TO_ORDER) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Cannot cancel a confirmed order draft");
@@ -433,7 +450,7 @@ public class OrderDraftService {
 
         draft.setStatus(OrderDraftStatus.CANCELLED);
         OrderDraft saved = orderDraftRepository.save(draft);
-        log.info("Cancelled Messenger order draft: draftId={}", draftId);
+        log.info("Cancelled Messenger order draft: draftId={}", draft.getId());
         return saved;
     }
 
@@ -1501,7 +1518,7 @@ public class OrderDraftService {
         }
 
         String cleaned = removePhoneFragments(updateContent)
-                .replaceAll("(?iu)\\b(day\\s*a|day|đây|a|ạ|nhe|nhé|shop|minh|mình)\\b", " ")
+                .replaceAll("(?iu)(?:^|\\s)(?:day\\s*a|day|đây|a|ạ|nhe|nhé|shop|minh|mình)(?=\\s|$)", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
         if (!StringUtils.hasText(cleaned)) {
@@ -1528,7 +1545,7 @@ public class OrderDraftService {
             return "";
         }
         return removePhoneFragments(value)
-                .replaceAll("(?iu)\\b(day\\s*a|day|đây|a|ạ|nhe|nhé|shop)\\b", " ")
+                .replaceAll("(?iu)(?:^|\\s)(?:day\\s*a|day|đây|a|ạ|nhe|nhé|shop)(?=\\s|$)", " ")
                 .replaceAll("\\s+", " ")
                 .trim();
     }
