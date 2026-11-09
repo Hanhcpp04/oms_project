@@ -1,10 +1,16 @@
-<section class="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-  <div>
-    <h2 class="m-0 mt-0.5 text-xl font-medium text-[#111111]">{{ title }}</h2>
-    <p class="mt-1 text-sm text-[#707072]" *ngIf="description">{{ description }}</p>
+<section class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+  <div class="min-w-0">
+    @if (title) {
+      <h2 class="m-0 text-xl font-semibold leading-tight tracking-[-0.02em] text-[var(--color-text-primary)]">{{ title }}</h2>
+    }
+    @if (description) {
+      <p class="m-0 mt-1 max-w-3xl text-sm leading-6 text-[var(--color-text-secondary)]">{{ description }}</p>
+    }
   </div>
 
-  <app-ui-button *ngIf="actionLabel" variant="primary" size="sm" (clicked)="action.emit()">
-    {{ actionLabel }}
-  </app-ui-button>
+  @if (actionLabel) {
+    <app-ui-button variant="primary" size="sm" (clicked)="action.emit()">
+      {{ actionLabel }}
+    </app-ui-button>
+  }
 </section>

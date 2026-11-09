@@ -1,16 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink, RouterModule } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormFieldType } from '../../../core/models/form-template.model';
 import { FormTemplateService } from '../../../core/services/form-template.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { FormConfigFieldCardComponent } from '../components/form-config-field-card/form-config-field-card.component';
+import { UiInputComponent } from '../../../shared/components/ui/ui-input.component';
 import { UiModalComponent } from '../../../shared/components/ui/ui-modal.component';
+import { PageTitleComponent } from '../../../shared/components/ui/page-title.component';
 
 @Component({
   selector: 'app-form-config-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterModule, FormConfigFieldCardComponent, UiModalComponent],
+  imports: [CommonModule, PageTitleComponent, RouterModule, FormConfigFieldCardComponent, UiModalComponent, UiInputComponent],
   templateUrl: './form-config-page.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -133,6 +135,16 @@ export class FormConfigPageComponent {
 
   protected closeSaveModal(): void {
     this.isSaveModalOpen.set(false);
+  }
+
+  protected openPublicForm(): void {
+    const link = this.getPublicFormLink();
+    if (!link) {
+      return;
+    }
+
+    const urlTree = this.router.createUrlTree(link);
+    window.open(this.router.serializeUrl(urlTree), '_blank', 'noopener');
   }
 
   protected getPublicFormLink(): string[] | null {

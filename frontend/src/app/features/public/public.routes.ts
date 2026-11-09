@@ -26,7 +26,13 @@ export const PUBLIC_ROUTES: Routes = [
       {
         path: 'forms/:templateId',
         component: PublicFormPageComponent,
-        data: { breadcrumb: 'Biểu mẫu công khai' }
+        data: { breadcrumb: 'Bieu mau cong khai' }
+      },
+      {
+        path: 'track-order/:token',
+        loadComponent: () =>
+          import('./pages/order-tracking-page.component').then((m) => m.OrderTrackingPageComponent),
+        data: { breadcrumb: 'Theo doi don hang' }
       }
     ]
   }

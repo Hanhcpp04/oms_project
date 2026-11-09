@@ -1,93 +1,104 @@
 @if (open && order; as detailOrder) {
-<div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 p-4 print:bg-white print:p-0" (click)="close()">
-  <div class="print-modal-panel" (click)="$event.stopPropagation()">
-    <div class="print-actions">
-      <button type="button" class="action-button" (click)="printNow()">In đơn</button>
-      <button type="button" class="action-button action-button--ghost" (click)="close()">Đóng</button>
+<div class="fixed inset-0 z-[70] flex items-center justify-center bg-[var(--color-overlay)] p-4 print:bg-white print:p-0" (click)="close()">
+  <div class="w-full max-w-5xl overflow-hidden rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]" (click)="$event.stopPropagation()">
+    <div class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
+      <div>
+        <h2 class="m-0 text-base font-semibold text-[var(--color-text-primary)]">In đơn hàng</h2>
+        <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">Xuất phiếu thông tin đơn hàng ra bản in.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-secondary)]" (click)="printNow()">In đơn</button>
+        <button type="button" class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-3 py-2 text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary)]" (click)="close()">Đóng</button>
+      </div>
     </div>
 
-    <article class="print-sheet">
-      <header class="sheet-header">
-        <h1 class="shop-title">OMS SHOP</h1>
-        <p class="sheet-subtitle">PHIẾU THÔNG TIN ĐƠN HÀNG</p>
+    <article class="space-y-6 p-5 sm:p-4">
+      <header class="space-y-1 text-center">
+        <h1 class="m-0 text-2xl font-semibold tracking-[-0.03em] text-[var(--color-text-primary)]">OMS SHOP</h1>
+        <p class="m-0 text-sm uppercase tracking-[0.12em] text-[var(--color-text-muted)]">Phiếu thông tin đơn hàng</p>
       </header>
 
-      <section class="sheet-meta">
-        <p><strong>Mã đơn:</strong> {{ detailOrder.orderNumber }}</p>
-        <p><strong>Ngày tạo:</strong> {{ detailOrder.createdAt }}</p>
+      <section class="grid gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4 sm:grid-cols-2">
+        <p class="m-0 text-sm text-[var(--color-text-secondary)]"><strong class="text-[var(--color-text-primary)]">Mã đơn:</strong> {{ detailOrder.orderNumber }}</p>
+        <p class="m-0 text-sm text-[var(--color-text-secondary)]"><strong class="text-[var(--color-text-primary)]">Ngày tạo:</strong> {{ detailOrder.createdAt }}</p>
       </section>
 
-      <section class="sheet-grid">
-        <section class="sheet-card">
-          <h2>Thông tin người gửi</h2>
-          <p><strong>Tên shop:</strong> {{ authStore.currentShop()?.name || 'Chưa thiết lập' }}</p>
-          <p><strong>Liên hệ shop:</strong> {{ authStore.currentShop()?.phone || 'Chưa thiết lập' }}</p>
-          <p><strong>Email:</strong> {{ authStore.currentShop()?.email || 'Chưa thiết lập' }}</p>
-          <p><strong>Địa chỉ:</strong> {{ getShopAddress() }}</p>
-          <p class="thanks">Cảm ơn quý khách đã tin tưởng và ủng hộ shop.</p>
+      <section class="grid gap-4 md:grid-cols-2">
+        <section class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h2 class="m-0 mb-3 text-base font-semibold text-[var(--color-text-primary)]">Thông tin người gửi</h2>
+          <div class="grid gap-2 text-sm text-[var(--color-text-secondary)]">
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Tên shop:</strong> {{ authStore.currentShop()?.name || 'Chưa thiết lập' }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Liên hệ shop:</strong> {{ authStore.currentShop()?.phone || 'Chưa thiết lập' }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Email:</strong> {{ authStore.currentShop()?.email || 'Chưa thiết lập' }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Địa chỉ:</strong> {{ getShopAddress() }}</p>
+          </div>
         </section>
 
-        <section class="sheet-card">
-          <h2>Thông tin khác</h2>
-          <p><strong>Khách hàng:</strong> {{ detailOrder.customerName }}</p>
-          <p><strong>Điện thoại:</strong> {{ detailOrder.customerPhone }}</p>
-          <p><strong>Địa chỉ:</strong> {{ detailOrder.customerAddress }}</p>
-          <p><strong>Loại đơn:</strong> {{ detailOrder.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}</p>
-          <p><strong>Trạng thái:</strong> {{ getStatusLabel(detailOrder.status) }}</p>
-          @if (detailOrder.customerNote) {
-          <p><strong>Ghi chú:</strong> {{ detailOrder.customerNote }}</p>
-          }
+        <section class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h2 class="m-0 mb-3 text-base font-semibold text-[var(--color-text-primary)]">Thông tin khác</h2>
+          <div class="grid gap-2 text-sm text-[var(--color-text-secondary)]">
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Khách hàng:</strong> {{ detailOrder.customerName }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Điện thoại:</strong> {{ detailOrder.customerPhone }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Địa chỉ:</strong> {{ detailOrder.customerAddress }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Loại đơn:</strong> {{ detailOrder.orderType === 'RENT' ? 'Cho thuê' : 'Bán' }}</p>
+            <p class="m-0"><strong class="text-[var(--color-text-primary)]">Trạng thái:</strong> {{ getStatusLabel(detailOrder.status) }}</p>
+            @if (detailOrder.customerNote) {
+              <p class="m-0"><strong class="text-[var(--color-text-primary)]">Ghi chú:</strong> {{ detailOrder.customerNote }}</p>
+            }
+          </div>
         </section>
       </section>
 
       @if (hasCustomFields(detailOrder)) {
-      <section class="sheet-custom-fields">
-        <h2>Trường theo cấu hình form</h2>
-        <div class="custom-field-grid">
-          @for (field of getCustomFieldEntries(detailOrder); track field.key) {
-          <article class="custom-field-item">
-            <p class="custom-field-label">{{ field.label }}</p>
-            <p class="custom-field-value">{{ field.value }}</p>
-          </article>
-          }
-        </div>
-      </section>
+        <section class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+          <h2 class="m-0 mb-3 text-base font-semibold text-[var(--color-text-primary)]">Trường theo cấu hình form</h2>
+          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            @for (field of getCustomFieldEntries(detailOrder); track field.key) {
+              <article class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-3">
+                <p class="m-0 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-muted)]">{{ field.label }}</p>
+                <p class="m-0 mt-1 text-sm font-medium text-[var(--color-text-primary)]">{{ field.value }}</p>
+              </article>
+            }
+          </div>
+        </section>
       }
 
-      <section class="sheet-products">
-        <h2>Thông tin sản phẩm</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>STT</th>
-              <th>Tên sản phẩm</th>
-              <th>Phân loại</th>
-              <th>Size</th>
-              <th class="text-right">Đơn giá</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (p of detailOrder.products; track $index) {
-            <tr>
-              <td>{{ $index + 1 }}</td>
-              <td>{{ p.name }}</td>
-              <td>{{ p.categoryNameSnapshot || '-' }}</td>
-              <td>{{ p.size }}</td>
-              <td class="text-right">{{ formatCurrency(p.unitPrice) }}</td>
-            </tr>
-            } @empty {
-            <tr>
-              <td colspan="5" class="text-center">Không có sản phẩm.</td>
-            </tr>
-            }
-          </tbody>
-        </table>
+      <section class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+        <h2 class="m-0 mb-3 text-base font-semibold text-[var(--color-text-primary)]">Thông tin sản phẩm</h2>
+        <div class="overflow-x-auto">
+          <table class="data-table min-w-[760px]">
+            <thead>
+              <tr>
+                <th>STT</th>
+                <th>Tên sản phẩm</th>
+                <th>Phân loại</th>
+                <th>Size</th>
+                <th class="text-right">Đơn giá</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (p of detailOrder.products; track $index) {
+                <tr>
+                  <td>{{ $index + 1 }}</td>
+                  <td>{{ p.name }}</td>
+                  <td>{{ p.categoryNameSnapshot || '-' }}</td>
+                  <td>{{ p.size }}</td>
+                  <td class="text-right">{{ formatCurrency(p.unitPrice) }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="py-8 text-center text-sm text-[var(--color-text-muted)]">Không có sản phẩm.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      <footer class="sheet-footer">
-        <div class="total-box">
-          <p class="label">Tổng tiền</p>
-          <p class="amount">{{ formatCurrency(detailOrder.totalAmount) }}</p>
+      <footer class="flex justify-end">
+        <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-5 py-4 text-right">
+          <p class="m-0 text-xs uppercase tracking-[0.08em] text-[var(--color-text-muted)]">Tổng tiền</p>
+          <p class="m-0 mt-1 text-2xl font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(detailOrder.totalAmount) }}</p>
         </div>
       </footer>
     </article>

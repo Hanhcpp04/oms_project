@@ -1,4 +1,14 @@
+type RuntimeEnvironment = {
+    googleClientId?: string;
+};
+
+declare global {
+    interface Window {
+        __OMS_ENV__?: RuntimeEnvironment;
+    }
+}
+
 export const environment = {
     production: false,
-    googleClientId: '10621515580-1vjlai3jn5h819n08n6ea36ct7ruiv0g.apps.googleusercontent.com'
+    googleClientId: window.__OMS_ENV__?.googleClientId ?? ''
 };

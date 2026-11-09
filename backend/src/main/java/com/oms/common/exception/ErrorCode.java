@@ -30,6 +30,7 @@ public enum ErrorCode {
     SHOP_NOT_FOUND("E200", "Shop not found"),
     SHOP_SLUG_EXISTS("E201", "Shop slug already exists"),
     SHOP_SUSPENDED("E202", "Shop is suspended"),
+    SHOP_MAINTENANCE("E203", "Shop is currently in maintenance mode"),
 
     // ==================== User ====================
     USER_NOT_FOUND("E300", "User not found"),

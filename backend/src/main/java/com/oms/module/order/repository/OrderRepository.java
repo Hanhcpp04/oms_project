@@ -9,15 +9,39 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
+
+    interface StaffOrderCount {
+        Long getUserId();
+
+        long getOrderCount();
+    }
 
     Optional<Order> findByOrderCode(String orderCode);
 
     Optional<Order> findByIdAndShopId(Long id, Long shopId);
 
     Page<Order> findByShopId(Long shopId, Pageable pageable);
+
+    @Query("""
+            SELECT o.createdBy.id AS userId, COUNT(o) AS orderCount
+            FROM Order o
+            WHERE o.shop.id = :shopId
+              AND o.createdBy.id IN :userIds
+              AND o.createdAt >= :fromDate
+              AND o.createdAt < :toDate
+            GROUP BY o.createdBy.id
+            """)
+    List<StaffOrderCount> countOrdersByStaff(
+            @Param("shopId") Long shopId,
+            @Param("userIds") Collection<Long> userIds,
+            @Param("fromDate") java.time.LocalDateTime fromDate,
+            @Param("toDate") java.time.LocalDateTime toDate
+    );
 
     @Query("SELECT o FROM Order o WHERE o.shop.id = :shopId " +
            "AND (:status IS NULL OR o.status = :status) " +
@@ -48,4 +72,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT COUNT(o) FROM Order o WHERE o.shop.id = :shopId AND o.orderType = :orderType AND o.status NOT IN (:excludedStatuses)")
     long countOpenOrdersByType(@Param("shopId") Long shopId, @Param("orderType") Order.OrderType orderType, @Param("excludedStatuses") java.util.Collection<Order.OrderStatus> excludedStatuses);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.paymentStatus = :paymentStatus AND o.paymentMethod = :paymentMethod AND o.sourceMethod IN :sourceMethods AND o.paymentReminderSent = false AND o.createdAt <= :threshold")
+    java.util.List<Order> findOrdersPendingPaymentReminder(@Param("status") Order.OrderStatus status, @Param("paymentStatus") Order.PaymentStatus paymentStatus, @Param("paymentMethod") Order.PaymentMethod paymentMethod, @Param("sourceMethods") java.util.Collection<Order.SourceMethod> sourceMethods, @Param("threshold") java.time.LocalDateTime threshold);
+
+    @Query("SELECT o FROM Order o WHERE o.status = :status AND o.paymentStatus = :paymentStatus AND o.paymentMethod = :paymentMethod AND o.sourceMethod IN :sourceMethods AND o.createdAt <= :threshold")
+    java.util.List<Order> findOrdersPendingPaymentCancellation(@Param("status") Order.OrderStatus status, @Param("paymentStatus") Order.PaymentStatus paymentStatus, @Param("paymentMethod") Order.PaymentMethod paymentMethod, @Param("sourceMethods") java.util.Collection<Order.SourceMethod> sourceMethods, @Param("threshold") java.time.LocalDateTime threshold);
 }

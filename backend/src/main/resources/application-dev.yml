@@ -1,35 +1,69 @@
 # ==================== DEV Profile ====================
 spring:
   config:
-    import: optional:file:.env[.properties]
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:backend/.env[.properties]
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
   devtools:
     restart:
       enabled: false
   datasource:
-    url: jdbc:mysql://localhost:3306/oms_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
-    username: root
-    password: "123456"
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:oms_db}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
 
 # ==================== JWT ====================
 app:
+  scheduling:
+    enabled: true
   jwt:
-    secret: bXlTdXBlclNlY3JldEtleUZvckRldmVsb3BtZW50T25seURvTm90VXNlSW5Qcm9kdWN0aW9u
-    access-token-expiration: 86400000
-    refresh-token-expiration: 604800000
+    secret: ${JWT_SECRET}
+    access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}
+    refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
   ai:
     gemini:
       api-key: ${GEMINI_API_KEY:}
       model: ${GEMINI_MODEL:gemini-2.5-flash}
   google:
     client-id: ${GOOGLE_CLIENT_ID:}
+  messenger:
+    verify-token: ${MESSENGER_VERIFY_TOKEN:}
+    default-page-id: ${MESSENGER_PAGE_ID:}
+    default-shop-id: ${MESSENGER_DEFAULT_SHOP_ID:0}
+    default-page-access-token: ${MESSENGER_PAGE_ACCESS_TOKEN:}
+  public:
+    frontend-base-url: ${PUBLIC_FRONTEND_BASE_URL:http://localhost:4200}
+    tracking-secret: ${PUBLIC_ORDER_TRACKING_SECRET:}
+  payment:
+    timeout:
+      cancel-minutes: ${PAYMENT_CANCEL_MINUTES:30}
+      reminder-minutes: ${PAYMENT_REMINDER_MINUTES:25}
+    payos:
+      enabled: ${PAYOS_ENABLED:false}
+      base-url: ${PAYOS_BASE_URL:https://api-merchant.payos.vn}
+      client-id: ${PAYOS_CLIENT_ID:}
+      api-key: ${PAYOS_API_KEY:}
+      checksum-key: ${PAYOS_CHECKSUM_KEY:}
+      return-url: ${PAYOS_RETURN_URL:${app.public.frontend-base-url}/payment/payos/return}
+      cancel-url: ${PAYOS_CANCEL_URL:${app.public.frontend-base-url}/payment/payos/cancel}
   cors:
-    allowed-origins: http://localhost:4200
+    allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
 
 # ==================== Logging ====================
 logging:

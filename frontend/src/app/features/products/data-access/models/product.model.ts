@@ -2,6 +2,7 @@ export type ProductType = 'SELL' | 'RENT' | 'SELL_RENT';
 
 export interface ProductVariant {
   id: string;
+  sku?: string;
   size: string;
   color: string;
   stockQty: number;
@@ -18,6 +19,14 @@ export interface ProductImage {
   sortOrder: number;
 }
 
+export interface ProductCustomAttribute {
+  id: string;
+  fieldId: string;
+  fieldKey: string;
+  label: string;
+  value: unknown;
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -29,6 +38,7 @@ export interface Product {
   variants: ProductVariant[];
   images: ProductImage[];
   customAttributes?: Record<string, unknown>;
+  customAttributeValues?: ProductCustomAttribute[];
 }
 
 export interface ProductsQuery {

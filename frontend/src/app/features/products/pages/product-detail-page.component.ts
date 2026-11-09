@@ -1,20 +1,40 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
-import { ProductsApiService, ProductsViewMode } from '../data-access/products-api.service';
-import { Product, CreateProductInput } from '../data-access/models/product.model';
-import { ProductsStore } from '../state/products.store';
-import { ProductFormComponent } from '../components/product-form/product-form.component';
-import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
-import { CreateOrderModalComponent } from '../components/create-order-modal/create-order-modal.component';
-import { ProductQrCodeModalComponent } from '../components/product-qr-code-modal.component';
+import { AuthStore } from '../../../core/auth/auth.store';
+import { PermissionService } from '../../../core/services/permission.service';
 import { RentalAvailabilityApiService, RentalAvailabilityBlock } from '../../../core/services/rental-availability-api.service';
+import { CreateOrderModalComponent } from '../components/create-order-modal/create-order-modal.component';
+import { ProductDetailGalleryComponent } from '../components/product-detail-gallery.component';
+import { ProductDetailInfoComponent } from '../components/product-detail-info.component';
+import { ProductDetailInventoryComponent } from '../components/product-detail-inventory.component';
+import { ProductDetailRentalInfoComponent } from '../components/product-detail-rental-info.component';
+import { ProductDetailSkeletonComponent } from '../components/product-detail-skeleton.component';
+import { ProductDetailVariantsComponent } from '../components/product-detail-variants.component';
+import { ProductFormComponent } from '../components/product-form/product-form.component';
+import { ProductQrCodeModalComponent } from '../components/product-qr-code-modal.component';
+import { ProductsApiService, ProductsViewMode } from '../data-access/products-api.service';
+import { CreateProductInput, Product } from '../data-access/models/product.model';
+import { ProductsStore } from '../state/products.store';
+
+type ProductDetailTab = 'overview' | 'variants' | 'inventory' | 'rental';
 
 @Component({
   selector: 'app-product-detail-page',
   standalone: true,
-  imports: [CommonModule, ProductFormComponent, UiButtonComponent, CreateOrderModalComponent, ProductQrCodeModalComponent],
+  imports: [
+    CommonModule,
+    ProductFormComponent,
+    CreateOrderModalComponent,
+    ProductQrCodeModalComponent,
+    ProductDetailGalleryComponent,
+    ProductDetailInfoComponent,
+    ProductDetailInventoryComponent,
+    ProductDetailRentalInfoComponent,
+    ProductDetailSkeletonComponent,
+    ProductDetailVariantsComponent
+  ],
   templateUrl: './product-detail-page.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
@@ -23,24 +43,73 @@ export class ProductDetailPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly productsApiService = inject(ProductsApiService);
   private readonly availabilityApi = inject(RentalAvailabilityApiService);
+  private readonly authStore = inject(AuthStore);
+  private readonly permissionService = inject(PermissionService);
 
   readonly store = inject(ProductsStore);
+  @ViewChild('productForm') productForm?: ProductFormComponent;
 
   protected readonly product = signal<Product | null>(null);
   protected readonly loading = signal(false);
   protected readonly notFound = signal(false);
-  
+
   protected readonly mode = signal<'view' | 'edit'>('view');
+  protected readonly activeTab = signal<ProductDetailTab>('overview');
   protected readonly isCreateOrderModalOpen = signal(false);
   protected readonly isQrModalOpen = signal(false);
   protected readonly availabilityLoading = signal(false);
   protected readonly availabilityBlocks = signal<RentalAvailabilityBlock[]>([]);
   protected readonly selectedAvailabilityVariantId = signal<string | null>(null);
 
+  protected readonly viewerOpen = signal(false);
+  protected readonly selectedViewerImage = signal<string | null>(null);
+
   protected readonly availabilityDays = signal(this.buildAvailabilityDays());
 
+  protected readonly customAttributeEntries = computed(() => {
+    const product = this.product();
+    const attributeValues = product?.customAttributeValues ?? [];
+
+    const formatEntry = (label: string, rawValue: unknown) => {
+      const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+      const items = values
+        .filter((v) => v !== null && v !== undefined && v !== '')
+        .map(String)
+        .map((val) => ({
+          value: val,
+          isImage: val.startsWith('/api/files/display/') || /\.(jpg|jpeg|png|webp|gif)$/i.test(val)
+        }));
+
+      return { label, items };
+    };
+
+    if (attributeValues.length > 0) {
+      return attributeValues
+        .map((attribute) => formatEntry(attribute.label, attribute.value))
+        .filter((entry) => entry.items.length > 0);
+    }
+
+    return Object.entries(product?.customAttributes ?? {})
+      .map(([label, value]) => formatEntry(label, value))
+      .filter((entry) => entry.items.length > 0);
+  });
+
+  protected readonly tabs = computed<Array<{ label: string; value: ProductDetailTab }>>(() => {
+    const base: Array<{ label: string; value: ProductDetailTab }> = [
+      { label: 'Tổng quan', value: 'overview' },
+      { label: 'Biến thể', value: 'variants' },
+      { label: 'Tồn kho', value: 'inventory' }
+    ];
+
+    if (this.isRentalProduct(this.product())) {
+      base.push({ label: 'Lịch thuê', value: 'rental' });
+    }
+
+    return base;
+  });
+
   ngOnInit(): void {
-    this.route.paramMap.subscribe(params => {
+    this.route.paramMap.subscribe((params) => {
       const productId = params.get('productId');
       if (productId) {
         this.resolveProduct(productId);
@@ -51,6 +120,10 @@ export class ProductDetailPageComponent implements OnInit {
   }
 
   protected toggleEditMode(): void {
+    if (this.mode() === 'view' && !this.canEditProduct()) {
+      return;
+    }
+
     this.mode.set(this.mode() === 'view' ? 'edit' : 'view');
   }
 
@@ -59,66 +132,120 @@ export class ProductDetailPageComponent implements OnInit {
     this.router.navigate(['../', view], { relativeTo: this.route });
   }
 
+  protected setActiveTab(tab: ProductDetailTab): void {
+    this.activeTab.set(tab);
+  }
+
+  protected openViewer(imageUrl: string): void {
+    this.selectedViewerImage.set(imageUrl);
+    this.viewerOpen.set(true);
+  }
+
+  protected closeViewer(): void {
+    this.viewerOpen.set(false);
+    this.selectedViewerImage.set(null);
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  protected onKeydown(event: KeyboardEvent): void {
+    if (this.viewerOpen() && event.key === 'Escape') {
+      this.closeViewer();
+    }
+  }
+
   protected onOrderCreated(orderId: string): void {
     this.router.navigate(['/app/orders', orderId]);
   }
 
   protected onSaved(input: CreateProductInput): void {
     const currentProduct = this.product();
-    if (!currentProduct) return;
+    if (!currentProduct) {
+      return;
+    }
 
     this.store.updateProduct(currentProduct.id, input);
-    // After update, we might want to switch back to view mode
-    // We can do this right away or wait for a callback.
-    // Assuming optimism, switch back to view
     this.mode.set('view');
-    // Also update the local signal so it re-renders immediately
-    this.product.update(p => p ? { ...p, ...input } as any : p);
+    this.product.update((product) => product ? { ...product, ...input } as Product : product);
+  }
+
+  protected hideProduct(): void {
+    const currentProduct = this.product();
+    if (!currentProduct || !currentProduct.active) {
+      return;
+    }
+
+    this.store.deactivateProduct(currentProduct);
+    this.product.set({ ...currentProduct, active: false });
+  }
+
+  protected restoreProduct(): void {
+    const currentProduct = this.product();
+    if (!currentProduct || currentProduct.active) {
+      return;
+    }
+
+    this.store.restoreProduct(currentProduct, (restoredProduct) => this.product.set(restoredProduct));
   }
 
   protected isRentalProduct(product: Product | null | undefined): boolean {
-    return product?.productType === 'RENT' || product?.productType === 'SELL_RENT';
+    return this.canUseRent() && (product?.productType === 'RENT' || product?.productType === 'SELL_RENT');
+  }
+
+  protected canCreateOrder(product: Product | null | undefined): boolean {
+    if (!product) {
+      return false;
+    }
+
+    if (!this.permissionService.hasPermission('ORDER_CREATE')) {
+      return false;
+    }
+
+    switch (product.productType) {
+      case 'SELL':
+        return this.canUseSell();
+      case 'RENT':
+        return this.canUseRent();
+      case 'SELL_RENT':
+        return this.canUseSell() && this.canUseRent();
+    }
+
+    return false;
+  }
+
+  protected canGenerateQr(): boolean {
+    return this.permissionService.hasPermission('PRODUCT_QR_CREATE');
+  }
+
+  protected canEditProduct(): boolean {
+    return this.permissionService.hasPermission('PRODUCT_EDIT');
   }
 
   protected setAvailabilityVariant(variantId: string): void {
     this.selectedAvailabilityVariantId.set(variantId);
   }
 
-  protected isAvailabilityDayBlocked(day: string): boolean {
-    const variantId = this.selectedAvailabilityVariantId();
-    if (!variantId) {
-      return false;
+  protected formatCustomValue(value: unknown): string {
+    if (value === null || value === undefined || value === '') {
+      return '—';
     }
 
-    return this.availabilityBlocks().some((block) =>
-      String(block.variantId) === variantId &&
-      block.startDate <= day &&
-      block.endDate >= day
-    );
-  }
+    if (Array.isArray(value)) {
+      return value.filter(Boolean).join(', ') || '—';
+    }
 
-  protected getAvailabilityDayClass(day: string): string {
-    return this.isAvailabilityDayBlocked(day)
-      ? 'border-[#FCA5A5] bg-[#FEF2F2] text-[#B91C1C]'
-      : 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]';
-  }
+    if (typeof value === 'object') {
+      return JSON.stringify(value);
+    }
 
-  protected formatDayLabel(day: string): string {
-    const date = new Date(`${day}T00:00:00`);
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
-  }
-
-  protected formatVariantLabel(variant: { size?: string | null; color?: string | null }): string {
-    return [variant.size || 'Size', variant.color].filter(Boolean).join(' - ');
+    return String(value);
   }
 
   protected onCanceled(): void {
     if (this.mode() === 'edit') {
       this.mode.set('view');
-      // Hack to force re-render of form with original data
-      const p = this.product();
+      const currentProduct = this.product();
       this.product.set(null);
-      setTimeout(() => this.product.set(p), 0);
+      setTimeout(() => this.product.set(currentProduct), 0);
     } else {
       this.goBack();
     }
@@ -153,6 +280,7 @@ export class ProductDetailPageComponent implements OnInit {
 
   private setResolvedProduct(product: Product): void {
     this.product.set(product);
+    this.activeTab.set('overview');
     const firstVariantId = product.variants[0]?.id ?? null;
     this.selectedAvailabilityVariantId.set(firstVariantId);
     if (this.isRentalProduct(product)) {
@@ -218,5 +346,15 @@ export class ProductDetailPageComponent implements OnInit {
     }
 
     return 'all';
+  }
+
+  private canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  private canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
   }
 }

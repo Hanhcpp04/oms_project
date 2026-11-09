@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardStore, GrowthPoint } from '../../state/dashboard.store';
+import { formatVndCurrency } from '../../../../shared/utils/currency.util';
 
 @Component({
   selector: 'app-dashboard-revenue-chart',
@@ -8,13 +9,13 @@ import { DashboardStore, GrowthPoint } from '../../state/dashboard.store';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="rounded-2xl border border-[var(--color-border)] bg-white">
+    <div class="rounded-sm border border-[var(--color-border)] bg-white">
       <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 py-4">
         <div>
           <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Biểu đồ tăng trưởng</h3>
           <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">Doanh thu 12 tháng gần nhất</p>
         </div>
-        <div class="rounded-xl bg-[var(--color-bg)] px-4 py-2 text-right">
+        <div class="rounded-sm bg-[var(--color-bg)] px-4 py-2 text-right">
           <p class="m-0 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-tertiary)]">Tổng doanh thu</p>
           <p class="m-0 mt-0.5 text-lg font-black text-[var(--color-text-primary)]">{{ formatCurrency(totalRevenue) }}</p>
         </div>
@@ -106,6 +107,6 @@ export class DashboardRevenueChartComponent {
   }
 
   formatCurrency(v: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(v);
+    return formatVndCurrency(v);
   }
 }

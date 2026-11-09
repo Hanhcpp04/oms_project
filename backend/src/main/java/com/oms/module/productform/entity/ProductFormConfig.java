@@ -26,7 +26,7 @@ public class ProductFormConfig extends BaseEntity {
     private Shop shop;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "form_type", nullable = false, length = 10)
+    @Column(name = "form_type", nullable = false, length = 10, columnDefinition = "enum('RENT','SELL','SELL_RENT')")
     private ProductType formType;
 
     @OneToMany(mappedBy = "config", cascade = CascadeType.ALL, orphanRemoval = true)

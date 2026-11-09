@@ -3,6 +3,7 @@
  * Extracted from order-create-modal.component.ts to keep the component lean.
  */
 import { FormFieldSemanticKey } from '../../../core/models/form-template.model';
+import { parseVndCurrencyInput } from '../../../shared/utils/currency.util';
 
 export interface ProductFormRow {
     name: string;
@@ -21,26 +22,19 @@ export function createEmptyProductRow(): ProductFormRow {
 }
 
 export function parsePositiveNumber(value: string, fallback: number): number {
-    const normalized = value.replace(/[^\d.-]/g, '');
-    const parsed = Number(normalized);
+    const parsed = parseVndCurrencyInput(value);
 
-    if (Number.isFinite(parsed)) {
-        return parsed;
+    if (parsed !== undefined && Number.isFinite(parsed)) {
+        return Math.max(0, parsed);
     }
 
     return fallback;
 }
 
 export function parseOptionalPositiveNumber(value: string): number | undefined {
-    const normalized = value.replace(/[^\d.-]/g, '').trim();
+    const parsed = parseVndCurrencyInput(value);
 
-    if (!normalized) {
-        return undefined;
-    }
-
-    const parsed = Number(normalized);
-
-    if (!Number.isFinite(parsed)) {
+    if (parsed === undefined || !Number.isFinite(parsed)) {
         return undefined;
     }
 

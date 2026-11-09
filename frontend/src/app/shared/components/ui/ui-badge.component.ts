@@ -18,7 +18,7 @@ export class UiBadgeComponent {
   @Input() dot = false;
 
   protected get badgeClasses(): string {
-    const base = 'inline-flex items-center font-medium rounded-[30px] whitespace-nowrap';
+    const base = 'inline-flex items-center font-medium rounded-none whitespace-nowrap';
 
     const sizes: Record<BadgeSize, string> = {
       sm: 'px-2 py-0.5 text-[11px]',
@@ -26,12 +26,12 @@ export class UiBadgeComponent {
     };
 
     const variants: Record<BadgeVariant, string> = {
-      default: 'bg-[#F5F5F5] text-[#707072]',
-      primary: 'bg-[#F5F5F5] text-[#111111]',
-      success: 'bg-[#d1fae5] text-[#007D48]',
-      warning: 'bg-[#fef3c7] text-[#92400e]',
-      danger: 'bg-[#FFE5E5] text-[#D30005]',
-      info: 'bg-[#D6EEFF] text-[#1151FF]'
+      default: 'bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)]',
+      primary: 'bg-[var(--color-accent-soft)] text-[var(--color-accent-text)]',
+      success: 'bg-[var(--color-success-soft)] text-[var(--color-success-text)]',
+      warning: 'bg-[var(--color-warning-soft)] text-[var(--color-warning-text)]',
+      danger: 'bg-[var(--color-danger-soft)] text-[var(--color-danger-text)]',
+      info: 'bg-[var(--color-info-soft)] text-[var(--color-info-text)]'
     };
 
     return [base, sizes[this.size], variants[this.variant]].join(' ');

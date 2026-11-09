@@ -26,7 +26,7 @@ public class ShopShippingMethod extends BaseEntity {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "fee_policy", nullable = false, length = 30)
+    @Column(name = "fee_policy", nullable = false, length = 30, columnDefinition = "enum('CUSTOMER_PAYS_SHIPPER','FIXED_FEE','FREESHIP')")
     private FeePolicy feePolicy;
 
     @Column(name = "default_fee", precision = 12, scale = 0)

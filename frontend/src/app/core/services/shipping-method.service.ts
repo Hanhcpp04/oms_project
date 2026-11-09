@@ -27,6 +27,12 @@ export class ShippingMethodService {
     );
   }
 
+  getActiveMethods(): Observable<ShippingMethodDto[]> {
+    return this.http.get<any>(`${this.BASE_URL}/active`).pipe(
+      map(response => unwrapApiResponse(response))
+    );
+  }
+
   createMethod(data: ShippingMethodDto): Observable<ShippingMethodDto> {
     return this.http.post<any, any>(this.BASE_URL, data).pipe(
       map(response => unwrapApiResponse(response))

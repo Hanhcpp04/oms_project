@@ -7,6 +7,8 @@ import com.oms.module.order.dto.AiParseRequest;
 import com.oms.module.order.dto.AiParseResponse;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
+import com.oms.module.order.dto.OrderPaymentUpdateRequest;
+import com.oms.module.order.dto.OrderUpdateRequest;
 import com.oms.module.order.entity.Order;
 import com.oms.module.order.service.OrderAiParseService;
 import com.oms.module.order.service.OrderService;
@@ -92,6 +94,118 @@ public class OrderController {
             @RequestParam Order.OrderStatus status) {
         var result = orderService.updateStatus(user.getShopId(), id, status, user.getUserId());
         return ResponseEntity.ok(ApiResponse.ok("Status updated", result));
+    }
+
+    @PatchMapping("/{id}/confirm")
+    @Operation(summary = "Confirm order")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmOrder(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.confirmOrder(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order confirmed", result));
+    }
+
+    @PatchMapping("/{id}/packing")
+    @Operation(summary = "Mark order as packing")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markPacking(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markPacking(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as packing", result));
+    }
+
+    @PatchMapping("/{id}/shipped")
+    @Operation(summary = "Mark order as shipped")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markShipped(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markShipped(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as shipped", result));
+    }
+
+    @PatchMapping("/{id}/done")
+    @Operation(summary = "Mark order as done")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markDone(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markDone(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as done", result));
+    }
+
+    @PatchMapping("/{id}/deposited")
+    @Operation(summary = "Mark rental order as deposited")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markDeposited(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markDeposited(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as deposited", result));
+    }
+
+    @PatchMapping("/{id}/renting")
+    @Operation(summary = "Mark rental order as renting")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markRenting(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markRenting(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as renting", result));
+    }
+
+    @PatchMapping("/{id}/overdue")
+    @Operation(summary = "Mark rental order as overdue")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markOverdue(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markOverdue(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as overdue", result));
+    }
+
+    @PatchMapping("/{id}/returned")
+    @Operation(summary = "Mark rental order as returned")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> markReturned(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.markReturned(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order marked as returned", result));
+    }
+
+    @PatchMapping("/{id}/cancel")
+    @Operation(summary = "Cancel order")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> cancelOrder(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id) {
+        var result = orderService.cancelOrder(user.getShopId(), id, user.getUserId());
+        return ResponseEntity.ok(ApiResponse.ok("Order cancelled", result));
+    }
+
+    @PatchMapping("/{id}")
+    @Operation(summary = "Update order information")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> updateOrder(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id,
+            @RequestBody OrderUpdateRequest request) {
+        var result = orderService.updateOrder(user.getShopId(), id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Order updated", result));
+    }
+
+    @PatchMapping("/{id}/payment")
+    @Operation(summary = "Update order payment")
+    @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
+    public ResponseEntity<ApiResponse<OrderResponse>> updatePayment(
+            @AuthenticationPrincipal CustomUserDetails user,
+            @PathVariable Long id,
+            @RequestBody OrderPaymentUpdateRequest request) {
+        var result = orderService.updatePayment(user.getShopId(), id, request);
+        return ResponseEntity.ok(ApiResponse.ok("Order payment updated", result));
     }
 
     @PostMapping("/ai-parse")

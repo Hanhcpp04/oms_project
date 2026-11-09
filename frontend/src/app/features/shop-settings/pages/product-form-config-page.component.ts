@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal, effect, ViewChild } from '@angular/core';
 import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
+import { PageTitleComponent } from '../../../shared/components/ui/page-title.component';
 import {
   ProductFormTemplate,
   ProductFormTemplateType,
@@ -14,7 +15,7 @@ import { DynamicFormFieldManagerComponent, DynamicFormField } from '../../../sha
 @Component({
   selector: 'app-product-form-config-page',
   standalone: true,
-  imports: [CommonModule, UiCardComponent, DynamicFormFieldManagerComponent],
+  imports: [CommonModule, PageTitleComponent, UiCardComponent, DynamicFormFieldManagerComponent],
   templateUrl: './product-form-config-page.component.html',
   styleUrls: ['./product-form-config-page.component.css'],
   changeDetection: ChangeDetectionStrategy.OnPush
@@ -26,7 +27,7 @@ export class ProductFormConfigPageComponent {
   private readonly authStore = inject(AuthStore);
   private readonly templateService = inject(ProductFormTemplateService);
 
-  readonly businessMode = computed(() => this.authStore.currentShop()?.businessMode || 'BOTH');
+  readonly businessMode = computed(() => this.resolveBusinessMode());
   readonly categories = computed(() => this.authStore.currentShop()?.categories || []);
   readonly activeTab = signal<ProductFormTemplateType>('SELL');
   
@@ -52,6 +53,10 @@ export class ProductFormConfigPageComponent {
   }
 
   protected setTab(type: ProductFormTemplateType): void {
+    if ((type === 'SELL' && !this.canUseSell()) || (type === 'RENT' && !this.canUseRent())) {
+      return;
+    }
+
     this.activeTab.set(type);
   }
 
@@ -126,5 +131,24 @@ export class ProductFormConfigPageComponent {
         this.notificationService.error('Có lỗi xảy ra khi xóa trường');
       }
     });
+  }
+
+  private resolveBusinessMode(): string {
+    const shop = this.authStore.currentShop();
+    if (shop?.enableSell && shop.enableRent) {
+      return 'BOTH';
+    }
+
+    return shop?.enableRent ? 'RENT' : 'SELL';
+  }
+
+  private canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  private canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
   }
 }

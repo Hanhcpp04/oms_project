@@ -1,5 +1,6 @@
-﻿import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -9,12 +10,15 @@ import { Product } from '../../products/data-access/models/product.model';
 import { NotificationService } from '../../../core/services/notification.service';
 import { OrderFormTemplate, OrderFormTemplateField } from '../../../core/models/order-form-template.model';
 import { OrderCustomFieldValue, OrderType } from '../../orders/data-access/models/order.model';
-import { ApiEnvelope, unwrapApiResponse } from '../../../core/utils/api-response.util';
+import { ApiEnvelope, isRecord, unwrapApiResponse } from '../../../core/utils/api-response.util';
 import { PublicPaymentConfig } from '../../../core/services/payment-config.service';
 import { formatPhoneDisplay, formatPhoneInput, normalizePhoneDigits } from '../../../shared/utils/phone-format.util';
 import { FIXED_RENTAL_VERIFICATION_FIELDS } from '../../orders/utils/rental-verification-fields.util';
 import { RentalAvailabilityApiService, RentalAvailabilityBlock } from '../../../core/services/rental-availability-api.service';
 import { InternationalPhoneInputComponent } from '../../../shared/components/form/international-phone-input.component';
+import { DynamicFormRendererComponent } from '../../../shared/components/dynamic-form/dynamic-form-renderer.component';
+import { DynamicFieldValue, DynamicRenderField } from '../../../shared/components/dynamic-form/dynamic-form.types';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 
 export type PaymentMethodType = 'COD' | 'BANK_TRANSFER' | 'VNPAY';
 
@@ -43,7 +47,11 @@ interface OrderFormConfigDto {
 interface FormConfigResponse {
   shopName: string;
   shopSlug: string;
+  logoUrl?: string;
+  shopPhone?: string;
+  shopEmail?: string;
   businessMode: string;
+  showInventoryOnStorefront?: boolean;
   rentalIdentityVerificationEnabled?: boolean;
   products: Product[];
   sellConfig?: OrderFormConfigDto;
@@ -53,472 +61,42 @@ interface FormConfigResponse {
   paymentConfig?: PublicPaymentConfig;
 }
 
+interface PublicFormErrorState {
+  title: string;
+  message: string;
+}
+
+interface PaymentCheckout {
+  provider?: string;
+  method?: string;
+  status?: string;
+  providerOrderCode?: number;
+  providerPaymentLinkId?: string;
+  amount?: number;
+  currency?: string;
+  description?: string;
+  checkoutUrl?: string;
+  qrCode?: string;
+  qrImageUrl?: string;
+}
+
+interface PublicOrderSubmitResponse {
+  id?: number;
+  orderCode?: string;
+  paymentStatus?: string;
+  trackingToken?: string;
+  payment?: PaymentCheckout;
+}
+
+interface PublicOrderTrackingResponse {
+  paymentStatus?: string;
+}
+
 @Component({
   selector: 'app-public-order-form-page',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, InternationalPhoneInputComponent],
-  template: `
-    <div class="min-h-screen bg-white py-12 px-4 sm:px-6 lg:px-8">
-      <div class="max-w-3xl mx-auto">
-        
-        @if (loading()) {
-          <div class="flex flex-col items-center justify-center py-20 text-[#707072]">
-            <div class="h-8 w-8 border-4 border-[#111111] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p>Đang tải thông tin form...</p>
-          </div>
-        } @else if (error()) {
-          <div class="bg-white rounded-xl border border-[#E5E5E5] p-8 shadow-sm">
-            <div class="text-center">
-              <div class="w-16 h-16 mx-auto bg-[#FFE5E5] text-[#D30005] rounded-full flex items-center justify-center mb-4">
-                <i class="ri-error-warning-line text-2xl"></i>
-              </div>
-              <h2 class="text-xl font-bold text-[#111111] mb-2">Không tìm thấy Form</h2>
-              <p class="text-[#707072]">{{ error() }}</p>
-            </div>
-          </div>
-        } @else if (isPaymentStep()) {
-          <div class="bg-white rounded-xl border border-[#E5E5E5] p-8 shadow-sm">
-            <div class="mb-8">
-              <button (click)="isPaymentStep.set(false)" class="flex items-center text-sm font-medium text-[#707072] hover:text-[#111111] transition-colors mb-4">
-                <i class="ri-arrow-left-s-line text-lg"></i> Quay lại thông tin
-              </button>
-              <h2 class="text-2xl font-bold text-[#111111]">Chọn phương thức thanh toán</h2>
-              <p class="text-sm text-[#707072] mt-1">Chọn cách bạn muốn thanh toán cho đơn hàng này.</p>
-            </div>
-
-            <div class="grid gap-3 mb-8">
-              @for (method of availablePaymentMethods(); track method.value) {
-                <label
-                  class="flex items-center gap-4 p-5 rounded-2xl border-2 cursor-pointer transition-all hover:bg-[#FAFAFA]"
-                  [class.border-[#111111]]="selectedPaymentMethod() === method.value"
-                  [class.bg-[#F5F5F5]]="selectedPaymentMethod() === method.value"
-                  [class.border-[#E5E5E5]]="selectedPaymentMethod() !== method.value"
-                >
-                  <input type="radio" [name]="'paymentMethod'" [value]="method.value"
-                    [checked]="selectedPaymentMethod() === method.value"
-                    (change)="selectedPaymentMethod.set(method.value)"
-                    class="w-5 h-5 accent-[#111111]">
-                  <div class="flex items-center gap-4">
-                    <span class="text-3xl">{{ method.icon }}</span>
-                    <div>
-                      <div class="text-base font-bold text-[#111111]">{{ method.label }}</div>
-                      <div class="text-sm text-[#707072]">{{ method.desc }}</div>
-                    </div>
-                  </div>
-                </label>
-              }
-            </div>
-
-            <div class="sticky bottom-0 bg-white pt-4 border-t border-[#E5E5E5]">
-              <div class="flex items-center justify-between mb-4">
-                <span class="text-[#707072] font-medium">Tổng thanh toán:</span>
-                <span class="text-2xl font-bold text-[#111111]">{{ formatCurrency(totalAmount()) }}</span>
-              </div>
-              <button (click)="confirmOrder()" [disabled]="!selectedPaymentMethod() || submitting()" class="w-full py-4 text-lg rounded-full bg-[#111111] text-white font-bold disabled:bg-[#E5E5E5] disabled:cursor-not-allowed">
-                {{ submitting() ? 'Đang xử lý...' : 'Xác nhận & Đặt hàng' }}
-              </button>
-            </div>
-          </div>
-        } @else if (success()) {
-          <div class="bg-white rounded-xl border border-[#E5E5E5] p-8 shadow-sm">
-            <div class="text-center py-4">
-              <div class="w-20 h-20 mx-auto bg-[#E5F5E5] text-[#0A7D0A] rounded-full flex items-center justify-center mb-6">
-                <i class="ri-check-line text-4xl"></i>
-              </div>
-              <h2 class="text-3xl font-bold text-[#111111] mb-3">Đặt hàng thành công!</h2>
-              <p class="text-[#707072] text-lg mb-8 max-w-md mx-auto">
-                Đơn hàng của bạn đã được ghi nhận. Chủ shop sẽ sớm liên hệ với bạn qua số điện thoại để xác nhận.
-              </p>
-
-              @if (selectedPaymentMethod() === 'BANK_TRANSFER' && successQrUrl()) {
-                <div class="mb-8 p-6 rounded-3xl bg-[#F8F8F8] border border-[#EEEEEE] shadow-sm animate-in zoom-in duration-300">
-                  <h3 class="text-lg font-bold text-[#111111] mb-2">Thanh toán chuyển khoản</h3>
-                  <p class="text-sm text-[#707072] mb-6">Mã QR đã được tạo với số tiền và nội dung đơn hàng của bạn.</p>
-                  
-                  <div class="relative group inline-block">
-                    <img [src]="successQrUrl()!" alt="QR thanh toán" 
-                      class="mx-auto w-64 h-64 rounded-2xl border-4 border-white bg-white p-2 shadow-xl mb-4 transition-transform group-hover:scale-[1.02]">
-                  </div>
-
-                  <div class="flex flex-col gap-3 max-w-sm mx-auto">
-                    <button (click)="downloadQr()" class="w-full py-3 rounded-full bg-[#111111] text-white font-bold">
-                      <i class="ri-download-2-line mr-2"></i> Tải mã QR về máy
-                    </button>
-                    <div class="bg-white p-4 rounded-xl border border-[#E5E5E5] text-left">
-                      <div class="flex justify-between text-xs text-[#707072] mb-1">
-                        <span>Chủ tài khoản:</span>
-                        <span class="font-bold text-[#111111]">{{ config()?.paymentConfig?.bankAccountName }}</span>
-                      </div>
-                      <div class="flex justify-between text-xs text-[#707072] mb-1">
-                        <span>Số tài khoản:</span>
-                        <span class="font-bold text-[#111111]">{{ config()?.paymentConfig?.bankAccountNumber }}</span>
-                      </div>
-                      <div class="flex justify-between text-xs text-[#707072]">
-                        <span>Ngân hàng:</span>
-                        <span class="font-bold text-[#111111]">{{ config()?.paymentConfig?.bankName }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              }
-
-              <div class="pt-4">
-                <button (click)="resetForm()" class="px-6 py-3 rounded-full border border-[#111111] text-[#111111] font-bold hover:bg-[#F5F5F5] transition-colors">
-                  Quay lại trang đặt hàng
-                </button>
-              </div>
-            </div>
-          </div>
-        } @else if (config()) {
-          <div class="bg-white rounded-xl border border-[#E5E5E5] p-8 shadow-sm">
-            <!-- Header -->
-            <div class="text-center mb-8">
-              <h1 class="text-3xl font-extrabold text-[#111111]">
-                {{ config()?.shopName }}
-              </h1>
-              <p class="mt-2 text-lg text-[#707072]">
-                Điền thông tin bên dưới để đặt hàng
-              </p>
-            </div>
-
-            <!-- Product Info -->
-            @if (selectedProduct()) {
-              <div class="mb-8 pb-8 border-b border-[#E5E5E5]">
-                <h3 class="text-lg font-medium text-[#111111] mb-4">Sản phẩm bạn chọn</h3>
-                
-                <div class="flex gap-4 mb-6">
-                  <img [src]="selectedProduct()?.images?.[0]?.url || 'assets/images/placeholder.webp'" class="w-20 h-20 object-cover rounded-lg border border-[#E5E5E5]">
-                  <div>
-                    <h4 class="font-bold text-[#111111] text-lg">{{ selectedProduct()?.name }}</h4>
-                    <p class="text-sm text-[#707072]">{{ selectedProduct()?.description }}</p>
-                  </div>
-                </div>
-
-                <!-- Variant selection if multiple or single -->
-                <div class="space-y-3">
-                  <label class="block text-sm font-medium text-[#111111]">Chọn biến thể</label>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    @for (variant of availableVariants(); track variant.id) {
-                      <div 
-                        class="border rounded-lg p-3 cursor-pointer transition-all"
-                        [class.border-[#111111]]="selectedVariant()?.id === variant.id"
-                        [class.bg-[#F5F5F5]]="selectedVariant()?.id === variant.id"
-                        [class.border-[#CACACB]]="selectedVariant()?.id !== variant.id"
-                        (click)="selectVariant(variant)"
-                      >
-                        <div class="flex items-center justify-between">
-                          <span class="font-medium text-[#111111]">Size: {{ variant.size }}</span>
-                          <span class="text-[#111111] font-semibold">{{ formatCurrency(getVariantPrice(variant)) }}</span>
-                        </div>
-                      </div>
-                    }
-                  </div>
-                </div>
-
-                <div class="mt-6 flex items-center justify-between">
-                  <label class="block text-sm font-medium text-[#111111]">Số lượng</label>
-                  <div class="flex items-center gap-3">
-                    <button type="button" class="w-10 h-10 rounded-full bg-[#F5F5F5] hover:bg-[#E5E5E5] flex items-center justify-center transition-colors" (click)="updateQuantity(-1)">
-                      <i class="ri-subtract-line"></i>
-                    </button>
-                    <span class="w-8 text-center font-bold text-lg text-[#111111]">{{ quantity() }}</span>
-                    <button type="button" class="w-10 h-10 rounded-full bg-[#F5F5F5] hover:bg-[#E5E5E5] flex items-center justify-center transition-colors" (click)="updateQuantity(1)">
-                      <i class="ri-add-line"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            } @else {
-              <div class="bg-[#FFFBEA] text-[#8B6914] p-4 rounded-lg border border-[#F5D547] mb-8">
-                Không tìm thấy thông tin sản phẩm. Vui lòng kiểm tra lại link.
-              </div>
-            }
-
-            <!-- Shipping Method Selection -->
-            @if (config()?.shippingMethods?.length) {
-              <div class="mb-8 pb-8 border-b border-[#E5E5E5]">
-                <label class="block text-sm font-medium text-[#111111] mb-1.5">Phương thức vận chuyển</label>
-                <select 
-                  class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                  [value]="selectedShippingMethodId()?.toString() || ''"
-                  (change)="selectedShippingMethodId.set($any($event.target).value ? Number($any($event.target).value) : null)"
-                >
-                  <option value="">-- Chọn phương thức --</option>
-                  @for (opt of shippingMethodOptions(); track opt.value) {
-                    <option [value]="opt.value">{{ opt.label }}</option>
-                  }
-                </select>
-              </div>
-            }
-
-            <!-- Order Source Selection -->
-            @if (config()?.orderSources?.length) {
-              <div class="mb-8 pb-8 border-b border-[#E5E5E5]">
-                <label class="block text-sm font-medium text-[#111111] mb-1.5">Bạn biết đến shop qua đâu? (Tùy chọn)</label>
-                <select 
-                  class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                  [value]="selectedSourceChannelId()?.toString() || ''"
-                  (change)="selectedSourceChannelId.set($any($event.target).value ? Number($any($event.target).value) : null)"
-                >
-                  <option value="">-- Chọn nền tảng --</option>
-                  @for (opt of orderSourceOptions(); track opt.value) {
-                    <option [value]="opt.value">{{ opt.label }}</option>
-                  }
-                </select>
-              </div>
-            }
-
-            <!-- Customer Form -->
-            <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-6">
-              <h3 class="text-lg font-medium text-[#111111] border-b border-[#E5E5E5] pb-2 mb-6">Thông tin liên hệ</h3>
-              
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-1.5">
-                  <label class="block text-sm font-medium text-[#111111]">Họ và tên <span class="text-[#D30005]">*</span></label>
-                  <input formControlName="customerName" class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all" [class.border-red-400]="form.get('customerName')?.invalid && form.get('customerName')?.touched" placeholder="Nhập họ và tên của bạn">
-                  @if (form.get('customerName')?.invalid && form.get('customerName')?.touched) {
-                    <p class="text-xs text-[#D30005] font-medium mt-0.5">Vui lòng nhập họ và tên.</p>
-                  }
-                </div>
-                <app-international-phone-input
-                  label="Số điện thoại"
-                  formControlName="customerPhone"
-                  [required]="true"
-                  [showError]="!!(form.get('customerPhone')?.invalid && form.get('customerPhone')?.touched)"
-                  errorText="Vui lòng nhập số điện thoại hợp lệ."
-                />
-              </div>
-              
-              <div class="space-y-1.5">
-                <label class="block text-sm font-medium text-[#111111]">Địa chỉ giao hàng <span class="text-[#D30005]">*</span></label>
-                <input formControlName="customerAddress" class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all" [class.border-red-400]="form.get('customerAddress')?.invalid && form.get('customerAddress')?.touched" placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/TP">
-                @if (form.get('customerAddress')?.invalid && form.get('customerAddress')?.touched) {
-                  <p class="text-xs text-[#D30005] font-medium mt-0.5">Vui lòng nhập địa chỉ giao hàng.</p>
-                }
-              </div>
-
-              @if (isRentOrderSelected()) {
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                  <div class="space-y-1.5">
-                    <label class="block text-sm font-medium text-[#111111]">Ngày thuê <span class="text-[#D30005]">*</span></label>
-                    <input type="date" formControlName="rentFrom" readonly class="w-full rounded-lg border border-[#CACACB] bg-white text-sm p-3 text-[#111111]">
-                  </div>
-                  <div class="space-y-1.5">
-                    <label class="block text-sm font-medium text-[#111111]">Ngày trả <span class="text-[#D30005]">*</span></label>
-                    <input type="date" formControlName="rentTo" readonly class="w-full rounded-lg border border-[#CACACB] bg-white text-sm p-3 text-[#111111]">
-                  </div>
-                </div>
-
-                <div class="mt-4 rounded-2xl border border-[#E5E5E5] bg-[#FAFAFA] p-4">
-                  <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h4 class="m-0 text-sm font-bold uppercase tracking-wide text-[#111111]">Lịch thuê còn trống</h4>
-                      <p class="m-0 mt-1 text-sm text-[#707072]">
-                        Chọn ngày bắt đầu và ngày kết thúc trên lịch. Ngày đỏ là đã có khách giữ lịch.
-                      </p>
-                    </div>
-                    @if (rentalAvailabilityLoading()) {
-                      <span class="text-xs font-medium text-[#707072]">Đang tải lịch...</span>
-                    }
-                  </div>
-
-                  <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-[#707072]">
-                    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded border border-[#BBF7D0] bg-[#F0FDF4]"></span>Còn trống</span>
-                    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded border border-[#FCA5A5] bg-[#FEF2F2]"></span>Đã giữ lịch</span>
-                    <span class="inline-flex items-center gap-1.5"><span class="h-3 w-3 rounded border border-[#111111] bg-[#111111]"></span>Đang chọn</span>
-                  </div>
-
-                  <div class="grid grid-cols-5 gap-2 sm:grid-cols-7 md:grid-cols-10">
-                    @for (day of rentalCalendarDays(); track day.date) {
-                      <button type="button"
-                        class="min-h-14 rounded-lg border px-1 text-center transition disabled:cursor-not-allowed disabled:opacity-60"
-                        [ngClass]="getRentalDayClass(day.date)"
-                        [disabled]="isRentalDayDisabled(day.date)"
-                        (click)="selectRentalDate(day.date)"
-                        [title]="getRentalDayTitle(day.date)">
-                        <span class="block text-[10px] font-semibold uppercase">{{ day.weekday }}</span>
-                        <span class="block text-xs font-bold">{{ formatRentalDayLabel(day.date) }}</span>
-                      </button>
-                    }
-                  </div>
-
-                  @if (rentalDateError()) {
-                    <p class="mt-3 text-xs font-medium text-[#D30005]">{{ rentalDateError() }}</p>
-                  }
-                </div>
-              }
-
-              @if (shouldShowRentalVerificationFields()) {
-                <div class="mt-6 pt-6 border-t border-[#E5E5E5] space-y-6">
-                  <div>
-                    <h4 class="text-sm font-semibold text-[#111111] uppercase tracking-wider">Xác thực giấy tờ tùy thân</h4>
-                    <p class="mt-1 text-sm text-[#707072]">Shop yêu cầu tải đủ ảnh mặt trước và mặt sau giấy tờ tùy thân cho đơn thuê.</p>
-                  </div>
-
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    @for (field of rentalVerificationFields; track field.key) {
-                      <div class="space-y-1.5">
-                        <label class="block text-sm font-medium text-[#111111]">
-                          {{ field.label }} <span class="text-[#D30005]">*</span>
-                        </label>
-                        <div
-                          class="relative flex h-36 w-full cursor-pointer flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border-2 border-dashed border-[#CACACB] bg-[#F5F5F5] transition-all hover:bg-[#EEEEEE] group"
-                        >
-                          @if (getRentalVerificationImageUrl(field.key)) {
-                            <img [src]="getRentalVerificationImageUrl(field.key)" class="h-full w-full object-cover" [alt]="field.label">
-                            <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                              <span class="text-xs font-bold text-white">Đổi ảnh</span>
-                            </div>
-                          } @else {
-                            <i class="ri-upload-cloud-2-line text-3xl text-[#707072]"></i>
-                            <span class="text-xs text-[#707072] text-center px-4">{{ field.placeholder }}</span>
-                          }
-                          <input type="file" class="absolute inset-0 cursor-pointer opacity-0" accept="image/*"
-                            (change)="onRentalVerificationFileChange(field.key, $event)">
-                        </div>
-                        <p class="text-xs text-[#707072]">{{ field.helperText }}</p>
-                        @if (getRentalVerificationError(field.key)) {
-                          <p class="text-xs font-medium text-[#D30005]">{{ getRentalVerificationError(field.key) }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-
-              <!-- Dynamic Custom Fields -->
-              @if (customFields().length > 0) {
-                <div class="mt-6 pt-6 border-t border-[#E5E5E5] space-y-6">
-                  <h4 class="text-sm font-semibold text-[#111111] uppercase tracking-wider">Thông tin bổ sung</h4>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    @for (field of customFields(); track field.id) {
-                      <div class="space-y-1.5">
-                        <label class="block text-sm font-medium text-[#111111]">
-                          {{ field.label }}
-                          @if (field.isRequired) { <span class="text-[#D30005]">*</span> }
-                        </label>
-
-                        @if (isCustomTextAreaField(field)) {
-                          <textarea 
-                            class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                            [placeholder]="field.placeholder || 'Nhập thông tin'"
-                            [value]="getCustomFieldValue(field.id)"
-                            (input)="updateCustomFieldValue(field.id, $any($event.target).value)"
-                            rows="3"
-                          ></textarea>
-                        } @else if (isCustomSingleChoiceField(field)) {
-                          <div class="space-y-2">
-                            @for (option of field.options; track option.id) {
-                              <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="radio" [name]="field.id" 
-                                  [checked]="getCustomFieldValue(field.id) === option.label"
-                                  (change)="setCustomSingleChoiceValue(field.id, option.label)"
-                                  class="text-[#111111] focus:ring-[#111111]"
-                                />
-                                <span class="text-sm text-[#707072]">{{ option.label }}</span>
-                              </label>
-                            }
-                          </div>
-                        } @else if (isCustomMultiChoiceField(field)) {
-                          <div class="space-y-2">
-                            @for (option of field.options; track option.id) {
-                              <label class="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox"
-                                  [checked]="isCustomMultiChoiceSelected(field.id, option.label)"
-                                  (change)="toggleCustomMultiChoiceValue(field.id, option.label, $any($event.target).checked)"
-                                  class="rounded text-[#111111] focus:ring-[#111111]"
-                                />
-                                <span class="text-sm text-[#707072]">{{ option.label }}</span>
-                              </label>
-                            }
-                          </div>
-                        } @else if (isCustomDropdownField(field)) {
-                          <select 
-                            class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                            [value]="getCustomFieldValue(field.id)"
-                            (change)="updateCustomFieldValue(field.id, $any($event.target).value)"
-                          >
-                            <option value="">{{ field.placeholder || 'Chọn một giá trị' }}</option>
-                            @for (option of field.options; track option.id) {
-                              <option [value]="option.label">{{ option.label }}</option>
-                            }
-                          </select>
-                        } @else if (isCustomImageField(field)) {
-                          <div class="w-full h-32 bg-[#F5F5F5] border-2 border-dashed border-[#CACACB] rounded-lg flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-[#FAFAFA] transition-all overflow-hidden relative group">
-                            @if (getCustomFieldValue(field.id)) {
-                              <img [src]="getCustomFieldValue(field.id)" class="w-full h-full object-cover">
-                              <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <span class="text-white text-xs font-bold">Đổi ảnh</span>
-                              </div>
-                            } @else {
-                              <i class="ri-image-add-line text-3xl text-[#CACACB]"></i>
-                              <span class="text-xs text-[#707072]">{{ field.placeholder || 'Tải ảnh lên' }}</span>
-                            }
-                            <input type="file" class="absolute inset-0 opacity-0 cursor-pointer" (change)="onCustomFileChange(field.id, $event)" accept="image/*">
-                          </div>
-                        } @else {
-                          <input 
-                            [type]="resolveCustomInputType(field)"
-                            [attr.inputmode]="field.fieldType === 'phone' ? 'numeric' : null"
-                            class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                            [placeholder]="field.placeholder || 'Nhập thông tin'"
-                            [value]="getCustomFieldDisplayValue(field)"
-                            (input)="onCustomFieldInput(field, $event)"
-                          />
-                        }
-
-                        @if (field.helperText) {
-                          <p class="text-xs text-[#707072] italic">{{ field.helperText }}</p>
-                        }
-                        @if (getCustomFieldError(field.id)) {
-                          <p class="text-xs text-[#D30005] font-medium">{{ getCustomFieldError(field.id) }}</p>
-                        }
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
-              
-              <div class="pt-6 border-t border-[#E5E5E5] space-y-6">
-                <div>
-                  <label class="block text-sm font-medium text-[#111111] mb-1">Ghi chú thêm (không bắt buộc)</label>
-                  <textarea 
-                    formControlName="customerNote"
-                    rows="3" 
-                    class="w-full rounded-lg border border-[#CACACB] focus:border-[#111111] focus:ring-2 focus:ring-[rgba(17,17,17,0.15)] bg-[#F5F5F5] text-sm p-3 transition-all"
-                    placeholder="Ghi chú thêm cho đơn hàng (không bắt buộc)"
-                  ></textarea>
-                </div>
-                
-                <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div class="text-left w-full sm:w-auto">
-                    <span class="text-sm text-[#707072]">Tổng cộng:</span>
-                    <div class="text-2xl font-bold text-[#111111]">{{ formatCurrency(totalAmount()) }}</div>
-                    @if (selectedShippingMethodId()) {
-                      <div class="text-xs text-[#707072] mt-1">(Đã bao gồm phí vận chuyển nếu có)</div>
-                    }
-                  </div>
-                  <button 
-                    type="submit" 
-                    class="w-full sm:w-auto px-8 py-3 rounded-full bg-[#111111] text-white font-bold disabled:bg-[#E5E5E5] disabled:cursor-not-allowed transition-colors"
-                    [disabled]="form.invalid || !selectedVariant() || (isRentOrderSelected() && !isRentalDateRangeValid()) || submitting()"
-                  >
-                    @if (submitting()) {
-                      <span class="flex items-center gap-2">
-                        <i class="ri-loader-4-line animate-spin"></i> Đang xử lý...
-                      </span>
-                    } @else {
-                      Tiếp tục chọn thanh toán
-                    }
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        }
-      </div>
-    </div>
-  `,
+  imports: [CommonModule, ReactiveFormsModule, DynamicFormRendererComponent],
+  templateUrl: './public-order-form-page.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class PublicOrderFormPageComponent implements OnInit {
@@ -532,10 +110,7 @@ export class PublicOrderFormPageComponent implements OnInit {
   protected readonly rentalVerificationFields = FIXED_RENTAL_VERIFICATION_FIELDS;
 
   protected formatVND(value: string | number | null | undefined): string {
-    if (!value) return '0 VNĐ';
-    const num = typeof value === 'string' ? parseInt(value.replace(/\D/g, '')) : value;
-    if (isNaN(num)) return '0 VNĐ';
-    return new Intl.NumberFormat('vi-VN').format(num) + ' VNĐ';
+    return formatVndCurrency(value, '0 ₫');
   }
 
 
@@ -549,7 +124,7 @@ export class PublicOrderFormPageComponent implements OnInit {
   }
 
   readonly loading = signal(true);
-  readonly error = signal<string | null>(null);
+  readonly error = signal<PublicFormErrorState | null>(null);
   readonly config = signal<FormConfigResponse | null>(null);
   readonly success = signal(false);
   readonly submitting = signal(false);
@@ -563,6 +138,10 @@ export class PublicOrderFormPageComponent implements OnInit {
   readonly isPaymentStep = signal(false);
   readonly selectedPaymentMethod = signal<PaymentMethodType | null>(null);
   readonly successQrUrl = signal<string | null>(null);
+  readonly paymentCheckout = signal<PaymentCheckout | null>(null);
+  readonly trackingToken = signal<string | null>(null);
+  readonly paymentNotice = signal<string | null>(null);
+  readonly checkingPayment = signal(false);
   readonly rentalVerificationValues = signal<Record<string, string>>({});
   readonly rentalVerificationErrors = signal<Record<string, string>>({});
   readonly rentalAvailabilityLoading = signal(false);
@@ -622,6 +201,12 @@ export class PublicOrderFormPageComponent implements OnInit {
 
     return config?.customFields || [];
   });
+  readonly renderableCustomFields = computed(() =>
+    this.customFields().filter(field => field.fieldType !== 'image')
+  );
+  readonly imageCustomFields = computed(() =>
+    this.customFields().filter(field => field.fieldType === 'image')
+  );
   readonly availableVariants = computed(() => {
     return this.selectedProduct()?.variants || [];
   });
@@ -653,7 +238,10 @@ export class PublicOrderFormPageComponent implements OnInit {
     const requestedOrderType = this.normalizeOrderType(this.route.snapshot.queryParamMap.get('orderType'));
 
     if (!this.shopSlug) {
-      this.error.set('Thiếu thông tin shop');
+      this.error.set({
+        title: 'Không thể tải form',
+        message: 'Thiếu thông tin shop trong đường dẫn.'
+      });
       this.loading.set(false);
       return;
     }
@@ -713,10 +301,63 @@ export class PublicOrderFormPageComponent implements OnInit {
             }
           }
         },
-        error: () => {
-          this.error.set('Không thể tải form. Shop có thể không tồn tại hoặc đã bị khóa.');
+        error: (err: unknown) => {
+          this.error.set(this.resolveFormLoadError(err));
         }
       });
+  }
+
+  private resolveFormLoadError(error: unknown): PublicFormErrorState {
+    if (error instanceof HttpErrorResponse) {
+      const backendMessage = this.extractBackendMessage(error).toLowerCase();
+      const backendCode = this.extractBackendCode(error);
+
+      if (backendCode === 'E203' || backendMessage.includes('maintenance mode')) {
+        return {
+          title: 'Shop đang bảo trì',
+          message: 'Shop hiện đang ở chế độ bảo trì. Vui lòng quay lại sau.'
+        };
+      }
+
+      if (backendCode === 'E202' || backendMessage.includes('shop is not active') || backendMessage.includes('suspended')) {
+        return {
+          title: 'Shop tạm ngừng hoạt động',
+          message: 'Shop hiện không nhận đơn qua form công khai. Vui lòng liên hệ shop để biết thêm thông tin.'
+        };
+      }
+
+      if (error.status === 404 || backendCode === 'E002' || backendMessage.includes('not found')) {
+        return {
+          title: 'Không tìm thấy Form',
+          message: 'Link form không hợp lệ hoặc shop không tồn tại.'
+        };
+      }
+    }
+
+    return {
+      title: 'Không thể tải form',
+      message: 'Đã có lỗi khi tải form. Vui lòng thử lại sau.'
+    };
+  }
+
+  private extractBackendMessage(error: HttpErrorResponse): string {
+    if (typeof error.error === 'string') {
+      return error.error;
+    }
+
+    if (isRecord(error.error) && typeof error.error['message'] === 'string') {
+      return error.error['message'];
+    }
+
+    return error.message;
+  }
+
+  private extractBackendCode(error: HttpErrorResponse): string {
+    if (isRecord(error.error) && typeof error.error['error'] === 'string') {
+      return error.error['error'];
+    }
+
+    return '';
   }
 
   selectVariant(variant: any) {
@@ -742,10 +383,7 @@ export class PublicOrderFormPageComponent implements OnInit {
   }
 
   formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(value);
+    return formatVndCurrency(value);
   }
 
   // --- Custom fields helpers (inspired by TabManualFormComponent) ---
@@ -757,6 +395,29 @@ export class PublicOrderFormPageComponent implements OnInit {
   protected updateCustomFieldValue(fieldId: string | number, value: string): void {
     this.customFieldValues.update(prev => ({ ...prev, [String(fieldId)]: value }));
     this.clearCustomFieldError(String(fieldId));
+  }
+
+  protected onCustomValuesChange(values: Record<string, DynamicFieldValue>): void {
+    const nextValues: Record<string, string | string[]> = {};
+    Object.entries(values).forEach(([fieldId, value]) => {
+      if (Array.isArray(value) || typeof value === 'string') {
+        nextValues[fieldId] = value;
+      }
+    });
+
+    this.customFieldValues.set(nextValues);
+    this.customFieldErrors.update((errors) => {
+      const next = { ...errors };
+      Object.keys(values).forEach((fieldId) => delete next[fieldId]);
+      return next;
+    });
+  }
+
+  private onCustomFileUpload(fieldId: string | number, file: File): void {
+    this.fileApiService.upload(file).subscribe({
+      next: (url) => this.updateCustomFieldValue(fieldId, url),
+      error: () => this.toast.error('Không thể tải ảnh lên. Vui lòng thử lại!')
+    });
   }
 
   protected getCustomFieldDisplayValue(field: OrderFormCustomFieldDto): string {
@@ -793,6 +454,17 @@ export class PublicOrderFormPageComponent implements OnInit {
         error: () => this.toast.error('Không thể tải ảnh lên. Vui lòng thử lại!')
       });
     }
+  }
+
+  protected onCustomRendererFileSelected(event: { field: DynamicRenderField; file: File }): void {
+    this.fileApiService.upload(event.file).subscribe({
+      next: (url) => this.updateCustomFieldValue(event.field.id, url),
+      error: () => this.toast.error('Không thể tải ảnh lên. Vui lòng thử lại!')
+    });
+  }
+
+  protected handleFileSelected(event: { field: DynamicRenderField; file: File }): void {
+    this.onCustomRendererFileSelected(event);
   }
 
   protected isRentOrderSelected(): boolean {
@@ -872,6 +544,10 @@ export class PublicOrderFormPageComponent implements OnInit {
 
   protected shouldShowRentalVerificationFields(): boolean {
     return this.isRentOrderSelected() && Boolean(this.config()?.rentalIdentityVerificationEnabled);
+  }
+
+  protected shouldShowInventory(): boolean {
+    return Boolean(this.config()?.showInventoryOnStorefront);
   }
 
   protected getRentalVerificationImageUrl(fieldKey: string): string {
@@ -1115,12 +791,11 @@ export class PublicOrderFormPageComponent implements OnInit {
 
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.toast.error('Vui lòng điền đầy đủ thông tin liên hệ bắt buộc!');
       return;
     }
 
-    // Instead of immediate API call, move to payment step
-    this.isPaymentStep.set(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    this.confirmOrder();
   }
 
   confirmOrder() {
@@ -1167,25 +842,79 @@ export class PublicOrderFormPageComponent implements OnInit {
       .pipe(finalize(() => this.submitting.set(false)))
       .subscribe({
         next: (response: any) => {
-          const res = unwrapApiResponse(response);
-          // Build QR URL for bank transfer success screen
+          const res = unwrapApiResponse(response) as PublicOrderSubmitResponse;
+          const checkout = res.payment ?? null;
+          this.paymentCheckout.set(checkout);
+          this.trackingToken.set(res.trackingToken ?? null);
+          this.paymentNotice.set(null);
+          this.successQrUrl.set(null);
+
           if (this.selectedPaymentMethod() === 'BANK_TRANSFER') {
-            const cfg = this.config()?.paymentConfig;
-            if (cfg?.bankCode && cfg?.bankAccountNumber) {
-              const amount = this.totalAmount();
-              const orderCode = res.orderCode || '';
-              const name = encodeURIComponent((cfg.bankAccountName ?? '').toUpperCase());
-              const addInfo = encodeURIComponent(`Thanh toan don hang ${orderCode}`);
-              this.successQrUrl.set(
-                `https://img.vietqr.io/image/${cfg.bankCode}-${cfg.bankAccountNumber}-compact.png?amount=${Math.round(amount)}&addInfo=${addInfo}&accountName=${name}`
-              );
+            if (checkout?.qrImageUrl) {
+              this.successQrUrl.set(checkout.qrImageUrl);
+            } else {
+              const cfg = this.config()?.paymentConfig;
+              if (cfg?.bankCode && cfg?.bankAccountNumber) {
+                const amount = this.totalAmount();
+                const orderCode = res.orderCode || '';
+                const name = encodeURIComponent((cfg.bankAccountName ?? '').toUpperCase());
+                const addInfo = encodeURIComponent(`Thanh toan don hang ${orderCode}`);
+                this.successQrUrl.set(
+                  `https://img.vietqr.io/image/${cfg.bankCode}-${cfg.bankAccountNumber}-compact.png?amount=${Math.round(amount)}&addInfo=${addInfo}&accountName=${name}`
+                );
+              }
             }
+            this.isPaymentStep.set(true);
+            this.success.set(false);
+          } else if (this.selectedPaymentMethod() === 'VNPAY') {
+            this.isPaymentStep.set(true);
+            this.success.set(false);
+          } else {
+            this.isPaymentStep.set(false);
+            this.success.set(true);
           }
-          this.isPaymentStep.set(false);
-          this.success.set(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         },
         error: () => {
           this.toast.error('Có lỗi xảy ra khi tạo đơn hàng. Vui lòng thử lại!');
+        }
+      });
+  }
+
+  completePayment() {
+    if (!this.paymentCheckout()) {
+      this.isPaymentStep.set(false);
+      this.success.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const token = this.trackingToken();
+    if (!token) {
+      this.isPaymentStep.set(false);
+      this.success.set(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    this.checkingPayment.set(true);
+    this.http.get(`/public/orders/track/${encodeURIComponent(token)}`)
+      .pipe(finalize(() => this.checkingPayment.set(false)))
+      .subscribe({
+        next: (response: any) => {
+          const trackedOrder = unwrapApiResponse(response) as PublicOrderTrackingResponse;
+          if (trackedOrder.paymentStatus === 'PAID') {
+            this.paymentNotice.set(null);
+            this.isPaymentStep.set(false);
+            this.success.set(true);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            return;
+          }
+
+          this.paymentNotice.set('Hệ thống chưa ghi nhận thanh toán. Nếu bạn vừa chuyển khoản, vui lòng đợi vài giây rồi kiểm tra lại.');
+        },
+        error: () => {
+          this.toast.error('Không thể kiểm tra trạng thái thanh toán. Vui lòng thử lại!');
         }
       });
   }
@@ -1195,6 +924,10 @@ export class PublicOrderFormPageComponent implements OnInit {
     this.success.set(false);
     this.isPaymentStep.set(false);
     this.successQrUrl.set(null);
+    this.paymentCheckout.set(null);
+    this.trackingToken.set(null);
+    this.paymentNotice.set(null);
+    this.checkingPayment.set(false);
     this.form.reset();
     this.quantity.set(1);
     this.customFieldValues.set({});
@@ -1257,11 +990,15 @@ export class PublicOrderFormPageComponent implements OnInit {
     }
 
     this.rentalAvailabilityLoading.set(true);
+    
+    // Find the first non-placeholder day to use as the from date
+    const firstValidDay = days.find(d => !d.isPlaceholder);
+    
     this.rentalAvailabilityApi.getPublicAvailability(this.shopSlug, {
       productId: product.id,
       variantId: variant.id,
-      from: days[0]?.date,
-      to: days[days.length - 1]?.date
+      from: firstValidDay?.dateStr || '',
+      to: days[days.length - 1]?.dateStr
     })
       .pipe(finalize(() => this.rentalAvailabilityLoading.set(false)))
       .subscribe({
@@ -1359,17 +1096,30 @@ export class PublicOrderFormPageComponent implements OnInit {
     return false;
   }
 
-  private buildRentalCalendarDays(): Array<{ date: string; weekday: string }> {
-    const days: Array<{ date: string; weekday: string }> = [];
+  private buildRentalCalendarDays(): Array<{ dateStr: string; isPlaceholder: boolean; dayNum: number | string }> {
+    const days: Array<{ dateStr: string; isPlaceholder: boolean; dayNum: number | string }> = [];
     const start = new Date();
     start.setHours(0, 0, 0, 0);
 
+    const firstDayOfWeek = start.getDay(); // 0 is Sunday
+    
+    // Add placeholders
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      days.push({
+        dateStr: `placeholder-${i}`,
+        isPlaceholder: true,
+        dayNum: ''
+      });
+    }
+
+    // Add 60 days
     for (let index = 0; index < 60; index += 1) {
       const date = new Date(start);
       date.setDate(start.getDate() + index);
       days.push({
-        date: this.toLocalDateString(date),
-        weekday: date.toLocaleDateString('vi-VN', { weekday: 'short' })
+        dateStr: this.toLocalDateString(date),
+        isPlaceholder: false,
+        dayNum: date.getDate()
       });
     }
 

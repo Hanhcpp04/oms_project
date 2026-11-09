@@ -1,0 +1,76 @@
+<section>
+  <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <div>
+      <h2 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Danh sách biến thể</h2>
+      <p class="m-0 mt-1 text-xs text-[var(--color-text-secondary)]">{{ product.variants.length }} biến thể đang quản lý.</p>
+    </div>
+    @if (canEdit) {
+      <button
+        type="button"
+        class="inline-flex h-8 w-fit shrink-0 items-center justify-center rounded-none border border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] font-medium text-[var(--color-text-primary)] transition hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]"
+        (click)="edit.emit()"
+      >
+        <i class="ri-pencil-line mr-1.5 text-[12px]"></i>
+        Sửa biến thể
+      </button>
+    }
+  </div>
+
+  @if (product.variants.length > 0) {
+    <div class="overflow-x-auto border-y border-[var(--color-border)]">
+      <table class="w-full min-w-[720px] border-collapse text-left">
+        <thead class="bg-[var(--color-surface-secondary)] text-[11px] font-semibold uppercase tracking-[0] text-[var(--color-text-muted)]">
+          <tr>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5">Ảnh</th>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5">Thuộc tính</th>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5 text-right">Giá bán</th>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5 text-right">Thuê/ngày</th>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5 text-right">Tồn kho</th>
+            <th class="border-b border-[var(--color-border)] px-3 py-2.5">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-[var(--color-border)] text-[13px]">
+          @for (variant of product.variants; track variant.id) {
+            <tr class="transition-colors hover:bg-[var(--color-surface-secondary)]">
+              <td class="px-3 py-2.5">
+                <div class="flex h-9 w-9 items-center justify-center overflow-hidden rounded-none border border-[var(--color-border)] bg-[var(--color-surface-secondary)]">
+                  @if (primaryImage; as image) {
+                    <img [src]="image" [alt]="product.name" class="h-full w-full object-cover" loading="lazy" />
+                  } @else {
+                    <i class="ri-image-line text-[var(--color-text-muted)]"></i>
+                  }
+                </div>
+              </td>
+              <td class="px-3 py-2.5">
+                <p class="m-0 font-semibold text-[var(--color-text-primary)]">{{ getVariantName(variant.size, variant.color) }}</p>
+                <p class="m-0 mt-0.5 text-xs text-[var(--color-text-secondary)]">Size {{ variant.size || '—' }} · {{ variant.color || 'Không màu' }}</p>
+              </td>
+              <td class="px-3 py-2.5 text-right font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(variant.priceSell) }}</td>
+              <td class="px-3 py-2.5 text-right font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(variant.priceRentPerDay) }}</td>
+              <td class="px-3 py-2.5 text-right font-semibold text-[var(--color-text-primary)]">{{ variant.stockQty }}</td>
+              <td class="px-3 py-2.5">
+                <span
+                  class="inline-flex h-5 items-center rounded-none px-2 text-[11px] font-semibold"
+                  [ngClass]="{
+                    'bg-[var(--color-danger-soft)] text-[var(--color-danger-text)]': variant.stockQty <= 0 || !variant.active,
+                    'bg-[var(--color-warning-soft)] text-[var(--color-warning-text)]': variant.stockQty > 0 && variant.stockQty <= 3 && variant.active,
+                    'bg-[var(--color-success-soft)] text-[var(--color-success-text)]': variant.stockQty > 3 && variant.active
+                  }"
+                >
+                  {{ !variant.active ? 'Tạm ẩn' : variant.stockQty <= 0 ? 'Hết hàng' : variant.stockQty <= 3 ? 'Sắp hết' : 'Còn hàng' }}
+                </span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  } @else {
+    <div class="grid min-h-32 place-items-center border-y border-dashed border-[var(--color-border)] px-5 py-8 text-center">
+      <div>
+        <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Chưa có biến thể</p>
+        <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">Thêm size, màu và tồn kho khi chỉnh sửa sản phẩm.</p>
+      </div>
+    </div>
+  }
+</section>

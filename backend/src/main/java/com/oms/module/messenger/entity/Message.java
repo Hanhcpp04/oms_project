@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "messenger_messages",
         indexes = {
+                @Index(name = "ux_messenger_message_mid", columnList = "mid", unique = true),
                 @Index(name = "idx_messenger_message_conversation_time", columnList = "conversation_id,message_time"),
                 @Index(name = "idx_messenger_message_sender_id", columnList = "sender_id")
         }
@@ -40,11 +41,18 @@ public class Message extends BaseEntity {
     private Conversation conversation;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "sender_type", nullable = false, length = 20)
+    @Column(name = "sender_type", nullable = false, length = 20, columnDefinition = "enum('CUSTOMER','STAFF','SYSTEM')")
     private MessageSenderType senderType;
 
     @Column(name = "sender_id", nullable = false, length = 100)
     private String senderId;
+
+    @Column(name = "mid", length = 255)
+    private String mid;
+
+    @Column(name = "is_echo", nullable = false)
+    @Builder.Default
+    private Boolean echo = false;
 
     @Lob
     @Column(name = "text", columnDefinition = "TEXT")

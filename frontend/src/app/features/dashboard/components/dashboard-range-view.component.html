@@ -8,7 +8,7 @@
 
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         @for (metric of store.metrics(); track metric.label) {
-        <div class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-3">
+        <div class="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-3">
           <p class="m-0 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">{{ metric.label }}</p>
           <p class="m-0 mt-1 text-xl font-semibold text-[var(--color-text-primary)]">{{ metric.value }}</p>
           <p class="m-0 mt-1 text-xs font-medium text-[var(--color-text-secondary)]">{{ metric.trend }}</p>
@@ -24,8 +24,8 @@
             <span class="text-[var(--color-text-primary)]">{{ day.label }}</span>
             <span class="text-[var(--color-text-tertiary)]">{{ day.orders }} đơn</span>
           </div>
-          <div class="h-2 w-full overflow-hidden rounded-full bg-[var(--color-bg)]">
-            <div class="h-full rounded-full bg-[var(--color-text-primary)] transition-all duration-500" [style.width.%]="getBarHeight(day.revenue)"></div>
+          <div class="h-2 w-full overflow-hidden rounded-[var(--radius-xs)] bg-[var(--color-bg)]">
+            <div class="h-full rounded-[var(--radius-xs)] bg-[var(--color-text-primary)] transition-all duration-500" [style.width.%]="getBarHeight(day.revenue)"></div>
           </div>
         </div>
         }
@@ -36,7 +36,7 @@
       <h3 class="m-0 mb-3 text-sm font-semibold text-[var(--color-text-primary)]">Chỉ số nhanh</h3>
       <div class="space-y-3">
         @for (metric of store.metrics(); track metric.label; let index = $index) {
-        <div class="relative overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
+        <div class="relative overflow-hidden rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
           <div class="absolute -right-4 -top-4 select-none text-5xl font-black text-[var(--color-bg)]">{{ index + 1 }}</div>
           <div class="relative">
             <p class="m-0 text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-tertiary)]">Hạng #{{ index + 1 }}</p>

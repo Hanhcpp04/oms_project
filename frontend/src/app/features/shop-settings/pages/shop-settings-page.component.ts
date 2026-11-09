@@ -203,6 +203,21 @@ export class ShopSettingsPageComponent implements OnInit, AfterViewInit, OnDestr
     this.cdr.markForCheck();
   });
 
+  private readonly syncBusinessType = effect(() => {
+    const shop = this.authStore.currentShop();
+    if (!shop) {
+      return;
+    }
+
+    this.enableSell.set(Boolean(shop.enableSell));
+    this.enableRent.set(Boolean(shop.enableRent));
+    this.autoAcceptOrders.set(Boolean(shop.autoAcceptOrders));
+    this.maintenanceMode.set(Boolean(shop.maintenanceMode));
+    this.showInventoryOnStorefront.set(Boolean(shop.showInventoryOnStorefront));
+    this.notificationsEnabled.set(Boolean(shop.notificationsEnabled));
+    this.rentalIdentityVerificationEnabled.set(Boolean(shop.rentalIdentityVerificationEnabled));
+  }, { allowSignalWrites: true });
+
   protected selectedDateValue = this.toIsoDate(new Date());
   protected readonly dayStaffBuckets: DayStaffBucket[] = this.buildDayStaffBuckets();
   protected monthAnchorDate = this.getMonthAnchorFromDateValue(this.selectedDateValue);
@@ -809,17 +824,21 @@ export class ShopSettingsPageComponent implements OnInit, AfterViewInit, OnDestr
   }
   protected toggleSellCapability(nextValue: boolean): void {
     if (!nextValue && !this.enableRent()) {
-      this.notificationService.info('Cần bật ít nhất 1 chế độ kinh doanh: Bán hoặc Thuê.');
+      this.enableRent.set(true);
+      this.enableSell.set(false);
       return;
     }
+
     this.enableSell.set(nextValue);
   }
 
   protected toggleRentCapability(nextValue: boolean): void {
     if (!nextValue && !this.enableSell()) {
-      this.notificationService.info('Cần bật ít nhất 1 chế độ kinh doanh: Bán hoặc Thuê.');
+      this.enableSell.set(true);
+      this.enableRent.set(false);
       return;
     }
+
     this.enableRent.set(nextValue);
   }
 

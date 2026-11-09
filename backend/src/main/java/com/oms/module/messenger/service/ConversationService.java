@@ -54,8 +54,14 @@ public class ConversationService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Conversation> getConversations(Pageable pageable) {
-        return conversationRepository.findAll(pageable);
+    public Conversation getByIdForShop(Long conversationId, Long shopId) {
+        return conversationRepository.findByIdAndShopId(conversationId, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation", conversationId));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<Conversation> getConversations(Long shopId, Pageable pageable) {
+        return conversationRepository.findAllByShopId(shopId, pageable);
     }
 
     @Transactional

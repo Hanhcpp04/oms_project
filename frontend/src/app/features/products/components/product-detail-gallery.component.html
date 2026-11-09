@@ -1,0 +1,138 @@
+<section class="grid min-w-0 gap-2">
+  <div class="relative min-w-0">
+    <button
+      type="button"
+      class="group relative aspect-[4/3] max-h-[420px] w-full overflow-hidden rounded-none border border-[var(--color-border)] bg-[var(--color-surface-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)] focus-visible:ring-offset-2"
+      (click)="openViewer()"
+    >
+      @if (selectedImage; as image) {
+        <img
+          [src]="image.url"
+          [alt]="image.altText || product.name"
+          class="h-full w-full object-contain transition-transform duration-300 group-hover:scale-[1.01]"
+          loading="eager"
+          decoding="async"
+        />
+        <span class="absolute left-2 top-2 inline-flex h-6 items-center rounded-sm bg-slate-950/80 px-2 text-[11px] font-semibold text-white">
+          {{ selectedIndex() + 1 }}/{{ sortedImages.length }}
+        </span>
+        <span class="absolute bottom-2 right-2 inline-flex h-7 items-center gap-1 rounded-sm bg-slate-950/80 px-3 text-[11px] font-semibold text-white">
+          <i class="ri-zoom-in-line text-[12px]"></i>
+          Xem ảnh
+        </span>
+      } @else {
+        <div class="grid h-full w-full place-items-center text-[var(--color-text-muted)]">
+          <div class="grid place-items-center gap-2">
+            <div class="grid h-10 w-10 place-items-center rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+              <i class="ri-image-line text-lg"></i>
+            </div>
+            <span class="text-[12px] text-[var(--color-text-muted)]">Chưa có ảnh</span>
+          </div>
+        </div>
+      }
+    </button>
+
+    @if (sortedImages.length > 1) {
+      <button
+        type="button"
+        class="absolute left-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-sm bg-white/90 text-[var(--color-text-primary)] shadow-sm transition hover:bg-white"
+        (click)="showPrevious($event)"
+        aria-label="Ảnh trước"
+      >
+        <i class="ri-arrow-left-s-line text-xl"></i>
+      </button>
+      <button
+        type="button"
+        class="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-sm bg-white/90 text-[var(--color-text-primary)] shadow-sm transition hover:bg-white"
+        (click)="showNext($event)"
+        aria-label="Ảnh sau"
+      >
+        <i class="ri-arrow-right-s-line text-xl"></i>
+      </button>
+    }
+  </div>
+
+  @if (sortedImages.length > 1) {
+    <div class="grid grid-cols-6 gap-2 sm:grid-cols-8 xl:grid-cols-6">
+      @for (image of sortedImages; track image.id; let index = $index) {
+        <button
+          type="button"
+          class="aspect-square min-w-0 overflow-hidden rounded-none border bg-[var(--color-surface)] p-0.5 transition"
+          [ngClass]="selectedIndex() === index ? 'border-[var(--color-accent)]' : 'border-[var(--color-border)] opacity-70 hover:opacity-100'"
+          (click)="selectImage(index)"
+          [attr.aria-label]="'Chọn ảnh ' + (index + 1)"
+        >
+          <img
+            [src]="image.url"
+            [alt]="image.altText || product.name"
+            class="h-full w-full rounded-none object-cover"
+            loading="lazy"
+            decoding="async"
+          />
+        </button>
+      }
+    </div>
+  }
+</section>
+
+@if (viewerOpen()) {
+  <div
+    class="fixed inset-0 z-[80] grid place-items-center bg-black/85 p-4"
+    role="dialog"
+    aria-modal="true"
+    (click)="closeViewer()"
+  >
+    <button
+      type="button"
+      class="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-[var(--radius-xs)] bg-white/10 text-white transition-colors hover:bg-white/20"
+      (click)="closeViewer(); $event.stopPropagation()"
+      aria-label="Đóng ảnh"
+    >
+      <i class="ri-close-line text-xl"></i>
+    </button>
+
+    @if (sortedImages.length > 1) {
+      <button
+        type="button"
+        class="absolute left-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-xs)] bg-white/10 text-white transition-colors hover:bg-white/20"
+        (click)="showPrevious($event)"
+        aria-label="Ảnh trước"
+      >
+        <i class="ri-arrow-left-s-line text-2xl"></i>
+      </button>
+      <button
+        type="button"
+        class="absolute right-4 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-[var(--radius-xs)] bg-white/10 text-white transition-colors hover:bg-white/20"
+        (click)="showNext($event)"
+        aria-label="Ảnh sau"
+      >
+        <i class="ri-arrow-right-s-line text-2xl"></i>
+      </button>
+    }
+
+    @if (selectedImage; as image) {
+      <div class="grid max-h-[92vh] max-w-[94vw] gap-3" (click)="$event.stopPropagation()">
+        <img
+          [src]="image.url"
+          [alt]="image.altText || product.name"
+          class="max-h-[82vh] max-w-[94vw] rounded-[var(--radius-sm)] object-contain"
+        />
+        @if (sortedImages.length > 1) {
+          <div class="flex items-center justify-center gap-2 overflow-x-auto px-2 scrollbar-hide">
+            @for (thumb of sortedImages; track thumb.id; let index = $index) {
+              <button
+                type="button"
+                class="h-11 w-11 shrink-0 overflow-hidden rounded-[var(--radius-sm)] border bg-white p-0.5 transition"
+                [ngClass]="selectedIndex() === index ? 'border-white' : 'border-white/30 opacity-50'"
+                (click)="selectImage(index)"
+                [attr.aria-label]="'Chọn ảnh ' + (index + 1)"
+              >
+                <img [src]="thumb.url" [alt]="thumb.altText || product.name" class="h-full w-full rounded-[6px] object-cover" />
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

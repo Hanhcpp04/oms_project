@@ -39,7 +39,7 @@ public class User extends BaseEntity {
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", length = 20, nullable = false)
+    @Column(name = "role", length = 20, nullable = false, columnDefinition = "enum('ADMIN','OWNER','STAFF')")
     private UserRole role;
 
     @Column(nullable = false)
@@ -48,9 +48,6 @@ public class User extends BaseEntity {
 
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
-
-    @Column(name = "temporary_password")
-    private String temporaryPassword;
 
     @Column(name = "force_change_password", nullable = false)
     @Builder.Default

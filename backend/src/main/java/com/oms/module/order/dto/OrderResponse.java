@@ -1,6 +1,7 @@
 package com.oms.module.order.dto;
 
 import com.oms.module.order.entity.Order;
+import com.oms.module.payment.dto.PaymentCheckoutResponse;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,13 +11,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class OrderResponse {
 
     private Long id;
     private String orderCode;
     private Order.OrderType orderType;
     private Order.OrderStatus status;
+    private String fulfillmentStatus;
+    private String source;
     private Order.PaymentStatus paymentStatus;
     private Order.PaymentMethod paymentMethod;
     private Order.SourceMethod sourceMethod;
@@ -35,6 +38,7 @@ public class OrderResponse {
 
     // Computed
     private BigDecimal totalAmount;
+    private BigDecimal depositAmount;
 
     private String createdByFullName;
     private String createdByUsername;
@@ -45,6 +49,9 @@ public class OrderResponse {
     private List<ItemResponse> items;
     private List<CustomFieldValueResponse> customFieldValues;
     private RentalInfo rentalInfo;
+    private MessengerInfo messenger;
+    private PaymentCheckoutResponse payment;
+    private String trackingToken;
 
     @Getter
     @Builder
@@ -85,5 +92,14 @@ public class OrderResponse {
         private BigDecimal depositPaid;
         private String returnStatus;
         private LocalDateTime returnedAt;
+    }
+
+    @Getter
+    @Builder
+    public static class MessengerInfo {
+        private String pageId;
+        private String customerPsid;
+        private Long conversationId;
+        private Long draftId;
     }
 }

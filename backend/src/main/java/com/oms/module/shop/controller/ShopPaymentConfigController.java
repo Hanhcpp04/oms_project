@@ -30,6 +30,15 @@ public class ShopPaymentConfigController {
         return ResponseEntity.ok(ApiResponse.ok(dto));
     }
 
+    @GetMapping("/available")
+    @RequirePermission(PermissionCode.ORDER_CREATE)
+    @Operation(summary = "Get enabled payment methods for order creation")
+    public ResponseEntity<ApiResponse<PaymentConfigDto>> getAvailableConfig(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        PaymentConfigDto dto = paymentConfigService.getPublicByShopId(userDetails.getShopId());
+        return ResponseEntity.ok(ApiResponse.ok(dto));
+    }
+
     @PutMapping
     @RequirePermission(PermissionCode.SHOP_SETTINGS)
     @Operation(summary = "Save (create or update) payment configuration for current shop")

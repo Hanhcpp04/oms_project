@@ -1,528 +1,335 @@
-<div class="flex flex-col gap-6">
-    <!-- Combined System Fields -->
-    <div class="grid gap-4 bg-white p-6 rounded-xl border border-[var(--color-border)] shadow-sm">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <span class="h-1 w-3 bg-[var(--color-accent)] rounded-full"></span>
-                <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">Thông tin
-                    sản phẩm</h3>
-            </div>
-
-            <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase mr-2">Hình thức:</span>
-                <div
-                    class="flex bg-[var(--color-surface-secondary)] p-1 rounded-md border border-[var(--color-border)]">
-                    <button type="button"
-                        class="px-4 py-1.5 text-[10px] font-extrabold rounded-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        [class.bg-white]="productType() === 'SELL'" [class.shadow-sm]="productType() === 'SELL'"
-                        [class.text-[var(--color-accent)]]="productType() === 'SELL'"
-                        [class.text-[var(--color-text-tertiary)]]="productType() !== 'SELL'"
-                        [disabled]="mode === 'view' || mode === 'edit'" (click)="productType.set('SELL')">
-                        CHỈ BÁN
-                    </button>
-                    <button type="button"
-                        class="px-4 py-1.5 text-[10px] font-extrabold rounded-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        [class.bg-white]="productType() === 'RENT'" [class.shadow-sm]="productType() === 'RENT'"
-                        [class.text-[var(--color-accent)]]="productType() === 'RENT'"
-                        [class.text-[var(--color-text-tertiary)]]="productType() !== 'RENT'"
-                        [disabled]="mode === 'view' || mode === 'edit'" (click)="productType.set('RENT')">
-                        CHỈ THUÊ
-                    </button>
-                    <button type="button"
-                        class="px-4 py-1.5 text-[10px] font-extrabold rounded-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        [class.bg-white]="productType() === 'SELL_RENT'"
-                        [class.shadow-sm]="productType() === 'SELL_RENT'"
-                        [class.text-[var(--color-accent)]]="productType() === 'SELL_RENT'"
-                        [class.text-[var(--color-text-tertiary)]]="productType() !== 'SELL_RENT'"
-                        [disabled]="mode === 'view' || mode === 'edit'" (click)="productType.set('SELL_RENT')">
-                        BÁN & THUÊ
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <!-- Left: Image -->
-            <div class="md:col-span-1 flex flex-col gap-3">
-                @if (imageUrls().length > 0) {
-                <div
-                    class="aspect-square rounded-xl border border-[var(--color-border)] bg-white overflow-hidden relative group shadow-sm">
-                    <img [src]="imageUrls()[0]" class="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" alt="Main product image">
-                    @if (mode === 'view' && imageUrls().length > 1) {
-                    <div class="absolute bottom-3 right-3 flex h-6 items-center gap-1.5 rounded-full bg-black/60 px-2.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                            <circle cx="8.5" cy="8.5" r="1.5"/>
-                            <polyline points="21 15 16 10 5 21"/>
-                        </svg>
-                        {{ imageUrls().length }} ảnh
-                    </div>
-                    }
-                    @if (mode !== 'view') {
-                    <button (click)="removeImage(0)"
-                        class="absolute top-2 right-2 h-7 w-7 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600"
-                        title="Xóa ảnh">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <path d="M18 6L6 18M6 6l12 12" />
-                        </svg>
-                    </button>
-                    }
-                </div>
-                } @else {
-                <div (click)="mode !== 'view' ? fileInput.click() : null"
-                    class="aspect-square rounded-xl border-2 border-dashed border-[var(--color-border)] bg-white flex flex-col items-center justify-center gap-2 text-[var(--color-text-tertiary)] transition-all group"
-                    [class.cursor-pointer]="mode !== 'view'" [class.hover:bg-gray-50]="mode !== 'view'"
-                    [class.hover:border-[var(--color-accent)]]="mode !== 'view'">
-                    @if (uploading()) {
-                    <div
-                        class="h-8 w-8 border-2 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin">
-                    </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest text-[var(--color-accent)]">Đang
-                        tải...</span>
-                    } @else {
-                    <div class="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center transition-colors"
-                        [class.group-hover:bg-[var(--color-accent-soft)]]="mode !== 'view'"
-                        [class.group-hover:text-[var(--color-accent)]]="mode !== 'view'">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                    </div>
-                    <span class="text-[9px] font-black uppercase tracking-widest">Tải ảnh lên</span>
-                    }
-                </div>
-                }
-
-                @if (imageUrls().length > 1 || (imageUrls().length > 0 && mode !== 'view')) {
-                <div class="grid grid-cols-3 gap-2">
-                    @for (url of imageUrls().slice(1); track url; let i = $index) {
-                    <div
-                        class="aspect-square rounded-lg border border-[var(--color-border)] overflow-hidden bg-white shadow-sm relative group">
-                        <img [src]="url" class="h-full w-full object-cover">
-                        @if (mode !== 'view') {
-                        <button (click)="removeImage(i + 1)"
-                            class="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-600">
-                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="3">
-                                <path d="M18 6L6 18M6 6l12 12" />
-                            </svg>
-                        </button>
-                        }
-                    </div>
-                    }
-                    @if (mode !== 'view') {
-                    <div (click)="fileInput.click()"
-                        class="aspect-square rounded-lg border-2 border-dashed border-[var(--color-border)] flex items-center justify-center text-[var(--color-text-tertiary)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] cursor-pointer transition-colors">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2.5">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
-                    </div>
-                    }
-                </div>
-                }
-
-                <input #fileInput type="file" class="hidden" (change)="onImageSelected($event)" accept="image/*"
-                    multiple>
-            </div>
-
-            <!-- Right: Controls -->
-            <div class="md:col-span-3 flex flex-col gap-4">
-                <!-- Row 1: Name & Category -->
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div class="md:col-span-2">
-                        <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">
-                            {{ getFieldLabel('name', 'Tên sản phẩm') }} <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text"
-                            class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-3 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                            [class.border-red-400]="nameError()"
-                            [placeholder]="getFieldPlaceholder('name', 'Nhập tên sản phẩm')"
-                            [value]="name()" [disabled]="mode === 'view'" (input)="name.set($any($event.target).value); nameError.set('')">
-                        @if (nameError() && mode !== 'view') {
-                        <p class="mt-1 text-[9px] text-red-500 font-bold uppercase tracking-wider">{{ nameError() }}</p>
-                        }
-                    </div>
-                    <div>
-                        <label
-                            class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">Danh
-                            mục</label>
-                        <select
-                            class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-2 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                            [value]="category()" [disabled]="mode === 'view'"
-                            (change)="category.set($any($event.target).value)">
-                            <option value="" disabled selected>Chọn danh mục</option>
-                            @for (opt of categoryOptions(); track opt.value) {
-                            <option [value]="opt.value">{{ opt.label }}</option>
-                            }
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Row 3: Description -->
-                @if (shouldDisplayCoreField('description')) {
-                <div class="flex flex-col gap-1">
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block">
-                        {{ getFieldLabel('description', 'Mô tả chi tiết sản phẩm') }}
-                    </label>
-                    <textarea
-                        class="h-20 w-full bg-white border border-[var(--color-border)] rounded px-3 py-2 text-xs outline-none focus:border-[var(--color-accent)] resize-none shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                        [placeholder]="getFieldPlaceholder('description', 'Nhập các đặc điểm nổi bật, chất liệu, kiểu dáng...')"
-                        [value]="description()" [disabled]="mode === 'view'"
-                        (input)="description.set($any($event.target).value)"></textarea>
-                </div>
-                }
-            </div>
-        </div>
+<div class="grid gap-4">
+  <section class="rounded-none border border-[#e5e5e5] bg-white">
+    <div class="border-b border-[#e5e5e5] px-4 py-3">
+      <h2 class="m-0 text-sm font-semibold text-[#111111]">Thông tin sản phẩm</h2>
+      <p class="m-0 mt-1 text-xs text-[#707072]">Ảnh, tên, danh mục và mô tả hiển thị trong catalog.</p>
     </div>
 
-    <!-- Variants Table Section -->
-    <div class="grid gap-4 bg-white p-6 rounded-xl border border-[var(--color-border)] shadow-sm">
-        <div class="flex items-center gap-2">
-            <span class="h-1 w-3 bg-emerald-500 rounded-full"></span>
-            <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">Danh sách biến
-                thể</h3>
+    <div class="grid gap-4 p-4 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+      <div class="grid content-start gap-3">
+        @if (imageUrls().length > 0) {
+          <div class="group relative aspect-[4/3] max-h-[280px] overflow-hidden rounded-none border border-[#e5e5e5] bg-[#fafafa]">
+            <img [src]="imageUrls()[0]" class="h-full w-full object-cover" alt="Ảnh sản phẩm chính" />
+            @if (mode !== 'view') {
+              <button
+                type="button"
+                class="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-none bg-white text-[#707072] transition-colors hover:bg-[#ffe5e5] hover:text-[#d30005]"
+                title="Xóa ảnh"
+                (click)="removeImage(0)"
+              >
+                <i class="ri-close-line text-lg"></i>
+              </button>
+            }
+          </div>
+        } @else {
+          <button
+            type="button"
+            class="grid aspect-[4/3] max-h-[280px] place-items-center rounded-none border border-dashed border-[#cacacb] bg-[#fafafa] px-4 text-center transition-colors hover:border-[#707072] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#275dc5]"
+            [disabled]="mode === 'view'"
+            (click)="mode !== 'view' ? fileInput.click() : null"
+          >
+            @if (uploading()) {
+              <span class="grid place-items-center gap-2">
+                <span class="h-7 w-7 rounded-none border-2 border-[#111111] border-t-transparent animate-spin"></span>
+                <span class="text-[13px] font-semibold text-[#111111]">Đang tải ảnh...</span>
+              </span>
+            } @else {
+              <span class="grid place-items-center gap-2">
+                <span class="inline-flex h-10 w-10 items-center justify-center rounded-none border border-[#e5e5e5] bg-white text-[#707072]">
+                  <i class="ri-upload-2-line text-xl"></i>
+                </span>
+                <span class="grid gap-0.5">
+                  <span class="text-sm font-semibold text-[#111111]">Tải ảnh lên</span>
+                  <span class="text-xs text-[#707072]">JPG, PNG hoặc WEBP</span>
+                </span>
+              </span>
+            }
+          </button>
+        }
+
+        <input #fileInput type="file" class="hidden" accept="image/jpeg,image/png,image/webp,image/*" multiple (change)="onImageSelected($event)" />
+
+        <div class="grid grid-cols-6 gap-2">
+          @for (url of visibleThumbnailUrls(); track url; let i = $index) {
+            <div class="group relative aspect-square overflow-hidden rounded-none border border-[#e5e5e5] bg-white">
+              <img [src]="url" class="h-full w-full object-cover" alt="Ảnh sản phẩm" />
+              @if (hiddenImageCount(i) > 0) {
+                <div class="absolute inset-0 grid place-items-center bg-[#111111]/65 text-xs font-semibold text-white">
+                  +{{ hiddenImageCount(i) }}
+                </div>
+              }
+              @if (mode !== 'view' && hiddenImageCount(i) === 0) {
+                <button
+                  type="button"
+                  class="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-none bg-white text-[#707072] opacity-0 transition-colors hover:bg-[#ffe5e5] hover:text-[#d30005] group-hover:opacity-100"
+                  title="Xóa ảnh"
+                  (click)="removeImage(i)"
+                >
+                  <i class="ri-close-line text-sm"></i>
+                </button>
+              }
+            </div>
+          }
+
+          @if (mode !== 'view') {
+            <button
+              type="button"
+              class="grid aspect-square place-items-center rounded-none border border-dashed border-[#cacacb] bg-white text-[#707072] transition-colors hover:border-[#707072] hover:bg-[#f5f5f5]"
+              title="Thêm ảnh"
+              (click)="fileInput.click()"
+            >
+              <i class="ri-add-line text-lg"></i>
+            </button>
+          }
+        </div>
+      </div>
+
+      <div class="grid content-start gap-4">
+        <div class="inline-flex w-fit rounded-none border border-[#e5e5e5] bg-[#f5f5f5] p-0.5">
+          @for (option of typeOptions; track option.value) {
+            <button
+              type="button"
+              class="h-8 rounded-none px-3 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              [ngClass]="{
+                'bg-white text-[#111111] shadow-sm': productType() === option.value,
+                'text-[#707072] hover:text-[#111111]': productType() !== option.value
+              }"
+              [disabled]="mode === 'view' || mode === 'edit' || (option.value === 'SELL' && !canUseSell()) || (option.value === 'RENT' && !canUseRent()) || (option.value === 'SELL_RENT' && !canUseSellRent())"
+              (click)="productType.set($any(option.value))"
+            >
+              {{ option.label }}
+            </button>
+          }
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="grid gap-1.5 md:col-span-2">
+            <span class="text-xs font-semibold text-[#707072]">
+              {{ getFieldLabel('name', 'Tên sản phẩm') }} <span class="text-[#d30005]">*</span>
+            </span>
+            <input
+              type="text"
+              class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] font-medium text-[#111111] outline-none placeholder:text-[#9e9ea0] focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20 disabled:bg-[#f5f5f5]"
+              [class.border-[#d30005]]="nameError()"
+              [placeholder]="getFieldPlaceholder('name', 'Nhập tên sản phẩm')"
+              [value]="name()"
+              [disabled]="mode === 'view'"
+              (input)="name.set($any($event.target).value); nameError.set('')"
+            />
+            @if (nameError() && mode !== 'view') {
+              <span class="text-xs font-semibold text-[#d30005]">{{ nameError() }}</span>
+            }
+          </label>
+
+          <label class="grid gap-1.5">
+            <span class="text-xs font-semibold text-[#707072]">Danh mục</span>
+            <select
+              class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] font-medium text-[#111111] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20 disabled:bg-[#f5f5f5]"
+              [value]="category()"
+              [disabled]="mode === 'view'"
+              (change)="category.set($any($event.target).value)"
+            >
+              <option value="">Chọn danh mục</option>
+              @for (opt of categoryOptions(); track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+        </div>
+
+        @if (shouldDisplayCoreField('description')) {
+          <div class="grid gap-1.5">
+            <span class="text-xs font-semibold text-[#707072]">
+              {{ getFieldLabel('description', 'Mô tả sản phẩm') }}
+            </span>
+            <div class="overflow-hidden rounded-none border border-[#cacacb] bg-white focus-within:border-[#111111] focus-within:ring-1 focus-within:ring-[#111111]/20">
+              <div class="flex flex-wrap items-center gap-1 border-b border-[#e5e5e5] bg-[#fafafa] px-2 py-1.5">
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="In đậm" (click)="applyDescriptionFormat(descriptionEditor, 'bold')">
+                  <i class="ri-bold text-sm"></i>
+                </button>
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="In nghiêng" (click)="applyDescriptionFormat(descriptionEditor, 'italic')">
+                  <i class="ri-italic text-sm"></i>
+                </button>
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="Gạch chân" (click)="applyDescriptionFormat(descriptionEditor, 'underline')">
+                  <i class="ri-underline text-sm"></i>
+                </button>
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="Danh sách" (click)="applyDescriptionFormat(descriptionEditor, 'list')">
+                  <i class="ri-list-unordered text-sm"></i>
+                </button>
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="Liên kết" (click)="applyDescriptionFormat(descriptionEditor, 'link')">
+                  <i class="ri-link text-sm"></i>
+                </button>
+                <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] hover:bg-white hover:text-[#111111]" title="Ảnh" (click)="applyDescriptionFormat(descriptionEditor, 'image')">
+                  <i class="ri-image-line text-sm"></i>
+                </button>
+              </div>
+              <textarea
+                #descriptionEditor
+                class="min-h-28 w-full resize-y border-0 bg-white px-3 py-2.5 text-[13px] leading-6 text-[#111111] outline-none placeholder:text-[#9e9ea0] disabled:bg-[#f5f5f5]"
+                [placeholder]="getFieldPlaceholder('description', 'Nhập đặc điểm nổi bật, chất liệu, kiểu dáng...')"
+                [value]="description()"
+                [disabled]="mode === 'view'"
+                (input)="description.set($any($event.target).value)"
+              ></textarea>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-none border border-[#e5e5e5] bg-white">
+    <div class="flex flex-col gap-2 border-b border-[#e5e5e5] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h2 class="m-0 text-sm font-semibold text-[#111111]">Danh sách biến thể</h2>
+        <p class="m-0 mt-1 text-xs text-[#707072]">Quản lý size, màu sắc, tồn kho và giá bán lẻ.</p>
+      </div>
+    </div>
+
+    @if (mode !== 'view') {
+      <div class="flex flex-wrap items-end gap-4 border-b border-[#e5e5e5] bg-[#fafafa] p-4">
+        <label class="flex min-w-[140px] flex-1 flex-col gap-1.5">
+          <span class="text-xs font-semibold text-[#707072]">Kích thước</span>
+          <input type="text" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="S, M, L" [value]="vSize()" (input)="vSize.set($any($event.target).value)" />
+        </label>
+        <label class="flex min-w-[140px] flex-1 flex-col gap-1.5">
+          <span class="text-xs font-semibold text-[#707072]">Màu sắc</span>
+          <input type="text" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="Đen, Trắng..." [value]="vColor()" (input)="vColor.set($any($event.target).value)" />
+        </label>
+        <label class="flex min-w-[100px] flex-1 flex-col gap-1.5">
+          <span class="text-xs font-semibold text-[#707072]">Số lượng</span>
+          <input type="number" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="0" [value]="vStockQty()" (input)="vStockQty.set($any($event.target).value)" />
+        </label>
+        @if (productType() !== 'RENT') {
+          <label class="flex min-w-[140px] flex-1 flex-col gap-1.5">
+            <span class="text-xs font-semibold text-[#707072]">Giá bán</span>
+            <input type="text" inputmode="numeric" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="0 ₫" [value]="formatCurrencyInput(vPriceSell())" (input)="vPriceSell.set(normalizeCurrencyInput($any($event.target).value))" />
+          </label>
+        }
+        @if (productType() !== 'SELL') {
+          <label class="flex min-w-[140px] flex-1 flex-col gap-1.5">
+            <span class="text-xs font-semibold text-[#707072]">Giá thuê/ngày</span>
+            <input type="text" inputmode="numeric" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="0 ₫" [value]="formatCurrencyInput(vPriceRentPerDay())" (input)="vPriceRentPerDay.set(normalizeCurrencyInput($any($event.target).value))" />
+          </label>
+          <label class="flex min-w-[140px] flex-1 flex-col gap-1.5">
+            <span class="text-xs font-semibold text-[#707072]">Tiền cọc</span>
+            <input type="text" inputmode="numeric" class="h-9 rounded-none border border-[#cacacb] bg-white px-3 text-[13px] outline-none focus:border-[#111111] focus:ring-1 focus:ring-[#111111]/20" placeholder="0 ₫" [value]="formatCurrencyInput(vDepositAmount())" (input)="vDepositAmount.set(normalizeCurrencyInput($any($event.target).value))" />
+          </label>
+        }
+        <button type="button" class="h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-none bg-[#111111] px-6 text-[13px] font-bold uppercase tracking-wider text-white transition-colors hover:bg-[#707072]" (click)="addVariant()">
+          Thêm mới
+        </button>
+      </div>
+      @if (variantPriceError()) {
+        <p class="m-0 border-b border-[#e5e5e5] px-4 py-2 text-xs font-semibold text-[#d30005]">{{ variantPriceError() }}</p>
+      }
+    }
+
+    @if (variants().length > 0) {
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[900px] table-fixed text-left text-[13px]">
+          <thead class="border-b border-[#e5e5e5] bg-[#fafafa] text-[11px] font-semibold uppercase tracking-[0.04em] text-[#707072]">
+            <tr>
+              <th class="w-[140px] px-3 py-2.5">Kích thước</th>
+              <th class="w-[140px] px-3 py-2.5">Màu sắc</th>
+              <th class="w-[100px] px-3 py-2.5 text-right">Tồn kho</th>
+              @if (productType() !== 'RENT') { <th class="w-[150px] px-3 py-2.5 text-right">Giá bán</th> }
+              @if (productType() !== 'SELL') {
+                <th class="w-[150px] px-3 py-2.5 text-right">Giá thuê/ngày</th>
+                <th class="w-[140px] px-3 py-2.5 text-right">Tiền cọc</th>
+              }
+              @if (mode !== 'view') { <th class="w-[60px] px-3 py-2.5 text-center">Xóa</th> }
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-[#f0f0f0]">
+            @for (v of variants(); track $index; let i = $index) {
+              <tr class="transition-colors hover:bg-[#fafafa]">
+                <td class="px-3 py-2">
+                  <input
+                    class="h-8 w-full border border-transparent bg-transparent px-2 text-[13px] font-semibold text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                    [value]="v.size" [disabled]="mode === 'view'" (input)="updateVariant(i, 'size', $any($event.target).value)" />
+                </td>
+                <td class="px-3 py-2">
+                  <input
+                    class="h-8 w-full border border-transparent bg-transparent px-2 text-[13px] text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                    [value]="v.color" [disabled]="mode === 'view'" (input)="updateVariant(i, 'color', $any($event.target).value)" />
+                </td>
+                <td class="px-3 py-2 text-right">
+                  <input type="number"
+                    class="ml-auto h-8 w-16 border border-transparent bg-transparent px-2 text-right text-[13px] font-semibold text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                    [value]="v.stockQty" [disabled]="mode === 'view'" (input)="updateVariant(i, 'stockQty', $any($event.target).value)" />
+                </td>
+                @if (productType() !== 'RENT') {
+                  <td class="px-3 py-2 text-right">
+                    <input type="text" inputmode="numeric"
+                      class="ml-auto h-8 w-28 border border-transparent bg-transparent px-2 text-right text-[13px] font-semibold text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                      [value]="formatCurrencyInput(v.priceSell)" [disabled]="mode === 'view'" (input)="updateVariant(i, 'priceSell', normalizeCurrencyInput($any($event.target).value))" />
+                  </td>
+                }
+                @if (productType() !== 'SELL') {
+                  <td class="px-3 py-2 text-right">
+                    <input type="text" inputmode="numeric"
+                      class="ml-auto h-8 w-28 border border-transparent bg-transparent px-2 text-right text-[13px] font-semibold text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                      [value]="formatCurrencyInput(v.priceRentPerDay)" [disabled]="mode === 'view'" (input)="updateVariant(i, 'priceRentPerDay', normalizeCurrencyInput($any($event.target).value))" />
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    <input type="text" inputmode="numeric"
+                      class="ml-auto h-8 w-28 border border-transparent bg-transparent px-2 text-right text-[13px] text-[#111111] outline-none focus:border-[#111111] focus:bg-white"
+                      [value]="formatCurrencyInput(v.depositAmount)" [disabled]="mode === 'view'" (input)="updateVariant(i, 'depositAmount', normalizeCurrencyInput($any($event.target).value))" />
+                  </td>
+                }
+                @if (mode !== 'view') {
+                  <td class="px-3 py-2 text-center">
+                    <button type="button" class="inline-flex h-7 w-7 items-center justify-center rounded-none text-[#707072] transition-colors hover:bg-[#ffe5e5] hover:text-[#d30005]" title="Xóa biến thể" (click)="removeVariant(i)">
+                      <i class="ri-delete-bin-line text-sm"></i>
+                    </button>
+                  </td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="grid min-h-32 place-items-center px-6 py-8 text-center">
+        <div class="grid max-w-md place-items-center gap-1">
+          <p class="m-0 text-sm font-semibold text-[#111111]">Chưa có biến thể nào được thêm.</p>
+          <p class="m-0 text-[13px] text-[#707072]">Thêm biến thể để quản lý size, màu sắc và giá.</p>
+          @if (variantError()) {
+            <p class="m-0 text-xs font-semibold text-[#d30005]">{{ variantError() }}</p>
+          }
+        </div>
+      </div>
+    }
+  </section>
+
+  @if (getCustomFields().length > 0) {
+    <section class="rounded-none border border-[#e5e5e5] bg-white">
+      <div class="flex flex-col gap-2 border-b border-[#e5e5e5] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 class="m-0 text-sm font-semibold text-[#111111]">Trường cấu hình form</h2>
+          <p class="m-0 mt-1 text-xs text-[#707072]">Các trường được lấy từ cấu hình form sản phẩm.</p>
         </div>
 
         @if (mode !== 'view') {
-        <!-- Form add variant (styled like the config inputs) -->
-        <div class="bg-gray-50/50 p-4 rounded-lg border border-[var(--color-border)] flex flex-col gap-3">
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">Kích
-                        thước</label>
-                    <input type="text"
-                        class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-3 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm"
-                        placeholder="Nhập kích thước (S, M, L, XL...)" [value]="vSize()" (input)="vSize.set($any($event.target).value)">
-                </div>
-                <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">Màu
-                        sắc</label>
-                    <input type="text"
-                        class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-3 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm"
-                        placeholder="Nhập màu sắc" [value]="vColor()" (input)="vColor.set($any($event.target).value)">
-                </div>
-                <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">Số
-                        lượng</label>
-                    <input type="number"
-                        class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-3 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm"
-                        placeholder="0" [value]="vStockQty()" (input)="vStockQty.set($any($event.target).value)">
-                </div>
-                @if (productType() !== 'RENT') {
-                <div>
-                    <label
-                        class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1 text-orange-600">Giá
-                        bán lẻ *</label>
-                    <div class="relative">
-                        <input type="number"
-                            class="h-9 w-full border rounded pl-3 pr-8 text-xs font-bold outline-none shadow-sm bg-orange-50 border-orange-100 text-orange-600 focus:border-orange-500"
-                            placeholder="Nhập giá (VNĐ)" [value]="vPriceSell()" (input)="vPriceSell.set($any($event.target).value)">
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold opacity-60">Đ</span>
-                    </div>
-                </div>
-                }
-                @if (productType() !== 'SELL') {
-                <div>
-                    <label
-                        class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1 text-blue-600">Giá
-                        thuê/ngày *</label>
-                    <div class="relative">
-                        <input type="number"
-                            class="h-9 w-full border rounded pl-3 pr-8 text-xs font-bold outline-none shadow-sm bg-blue-50 border-blue-100 text-blue-600 focus:border-blue-500"
-                            placeholder="Nhập giá (VNĐ)" [value]="vPriceRentPerDay()"
-                            (input)="vPriceRentPerDay.set($any($event.target).value)">
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold opacity-60">Đ</span>
-                    </div>
-                </div>
-                <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">Tiền
-                        cọc</label>
-                    <div class="relative">
-                        <input type="number"
-                            class="h-9 w-full bg-white border border-[var(--color-border)] rounded pl-3 pr-8 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm"
-                            placeholder="0" [value]="vDepositAmount()"
-                            (input)="vDepositAmount.set($any($event.target).value)">
-                        <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold opacity-60">Đ</span>
-                    </div>
-                </div>
-                }
-            </div>
-            <div class="flex justify-end mt-1">
-                @if (variantPriceError()) {
-                <p class="flex-1 text-[9px] text-red-500 font-bold uppercase tracking-wider mt-1">{{ variantPriceError() }}</p>
-                }
-                <button type="button" (click)="addVariant()"
-                    class="h-8 px-4 bg-[var(--color-surface-secondary)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)] rounded text-[11px] font-bold text-[var(--color-text-primary)] transition-colors shadow-sm">
-                    Thêm biến thể
-                </button>
-            </div>
-        </div>
+          <a routerLink="/app/shop-settings/product-form" target="_blank" class="text-xs font-semibold text-[#111111] underline underline-offset-4">Cấu hình form</a>
         }
+      </div>
 
-        <!-- Variants Table -->
-        @if (variants().length > 0) {
-        <div class="overflow-x-auto rounded-lg border border-[var(--color-border)] bg-white shadow-sm mt-1">
-            <table class="w-full text-xs text-left">
-                <thead
-                    class="text-[9px] text-[var(--color-text-tertiary)] uppercase tracking-wider bg-[var(--color-surface-secondary)] border-b border-[var(--color-border)]">
-                    <tr>
-                        <th class="px-4 py-2 font-bold">Kích thước</th>
-                        <th class="px-4 py-2 font-bold">Màu sắc</th>
-                        <th class="px-4 py-2 font-bold text-right">Tồn kho</th>
-                        @if (productType() !== 'RENT') {
-                        <th class="px-4 py-2 font-bold text-right text-orange-600">Giá bán</th>
-                        }
-                        @if (productType() !== 'SELL') {
-                        <th class="px-4 py-2 font-bold text-right text-blue-600">Giá thuê/ngày</th>
-                        <th class="px-4 py-2 font-bold text-right">Tiền cọc</th>
-                        }
-                        @if (mode !== 'view') {
-                        <th class="px-4 py-2 font-bold text-center w-[60px]">Xóa</th>
-                        }
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-[var(--color-border)]">
-                    @for (v of variants(); track $index; let i = $index) {
-                    <tr class="hover:bg-gray-50 transition-colors">
-                        <td class="px-4 py-2 font-medium">
-                            @if (mode === 'view') {
-                                {{ v.size || '--' }}
-                            } @else {
-                                <input type="text" [value]="v.size" (input)="updateVariant(i, 'size', $any($event.target).value)"
-                                    class="w-full bg-transparent border-none p-0 text-xs focus:ring-0">
-                            }
-                        </td>
-                        <td class="px-4 py-2">
-                            @if (mode === 'view') {
-                                @if (v.color) {
-                                <span class="inline-flex h-5 items-center rounded bg-[var(--color-surface-hover)] px-2 text-[10px] font-semibold text-[var(--color-text-secondary)]">{{ v.color }}</span>
-                                } @else {
-                                <span class="text-[var(--color-text-tertiary)]">--</span>
-                                }
-                            } @else {
-                                <input type="text" [value]="v.color" (input)="updateVariant(i, 'color', $any($event.target).value)"
-                                    class="w-full bg-transparent border-none p-0 text-xs focus:ring-0">
-                            }
-                        </td>
-                        <td class="px-4 py-2 text-right font-medium">
-                            @if (mode === 'view') {
-                                @if (v.stockQty <= 0) {
-                                <span class="inline-flex h-5 items-center rounded bg-red-50 px-2 text-[10px] font-bold text-red-600">Hết hàng</span>
-                                } @else if (v.stockQty <= 3) {
-                                <span class="inline-flex h-5 items-center rounded bg-orange-50 px-2 text-[10px] font-bold text-orange-600">{{ v.stockQty }}</span>
-                                } @else {
-                                <span class="font-semibold">{{ v.stockQty }}</span>
-                                }
-                            } @else {
-                                <input type="number" [value]="v.stockQty" (input)="updateVariant(i, 'stockQty', $any($event.target).value)"
-                                    class="w-16 bg-transparent border-none p-0 text-xs text-right focus:ring-0">
-                            }
-                        </td>
-                        @if (productType() !== 'RENT') {
-                        <td class="px-4 py-2 text-right font-bold text-orange-600">
-                            @if (mode === 'view') {
-                                {{ formatCurrency(v.priceSell) }}
-                            } @else {
-                                <input type="number" [value]="v.priceSell" (input)="updateVariant(i, 'priceSell', $any($event.target).value)"
-                                    class="w-20 bg-transparent border-none p-0 text-xs text-right font-bold text-orange-600 focus:ring-0">
-                            }
-                        </td>
-                        }
-                        @if (productType() !== 'SELL') {
-                        <td class="px-4 py-2 text-right font-bold text-blue-600">
-                            @if (mode === 'view') {
-                                {{ formatCurrency(v.priceRentPerDay) }}
-                            } @else {
-                                <input type="number" [value]="v.priceRentPerDay" (input)="updateVariant(i, 'priceRentPerDay', $any($event.target).value)"
-                                    class="w-20 bg-transparent border-none p-0 text-xs text-right font-bold text-blue-600 focus:ring-0">
-                            }
-                        </td>
-                        <td class="px-4 py-2 text-right text-[var(--color-text-secondary)]">
-                            @if (mode === 'view') {
-                                {{ formatCurrency(v.depositAmount) }}
-                            } @else {
-                                <input type="number" [value]="v.depositAmount" (input)="updateVariant(i, 'depositAmount', $any($event.target).value)"
-                                    class="w-20 bg-transparent border-none p-0 text-xs text-right focus:ring-0">
-                            }
-                        </td>
-                        }
-                        @if (mode !== 'view') {
-                        <td class="px-4 py-2 text-center">
-                            <button (click)="removeVariant(i)"
-                                class="text-[var(--color-text-tertiary)] hover:text-red-500 transition-colors"
-                                title="Xóa">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                            </button>
-                        </td>
-                        }
-                    </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-        } @else {
-        <div
-            class="flex flex-col items-center justify-center py-6 text-[var(--color-text-tertiary)] border-2 border-dashed rounded-lg bg-gray-50"
-            [class.border-red-300]="variantError()" [class.border-[var(--color-border)]]="!variantError()">
-            <p class="text-xs font-medium">Chưa có biến thể nào được thêm.</p>
-            @if (variantError()) {
-            <p class="mt-1 text-[9px] text-red-500 font-bold uppercase tracking-wider">{{ variantError() }}</p>
-            }
-        </div>
-        }
-    </div>
-
-    <!-- Custom Fields Section -->
-    <div class="grid gap-4 bg-white p-6 rounded-xl border border-[var(--color-border)] shadow-sm">
-        <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center gap-2">
-                <span class="h-1 w-3 bg-orange-500 rounded-full"></span>
-                <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">Thông tin tùy chỉnh</h3>
-            </div>
-            @if (mode !== 'view') {
-                <a [routerLink]="['/settings/product-form']" target="_blank"
-                   class="flex items-center gap-1 text-[10px] font-bold text-[var(--color-accent)] hover:text-[var(--color-accent)]/80 transition-colors">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    CẤU HÌNH TRƯỜNG
-                </a>
-            }
-        </div>
-
-        @if (getCustomFields().length > 0) {
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            @for (field of getCustomFields(); track field.id) {
-            <div
-                [class.md:col-span-2]="field.type === 'textarea' || field.type === 'image' || field.type === 'single_choice' || field.type === 'multi_choice'">
-                <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1">
-                    {{ field.label }}
-                    @if (field.required) { <span class="text-red-500">*</span> }
-                </label>
-
-                @switch (field.type) {
-                @case ('textarea') {
-                <textarea
-                    class="h-20 w-full bg-white border border-[var(--color-border)] rounded px-3 py-2 text-xs outline-none focus:border-[var(--color-accent)] resize-none shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                    [placeholder]="field.placeholder || ''" [value]="customValues()[field.id] || ''"
-                    [disabled]="mode === 'view'"
-                    (input)="updateCustomValue(field.id, $any($event.target).value)"></textarea>
-                }
-                @case ('dropdown') {
-                <select
-                    class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-2 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                    [value]="customValues()[field.id] || ''" [disabled]="mode === 'view'"
-                    (change)="updateCustomValue(field.id, $any($event.target).value)">
-                    <option value="" disabled selected>{{ field.placeholder || 'Chọn giá trị' }}</option>
-                    @for (opt of field.options; track opt.id) {
-                    <option [value]="opt.value">{{ opt.label }}</option>
-                    }
-                </select>
-                }
-                @case ('single_choice') {
-                <div class="flex flex-col gap-2 p-3 bg-gray-50/50 rounded border border-[var(--color-border)] shadow-sm"
-                    [class.opacity-70]="mode === 'view'">
-                    @for (opt of field.options; track opt.id) {
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="radio" [name]="field.id" [value]="opt.value"
-                            [checked]="customValues()[field.id] === opt.value" [disabled]="mode === 'view'"
-                            (change)="updateCustomValue(field.id, opt.value)" class="accent-[var(--color-accent)]">
-                        <span
-                            class="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">{{
-                            opt.label }}</span>
-                    </label>
-                    }
-                </div>
-                }
-                @case ('multi_choice') {
-                <div class="flex flex-col gap-2 p-3 bg-gray-50/50 rounded border border-[var(--color-border)] shadow-sm"
-                    [class.opacity-70]="mode === 'view'">
-                    @for (opt of field.options; track opt.id) {
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" [value]="opt.value"
-                            [checked]="isMultiChoiceSelected(field.id, opt.value)" [disabled]="mode === 'view'"
-                            (change)="toggleMultiChoice(field.id, opt.value, $any($event.target).checked)"
-                            class="accent-[var(--color-accent)]">
-                        <span
-                            class="text-xs font-medium text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-colors">{{
-                            opt.label }}</span>
-                    </label>
-                    }
-                </div>
-                }
-                @case ('image') {
-                <div class="flex items-center gap-4">
-                    @if (customValues()[field.id]) {
-                    <div
-                        class="h-16 w-16 rounded border border-[var(--color-border)] overflow-hidden bg-white shadow-sm">
-                        <img [src]="customValues()[field.id]" class="h-full w-full object-cover" alt="Preview">
-                    </div>
-                    }
-                    @if (mode !== 'view') {
-                    <div class="flex-1">
-                        <input #customFileInput type="file" class="hidden"
-                            (change)="updateCustomImage(field.id, $event)" accept="image/*">
-                        <button type="button" (click)="customFileInput.click()"
-                            class="h-8 px-3 bg-white hover:bg-gray-50 border border-[var(--color-border)] rounded text-[10px] font-bold text-[var(--color-text-primary)] transition-colors shadow-sm">
-                            {{ customValues()[field.id] ? 'Đổi ảnh' : 'Tải ảnh lên' }}
-                        </button>
-                    </div>
-                    } @else if (!customValues()[field.id]) {
-                    <span class="text-xs text-[var(--color-text-tertiary)]">--</span>
-                    }
-                </div>
-                }
-                @default {
-                <input
-                    [type]="field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'email' ? 'email' : 'text'"
-                    class="h-9 w-full bg-white border border-[var(--color-border)] rounded px-3 text-xs outline-none focus:border-[var(--color-accent)] shadow-sm disabled:opacity-70 disabled:bg-gray-50"
-                    [placeholder]="field.placeholder || ''" [value]="customValues()[field.id] || ''"
-                    [disabled]="mode === 'view'" (input)="updateCustomValue(field.id, $any($event.target).value)">
-                }
-                }
-
-                @if (customErrors()[field.id] && mode !== 'view') {
-                <p class="mt-1 text-[9px] text-red-500 font-bold uppercase tracking-wider">{{ customErrors()[field.id]
-                    }}</p>
-                }
-                @if (field.helperText && mode !== 'view') {
-                <p class="mt-1 text-[10px] text-[var(--color-text-tertiary)] italic">{{ field.helperText }}</p>
-                }
-            </div>
-            }
-        </div>
-        } @else {
-            <div class="flex flex-col items-center justify-center py-6 text-[var(--color-text-tertiary)] border-2 border-dashed border-[var(--color-border)] rounded-lg bg-gray-50">
-                <p class="text-xs font-medium">Chưa có trường tùy chỉnh nào.</p>
-                @if (mode !== 'view') {
-                <p class="text-[10px] mt-1">Bấm vào "Cấu hình trường" để thêm các trường mới như Thương hiệu, Chất liệu...</p>
-                }
-            </div>
-        }
-    </div>
-
-    <!-- Actions -->
-    @if (mode !== 'view') {
-    <div class="flex items-center justify-end gap-3 pt-2">
-        <button type="button" (click)="canceled.emit()" [disabled]="loading"
-            class="h-10 px-6 rounded-lg font-bold text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors">
-            Hủy bỏ
-        </button>
-        <button type="button" [disabled]="uploading() || loading" (click)="submit()"
-            class="h-10 px-6 rounded-lg font-bold text-sm bg-[var(--color-accent)] text-white hover:bg-[var(--color-accent)]/90 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2">
-            @if (loading) {
-            <div class="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            }
-            {{ mode === 'create' ? 'Tạo Sản Phẩm' : 'Lưu Thay Đổi' }}
-        </button>
-    </div>
-    }
+      <div class="p-4">
+        <app-dynamic-form-renderer
+          [fields]="getCustomFields()"
+          [values]="customValues()"
+          [mode]="mode === 'view' ? 'preview' : mode"
+          [readonly]="mode === 'view'"
+          context="product"
+          variant="internal"
+          [errors]="customErrors()"
+          (valuesChange)="onCustomValuesChange($event)"
+          (fileSelected)="onCustomRendererFileSelected($event)"
+        />
+      </div>
+    </section>
+  }
 </div>
+

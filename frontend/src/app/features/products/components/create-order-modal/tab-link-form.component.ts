@@ -13,7 +13,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
   imports: [CommonModule, UiButtonComponent],
   template: `
     <div class="space-y-6">
-      <div class="bg-[var(--color-info-soft)] p-4 rounded-[var(--radius-lg)] border border-[var(--color-info-text)]/20">
+      <div class="bg-[var(--color-info-soft)] p-4 rounded-[var(--radius-sm)] border border-[var(--color-info-text)]/20">
         <h4 class="text-sm font-semibold text-[var(--color-info-text)] flex items-center gap-2">
           <i class="ri-links-line"></i>
           Link tạo đơn hàng Public
@@ -30,7 +30,7 @@ import { NotificationService } from '../../../../core/services/notification.serv
             type="text" 
             readonly 
             [value]="generatedLink()" 
-            class="flex-1 rounded-[var(--radius-md)] border border-[var(--color-input-border)] bg-[var(--color-surface-secondary)] text-[var(--color-text-tertiary)] sm:text-sm p-3 outline-none"
+            class="flex-1 rounded-[var(--radius-sm)] border border-[var(--color-input-border)] bg-[var(--color-surface-secondary)] text-[var(--color-text-tertiary)] sm:text-sm p-3 outline-none"
           >
           <app-ui-button type="button" variant="primary" (clicked)="copyLink()">
             <i class="ri-clipboard-line mr-1"></i> Copy

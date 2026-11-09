@@ -14,6 +14,9 @@ import com.oms.module.messenger.service.MessageService;
 import com.oms.module.messenger.service.MessengerDtoMapper;
 import com.oms.module.messenger.service.MessengerOrderService;
 import com.oms.module.messenger.service.OrderDraftService;
+import com.oms.module.order.dto.OrderResponse;
+import com.oms.module.order.entity.Order;
+import com.oms.module.order.mapper.OrderMapper;
 import com.oms.security.CustomUserDetails;
 import com.oms.security.PermissionCode;
 import com.oms.security.RequirePermission;
@@ -45,16 +48,18 @@ public class MessengerStaffController {
     private final OrderDraftService orderDraftService;
     private final MessengerOrderService messengerOrderService;
     private final MessengerDtoMapper mapper;
+    private final OrderMapper orderMapper;
 
     @GetMapping("/conversations")
     @Operation(summary = "Get latest Messenger conversations")
     @RequirePermission(PermissionCode.ORDER_VIEW)
     public ResponseEntity<ApiResponse<PageResponse<ConversationResponse>>> getConversations(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
         var pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
-        var result = conversationService.getConversations(pageable);
+        var result = conversationService.getConversations(user.getShopId(), pageable);
         var mappedContent = result.getContent().stream()
                 .map(mapper::toConversationResponse)
                 .toList();
@@ -66,9 +71,10 @@ public class MessengerStaffController {
     @RequirePermission(PermissionCode.ORDER_VIEW)
     public ResponseEntity<ApiResponse<List<MessageResponse>>> getMessages(
             @PathVariable Long conversationId,
-            @RequestParam(defaultValue = "200") int limit
+            @RequestParam(defaultValue = "200") int limit,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
-        conversationService.getById(conversationId);
+        conversationService.getByIdForShop(conversationId, user.getShopId());
         List<MessageResponse> messages = messageService.getRecentMessagesAsc(conversationId, limit).stream()
                 .map(mapper::toMessageResponse)
                 .toList();
@@ -94,10 +100,11 @@ public class MessengerStaffController {
     @RequirePermission(PermissionCode.ORDER_VIEW)
     public ResponseEntity<ApiResponse<PageResponse<OrderDraftResponse>>> getOrderDrafts(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        var result = orderDraftService.getOrderDrafts(pageable);
+        var result = orderDraftService.getOrderDrafts(user.getShopId(), pageable);
         var mappedContent = result.getContent().stream()
                 .map(mapper::toOrderDraftResponse)
                 .toList();
@@ -109,10 +116,11 @@ public class MessengerStaffController {
     @RequirePermission(PermissionCode.ORDER_VIEW)
     public ResponseEntity<ApiResponse<PageResponse<MessengerOrderResponse>>> getOrders(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal CustomUserDetails user
     ) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        var result = messengerOrderService.getOrders(pageable);
+        var result = messengerOrderService.getOrders(user.getShopId(), pageable);
         var mappedContent = result.getContent().stream()
                 .map(mapper::toMessengerOrderResponse)
                 .toList();
@@ -122,16 +130,20 @@ public class MessengerStaffController {
     @PostMapping("/order-drafts/{draftId}/confirm-manually")
     @Operation(summary = "Manually confirm a Messenger order draft")
     @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
-    public ResponseEntity<ApiResponse<MessengerOrderResponse>> confirmManually(@PathVariable Long draftId) {
-        MessengerOrder order = messengerOrderService.confirmDraftManually(draftId);
-        return ResponseEntity.ok(ApiResponse.ok("Order draft confirmed", mapper.toMessengerOrderResponse(order)));
+    public ResponseEntity<ApiResponse<OrderResponse>> confirmManually(
+            @PathVariable Long draftId,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        Order order = messengerOrderService.confirmDraftManually(user.getShopId(), draftId);
+        return ResponseEntity.ok(ApiResponse.ok("Order draft confirmed", orderMapper.toResponse(order)));
     }
 
     @PostMapping("/order-drafts/{draftId}/cancel")
     @Operation(summary = "Cancel a Messenger order draft")
     @RequirePermission(PermissionCode.ORDER_UPDATE_STATUS)
-    public ResponseEntity<ApiResponse<OrderDraftResponse>> cancel(@PathVariable Long draftId) {
-        OrderDraft draft = orderDraftService.cancel(draftId);
+    public ResponseEntity<ApiResponse<OrderDraftResponse>> cancel(
+            @PathVariable Long draftId,
+            @AuthenticationPrincipal CustomUserDetails user) {
+        OrderDraft draft = orderDraftService.cancelForShop(draftId, user.getShopId());
         return ResponseEntity.ok(ApiResponse.ok("Order draft cancelled", mapper.toOrderDraftResponse(draft)));
     }
 }

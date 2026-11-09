@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardStore } from '../../state/dashboard.store';
+import { formatVndCurrency } from '../../../../shared/utils/currency.util';
 
 @Component({
   selector: 'app-dashboard-staff-section',
@@ -8,14 +9,14 @@ import { DashboardStore } from '../../state/dashboard.store';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="rounded-2xl border border-[var(--color-border)] bg-white">
+    <div class="rounded-sm border border-[var(--color-border)] bg-white">
       <div class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
         <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Xếp hạng nhân viên</h3>
         <span class="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-tertiary)]">Theo doanh thu</span>
       </div>
       <div class="p-4 space-y-3">
         @for (emp of store.employeeStats(); track emp.id; let i = $index) {
-          <div class="rounded-xl border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-border-hover)]">
+          <div class="rounded-sm border border-[var(--color-border)] p-3 transition-colors hover:border-[var(--color-border-hover)]">
             <div class="mb-2 flex items-center justify-between">
               <div class="flex items-center gap-2.5">
                 <div class="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-black text-white"
@@ -47,7 +48,6 @@ export class DashboardStaffSectionComponent {
   get maxRevenue() { return Math.max(...this.store.employeeStats().map(e => e.revenue), 1); }
 
   formatCurrency(v: number): string {
-    if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + ' tr';
-    return v.toLocaleString('vi-VN') + 'đ';
+    return formatVndCurrency(v);
   }
 }

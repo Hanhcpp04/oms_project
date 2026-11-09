@@ -1,5 +1,12 @@
 <!-- FORM DASHBOARD ENTIRE PAGE CONTAINER -->
 <div class="min-h-[100vh] bg-white">
+    <div class="px-6 pt-4">
+        <app-page-title
+            [title]="activeTab() === 'rent' ? 'Biểu mẫu đơn thuê' : 'Biểu mẫu đơn bán'"
+            description="Tạo, quản lý và phân quyền các biểu mẫu đặt hàng công khai."
+        />
+    </div>
+
     <!-- TOP SECTION: Template Gallery -->
     <div class="bg-[#f1f3f4] w-full pt-6 pb-8 border-b border-[#e0e0e0]">
         <div class="mx-auto max-w-[1000px] px-6">
@@ -15,7 +22,7 @@
                 <!-- Blank template -->
                 <div class="flex flex-col gap-2 w-44 shrink-0 group">
                     <button (click)="createBlankForm()"
-                        class="h-[132px] w-full rounded-md border border-[#dadce0] bg-white flex items-center justify-center cursor-pointer transition hover:border-[#673ab7]">
+                        class="h-[132px] w-full rounded-sm border border-[#dadce0] bg-white flex items-center justify-center cursor-pointer transition hover:border-[#673ab7]">
                         <svg width="48" height="48" viewBox="0 0 100 100" class="h-[52px] w-[52px]">
                             <path fill="#34A853" d="M46 68V46H24v22z"></path>
                             <path fill="#4285F4" d="M76 46H46v22h30z"></path>
@@ -43,7 +50,7 @@
                     <div class="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4">
                         @for (tmpl of visibleTemplates(); track tmpl.id) {
                         <div (click)="editForm(tmpl.id)"
-                            class="group block overflow-visible rounded-[var(--radius-md)] border border-[#dadce0] bg-white transition ">
+                            class="group block overflow-visible rounded-[var(--radius-sm)] border border-[#dadce0] bg-white transition ">
 
                             <!-- Thumbnail -->
                             <div
@@ -68,11 +75,11 @@
 
                                         @if (field.type === 'single_choice' || field.type === 'multi_choice') {
                                         <div class="flex items-center gap-3 mt-1.5">
-                                            <div class="h-3 w-3 rounded-full bg-[#dadce0] shrink-0"></div>
+                                            <div class="h-3 w-3 rounded-[var(--radius-xs)] bg-[#dadce0] shrink-0"></div>
                                             <div class="h-2.5 w-1/2 rounded-sm bg-[#f1f3f4]"></div>
                                         </div>
                                         <div class="flex items-center gap-3 mt-1.5">
-                                            <div class="h-3 w-3 rounded-full bg-[#dadce0] shrink-0"></div>
+                                            <div class="h-3 w-3 rounded-[var(--radius-xs)] bg-[#dadce0] shrink-0"></div>
                                             <div class="h-2.5 w-1/3 rounded-sm bg-[#f1f3f4]"></div>
                                         </div>
 
@@ -119,7 +126,7 @@
 
                                 <div class="relative z-30">
                                     <button
-                                        class="flex shrink-0 h-8 w-8 items-center justify-center rounded-full text-[#5f6368] opacity-0 group-hover:opacity-100 hover:bg-black/5"
+                                        class="flex shrink-0 h-8 w-8 items-center justify-center rounded-[var(--radius-xs)] text-[#5f6368] opacity-0 group-hover:opacity-100 hover:bg-black/5"
                                         title="Menu" (click)="toggleMenu(tmpl.id, $event)">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2">
@@ -134,7 +141,7 @@
                                     <div class="fixed inset-0 z-40" (click)="closeMenu($event)"></div>
                                     <!-- Dropdown -->
                                     <div
-                                        class="absolute -right-40 bottom-full mb-2 z-50 w-48 rounded bg-white py-1.5 shadow-lg border border-[#e0e0e0]">
+                                        class="absolute -right-40 bottom-full mb-2 z-50 w-48 rounded bg-white py-1.5 shadow-sm border border-[#e0e0e0]">
                                         <button
                                             class="w-full text-left px-4 py-2 text-sm text-[#202124] hover:bg-black/5 transition"
                                             (click)="openPermissionModal(tmpl.id, $event)">
@@ -159,7 +166,7 @@
                         description="Mặc định: mọi nhân viên thuộc shop đều có quyền xem biểu mẫu. Chỉ bật người chỉnh sửa cho những nhân viên cần sửa form."
                         maxWidthClass="max-w-[620px]" (closed)="closePermissionModal()">
 
-                        <div class="mb-6 overflow-hidden rounded-[var(--radius-md)] border border-[#e0e0e0]">
+                        <div class="mb-6 overflow-hidden rounded-[var(--radius-sm)] border border-[#e0e0e0]">
                             <div
                                 class="grid grid-cols-[minmax(0,1fr)_120px_150px] gap-3 border-b border-[#e0e0e0] bg-[#f8f9fa] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[#5f6368]">
                                 <span>Nhân viên</span>
@@ -181,7 +188,7 @@
                                         <p class="truncate text-xs text-[#5f6368]">{{ member.email }}</p>
                                     </div>
                                     <span
-                                        class="inline-flex w-fit rounded-full bg-[#f3f4f6] px-2 py-1 text-xs font-medium text-[#4b5563]">
+                                        class="inline-flex w-fit rounded-[var(--radius-xs)] bg-[#f3f4f6] px-2 py-1 text-xs font-medium text-[#4b5563]">
                                         {{ member.role }}
                                     </span>
                                     <select

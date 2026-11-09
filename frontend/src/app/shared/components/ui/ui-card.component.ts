@@ -19,12 +19,12 @@ export class UiCardComponent {
   @Input() className = '';
 
   protected get cardClasses(): string {
-    const baseClass = `w-full border transition-colors duration-200 ${this.rounded ? 'rounded-[20px]' : 'rounded-none'}`;
+    const baseClass = `w-full border transition-colors duration-200 ${this.rounded ? 'rounded-[var(--radius-sm)]' : 'rounded-none'}`;
 
     const toneClasses: Record<UiCardTone, string> = {
-      default: 'border-[#E5E5E5] bg-white',
-      soft: 'border-[#E5E5E5] bg-white',
-      muted: 'border-[#E5E5E5] bg-[#FAFAFA]'
+      default: 'border-[var(--color-border)] bg-[var(--color-surface)]',
+      soft: 'border-transparent bg-[var(--color-surface-secondary)]',
+      muted: 'border-[var(--color-border)] bg-[var(--color-surface-secondary)]'
     };
 
     const paddingClasses: Record<UiCardPadding, string> = {
@@ -35,11 +35,11 @@ export class UiCardComponent {
     };
 
     const interactiveClass = this.interactive
-      ? 'cursor-pointer hover:border-[#CACACB]'
+      ? 'cursor-pointer hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-hover)]'
       : '';
 
     const selectedClass = this.selected
-      ? 'border-[#111111]! ring-2 ring-[#111111]/10'
+      ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)]'
       : '';
 
     return [

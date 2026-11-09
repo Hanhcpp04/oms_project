@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, forwardRef } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { formatVndCurrencyInput, normalizeVndCurrencyInput } from '../../utils/currency.util';
 import { formatPhoneDisplay, formatPhoneInput, normalizePhoneDigits } from '../../utils/phone-format.util';
 
 let nextUiInputId = 0;
@@ -35,8 +36,9 @@ export class UiInputComponent implements ControlValueAccessor {
   @Input() readonly = false;
   @Input() required = false;
   @Input() className = '';
-  @Input() variant: 'default' | 'underlined' = 'default';
+  @Input() variant: 'default' | 'underlined' | 'filter' = 'default';
   @Input() phoneMaxDigits = 11;
+  @Input() format: 'default' | 'currency' = 'default';
 
   @Output() valueChange = new EventEmitter<string>();
   @Output() enterPressed = new EventEmitter<string>();
@@ -57,23 +59,31 @@ export class UiInputComponent implements ControlValueAccessor {
   }
 
   protected get shellClasses(): string {
-    if (this.variant === 'underlined') {
-      const baseClass = 'grid min-h-10 items-center border-b transition-all duration-200';
-      const layoutClass = this.suffixText ? 'grid-cols-[1fr_auto]' : 'grid-cols-1';
+    const layoutClass = this.suffixText ? 'grid-cols-[1fr_auto]' : 'grid-cols-1';
+
+    if (this.variant === 'filter') {
+      const baseClass =
+        'grid h-8 items-center rounded-[var(--radius-xs)] border bg-[var(--color-surface)] transition-colors';
       const stateClass = this.hasError
-        ? 'border-[#D30005]'
-        : 'border-[var(--color-border)] focus-within:border-[var(--color-accent)]';
+        ? 'border-[var(--color-danger)] focus-within:border-[var(--color-danger)]'
+        : 'border-[var(--color-border)] focus-within:border-[var(--color-border-focus)] focus-within:ring-1 focus-within:ring-[var(--color-focus-ring)]';
+      return [baseClass, layoutClass, stateClass].filter(Boolean).join(' ');
+    }
+
+    if (this.variant === 'underlined') {
+      const baseClass = 'grid min-h-8 items-center border-b bg-transparent transition-colors';
+      const stateClass = this.hasError
+        ? 'border-[var(--color-danger)]'
+        : 'border-[var(--color-border)] focus-within:border-[var(--color-border-focus)]';
       return [baseClass, layoutClass, stateClass].join(' ');
     }
 
     const baseClass =
-      'grid min-h-9 items-center rounded-[8px] border bg-[#F5F5F5] transition-all duration-200 focus-within:ring-2';
-
-    const layoutClass = this.suffixText ? 'grid-cols-[1fr_auto]' : 'grid-cols-1';
+      'grid min-h-9 items-center rounded-[var(--radius-xs)] border bg-[var(--color-surface)] transition-colors duration-200';
 
     const stateClass = this.hasError
-      ? 'border-[#D30005] focus-within:border-[#D30005] focus-within:ring-[#FFE5E5]'
-      : 'border-[#CACACB] focus-within:border-[#111111] focus-within:ring-[rgba(39,93,197,0.15)]';
+      ? 'border-[var(--color-danger)] focus-within:border-[var(--color-danger)] focus-within:ring-1 focus-within:ring-[rgba(220,38,38,0.12)]'
+      : 'border-[var(--color-border)] focus-within:border-[var(--color-border-focus)] focus-within:ring-1 focus-within:ring-[var(--color-focus-ring)]';
 
     return [baseClass, layoutClass, stateClass].join(' ');
   }
@@ -81,7 +91,8 @@ export class UiInputComponent implements ControlValueAccessor {
   protected get inputClasses(): string {
     return [
       'h-full w-full bg-transparent px-3 text-sm text-[var(--color-input-text)] outline-none placeholder:text-[var(--color-input-placeholder)]',
-      'disabled:cursor-not-allowed disabled:text-[var(--color-text-tertiary)]'
+      'disabled:cursor-not-allowed disabled:text-[var(--color-text-muted)]',
+      this.readonly ? 'cursor-default text-[var(--color-text-secondary)]' : ''
     ].join(' ');
   }
 
@@ -89,30 +100,42 @@ export class UiInputComponent implements ControlValueAccessor {
     return this.type === 'tel';
   }
 
+  protected get isCurrencyInput(): boolean {
+    return this.format === 'currency';
+  }
+
   protected get displayValue(): string {
-    if (!this.isPhoneInput) {
-      return this.value;
+    if (this.isCurrencyInput) {
+      return formatVndCurrencyInput(this.value);
     }
 
-    const normalized = normalizePhoneDigits(this.value, this.phoneMaxDigits);
-    return formatPhoneDisplay(normalized);
+    if (this.isPhoneInput) {
+      const normalized = normalizePhoneDigits(this.value, this.phoneMaxDigits);
+      return formatPhoneDisplay(normalized);
+    }
+
+    return this.value;
+  }
+
+  protected get inputTypeAttr(): string {
+    return this.isCurrencyInput ? 'text' : this.type;
   }
 
   protected get inputModeAttr(): string | null {
-    return this.isPhoneInput ? 'numeric' : null;
+    return this.isPhoneInput || this.isCurrencyInput ? 'numeric' : null;
   }
 
   // ControlValueAccessor implementation
   private onChange: (value: string) => void = () => {};
   private onTouched: () => void = () => {};
 
-  writeValue(value: string): void {
+  writeValue(value: string | number | null | undefined): void {
     if (this.isPhoneInput) {
-      this.value = normalizePhoneDigits(value || '', this.phoneMaxDigits);
+      this.value = normalizePhoneDigits(value === null || value === undefined ? '' : String(value), this.phoneMaxDigits);
       return;
     }
 
-    this.value = value || '';
+    this.value = value === null || value === undefined ? '' : String(value);
   }
 
   registerOnChange(fn: (value: string) => void): void {
@@ -129,6 +152,13 @@ export class UiInputComponent implements ControlValueAccessor {
 
   protected onInput(event: Event): void {
     const input = event.target as HTMLInputElement;
+    if (this.isCurrencyInput) {
+      this.value = normalizeVndCurrencyInput(input.value);
+      this.onChange(this.value);
+      this.valueChange.emit(this.value);
+      return;
+    }
+
     if (this.isPhoneInput) {
       const formatted = formatPhoneInput(input.value, this.phoneMaxDigits);
       this.value = formatted.raw;

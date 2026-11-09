@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, OnInit, signal } from '@angular/core';
 import { PageTitleComponent } from '../../../shared/components/ui/page-title.component';
 import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { DashboardStore } from '../state/dashboard.store';
 
 type EmployeePeriod = 'today' | 'week' | 'month' | 'range';
@@ -77,13 +78,19 @@ export class EmployeeStatsPageComponent implements OnInit {
     };
   });
 
+  private readonly selectFirstEmployeeWhenLoaded = effect(() => {
+    if (this.selectedEmpId()) {
+      return;
+    }
+
+    const firstEmployee = this.store.employeeStats()[0];
+    if (firstEmployee) {
+      this.selectedEmpId.set(firstEmployee.id);
+    }
+  });
+
   ngOnInit(): void {
     this.store.loadByPeriod('all');
-    // Pre-select first employee if available
-    const emps = this.store.employeeStats();
-    if (emps.length > 0) {
-      this.selectedEmpId.set(emps[0].id);
-    }
   }
 
   selectEmployee(id: string): void {
@@ -104,7 +111,7 @@ export class EmployeeStatsPageComponent implements OnInit {
   }
 
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected getStatusVariant(status: string): 'primary' | 'warning' | 'info' | 'success' | 'danger' {

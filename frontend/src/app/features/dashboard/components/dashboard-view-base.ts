@@ -1,4 +1,5 @@
 import { inject } from '@angular/core';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { DashboardStore } from '../state/dashboard.store';
 
 export interface ChartPoint {
@@ -48,7 +49,7 @@ export abstract class DashboardViewBase {
   }
 
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected getBarHeight(revenue: number): number {

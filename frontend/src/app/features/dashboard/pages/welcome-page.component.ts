@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthStore } from '../../../core/auth/auth.store';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { OrdersStore } from '../../orders/state/orders.store';
 
 @Component({
@@ -35,5 +36,9 @@ export class WelcomePageComponent implements OnInit {
   ngOnInit(): void {
     this.showRegisteredBanner.set(this.route.snapshot.queryParamMap.get('registered') === 'success');
     setTimeout(() => this.showGreeting.set(false), 2000);
+  }
+
+  protected formatCurrency(value: number): string {
+    return formatVndCurrency(value);
   }
 }

@@ -1,40 +1,117 @@
 import { CommonModule } from '@angular/common';
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
-import { finalize } from 'rxjs';
-import { formatPhoneDisplay, normalizePhoneDigits } from '../../../shared/utils/phone-format.util';
+import { EMPTY, Subject, catchError, finalize, interval, switchMap, takeUntil } from 'rxjs';
+import { NotificationService } from '../../../core/services/notification.service';
+import { PermissionService } from '../../../core/services/permission.service';
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
 import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
-import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
-import { OrderPrintModalComponent } from './order-print-modal.component';
-import { OrdersApiService } from '../data-access/orders-api.service';
-import { Order, OrderType } from '../data-access/models/order.model';
-import { OrdersStore } from '../state/orders.store';
-import { CustomFieldDisplayEntry, getOrderCustomFieldDisplayEntries } from '../utils/order-custom-fields.util';
+import {
+  formatVndCurrency,
+  formatVndCurrencyInput,
+  parseVndCurrencyInput
+} from '../../../shared/utils/currency.util';
+import { formatPhoneDisplay, normalizePhoneDigits } from '../../../shared/utils/phone-format.util';
 import { ORDER_STATUS_OPTIONS } from '../data-access/constants/order-status.constants';
-import { NotificationService } from '../../../core/services/notification.service';
-import { OrderStatus } from '../data-access/models/order.model';
+import { Order, OrderProduct, OrderStatus, OrderType, PaymentStatus, UpdateOrderInput } from '../data-access/models/order.model';
+import { OrdersApiService } from '../data-access/orders-api.service';
+import { OrdersStore } from '../state/orders.store';
+import {
+  CustomFieldDisplayEntry,
+  getOrderCustomFieldDisplayEntries
+} from '../utils/order-custom-fields.util';
+import { OrderPrintModalComponent } from './order-print-modal.component';
+
+type DetailActionButton = {
+  label: string;
+  icon: string;
+  variant: 'primary' | 'secondary' | 'danger';
+  disabled: boolean;
+  onClick: () => Promise<void>;
+};
 
 @Component({
   selector: 'app-order-detail-page',
   standalone: true,
-  imports: [CommonModule, UiBadgeComponent, UiButtonComponent, UiCardComponent, OrderPrintModalComponent],
+  imports: [CommonModule, FormsModule, UiBadgeComponent, UiButtonComponent, OrderPrintModalComponent],
   templateUrl: './order-detail-page.component.html',
+  styleUrl: './order-detail-page.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class OrderDetailPageComponent implements OnInit {
+export class OrderDetailPageComponent implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly ordersApiService = inject(OrdersApiService);
   private readonly notificationService = inject(NotificationService);
+  private readonly permissionService = inject(PermissionService);
 
   readonly store = inject(OrdersStore);
   readonly statusOptions = ORDER_STATUS_OPTIONS;
+  private readonly destroy$ = new Subject<void>();
+  private readonly paymentRefreshIntervalMs = 10000;
+  private readonly rentalOnlyStatuses = new Set<OrderStatus>(['DEPOSITED', 'RENTING', 'OVERDUE', 'RETURNED']);
 
   protected readonly order = signal<Order | null>(null);
   protected readonly loading = signal(false);
   protected readonly notFound = signal(false);
   protected readonly isPrintModalOpen = signal(false);
+  protected readonly editing = signal(false);
+  protected readonly saving = signal(false);
+  protected readonly editForm = signal<UpdateOrderInput>({
+    customerName: '',
+    customerPhone: '',
+    customerAddress: '',
+    customerNote: '',
+    sourceChannel: '',
+    shippingMethod: '',
+    shippingFee: 0,
+    paymentStatus: 'UNPAID',
+    paymentMethod: undefined
+  });
+
+  protected readonly paymentStatusOptions: ReadonlyArray<{ label: string; value: PaymentStatus }> = [
+    { label: 'Chưa thanh toán', value: 'UNPAID' },
+    { label: 'Đã nhận cọc', value: 'DEPOSITED' },
+    { label: 'Đã thanh toán', value: 'PAID' }
+  ];
+
+  protected readonly paymentMethodOptions: ReadonlyArray<{ label: string; value: NonNullable<UpdateOrderInput['paymentMethod']> }> = [
+    { label: 'COD', value: 'COD' },
+    { label: 'Chuyển khoản ngân hàng', value: 'BANK_TRANSFER' },
+    { label: 'VNPay', value: 'VNPAY' }
+  ];
+
+  private readonly orderStatusTransitions: Record<OrderType, Record<OrderStatus, OrderStatus[]>> = {
+    SELL: {
+      NEW: ['CONFIRMED', 'CANCELLED'],
+      PENDING: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['PACKING', 'CANCELLED'],
+      PACKING: ['SHIPPED', 'CANCELLED'],
+      SHIPPED: ['DONE'],
+      DONE: [],
+      CANCELLED: [],
+      DEPOSITED: [],
+      PAID: [],
+      RENTING: [],
+      OVERDUE: [],
+      RETURNED: []
+    },
+    RENT: {
+      NEW: ['CONFIRMED', 'CANCELLED'],
+      PENDING: ['CONFIRMED', 'CANCELLED'],
+      CONFIRMED: ['DEPOSITED', 'RENTING', 'CANCELLED'],
+      DEPOSITED: ['RENTING', 'CANCELLED'],
+      RENTING: ['OVERDUE', 'RETURNED', 'DONE', 'CANCELLED'],
+      OVERDUE: ['RETURNED', 'DONE', 'CANCELLED'],
+      RETURNED: [],
+      DONE: [],
+      CANCELLED: [],
+      PACKING: [],
+      SHIPPED: [],
+      PAID: []
+    }
+  };
 
   ngOnInit(): void {
     const orderId = this.route.snapshot.paramMap.get('orderId');
@@ -45,11 +122,21 @@ export class OrderDetailPageComponent implements OnInit {
     }
 
     this.resolveOrder(orderId);
+    this.startPaymentAutoRefresh(orderId);
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   protected goBack(): void {
     const type = this.normalizeType(this.route.snapshot.queryParamMap.get('type'));
     this.router.navigate(['/app/orders', type]);
+  }
+
+  protected createNewOrder(): void {
+    this.router.navigate(['/app/products']);
   }
 
   protected openPrintModal(): void {
@@ -60,25 +147,199 @@ export class OrderDetailPageComponent implements OnInit {
     this.isPrintModalOpen.set(false);
   }
 
+  protected startEditing(order: Order): void {
+    this.syncEditForm(order);
+    this.editing.set(true);
+  }
+
+  protected cancelEditing(order: Order): void {
+    this.syncEditForm(order);
+    this.editing.set(false);
+  }
+
+  protected async saveOrderDetails(): Promise<void> {
+    const currentOrder = this.order();
+    if (!currentOrder) return;
+
+    if (!this.canUpdateOrderDetails()) {
+      this.notificationService.error('Bạn không có quyền cập nhật thông tin đơn hàng.');
+      return;
+    }
+
+    try {
+      this.saving.set(true);
+      const form = this.editForm();
+      let updatedOrder = await this.store.updateOrder(currentOrder.id, {
+        ...form,
+        shippingFee: Number(form.shippingFee ?? 0)
+      });
+
+      if (this.hasPaymentChanges(currentOrder, form)) {
+        updatedOrder = await this.store.updatePayment(currentOrder.id, {
+          paymentStatus: form.paymentStatus,
+          paymentMethod: form.paymentMethod
+        });
+      }
+
+      this.applyResolvedOrder(updatedOrder);
+      this.editing.set(false);
+      this.notificationService.success('Đã cập nhật thông tin đơn hàng');
+    } catch {
+      this.notificationService.error('Có lỗi xảy ra khi cập nhật thông tin đơn hàng');
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected updateEditForm(patch: Partial<UpdateOrderInput>): void {
+    this.editForm.update((form) => ({ ...form, ...patch }));
+  }
+
+  protected updateShippingFeeInput(value: string): void {
+    this.updateEditForm({ shippingFee: parseVndCurrencyInput(value) ?? 0 });
+  }
+
+
+  protected getPageTitle(): string {
+    return this.order()?.orderNumber
+      ? `Chi tiết đơn hàng #${this.order()!.orderNumber}`
+      : 'Chi tiết đơn hàng';
+  }
+
+  protected getDisplayOrderNumber(order: Order): string {
+    return order.orderNumber || order.orderCode || order.id;
+  }
+
+  protected getPageDescription(): string {
+    const currentOrder = this.order();
+    if (!currentOrder) {
+      return 'Xem thông tin khách hàng, sản phẩm, thanh toán và trạng thái đơn hàng.';
+    }
+
+    return currentOrder.orderType === 'RENT'
+      ? 'Thông tin đơn thuê, lịch thuê, thanh toán và trạng thái trả hàng.'
+      : 'Thông tin đơn bán, thanh toán, vận chuyển và trạng thái xử lý.';
+  }
+
   protected goToQrHistory(productId: string | number | undefined): void {
     if (!productId) return;
     this.router.navigate(['/app/products', productId, 'qr-history']);
   }
 
-  protected async updateStatus(status: string): Promise<void> {
-    const currentOrder = this.order();
-    if (!currentOrder) return;
+  protected canShowStatusActions(order: Order): boolean {
+    return this.canUpdateOrderStatus() && this.getActionButtons(order).length > 0;
+  }
 
-    try {
-      this.loading.set(true);
-      const updatedOrder = await this.store.updateOrderStatus(currentOrder.id, status as OrderStatus);
-      this.order.set(updatedOrder);
-      this.notificationService.success('Đã cập nhật trạng thái đơn hàng thành công');
-    } catch (error) {
-      this.notificationService.error('Có lỗi xảy ra khi cập nhật trạng thái');
-    } finally {
-      this.loading.set(false);
+  protected canShowPaymentActions(order: Order): boolean {
+    return this.canEditPayment(order);
+  }
+
+
+  protected getActionButtons(order: Order): DetailActionButton[] {
+    const actions: DetailActionButton[] = [];
+    const allowed = this.getAllowedStatuses(order);
+
+    if (allowed.includes('CONFIRMED')) {
+      actions.push({ label: 'Xác nhận', icon: 'ri-checkbox-circle-line', variant: 'primary', disabled: false, onClick: () => this.confirmOrder() });
     }
+    if (allowed.includes('PACKING')) {
+      actions.push({ label: 'Đóng gói', icon: 'ri-archive-line', variant: 'secondary', disabled: false, onClick: () => this.markPacking() });
+    }
+    if (allowed.includes('SHIPPED')) {
+      actions.push({ label: 'Giao hàng', icon: 'ri-truck-line', variant: 'primary', disabled: false, onClick: () => this.markShipped() });
+    }
+    if (allowed.includes('DONE')) {
+      actions.push({ label: 'Hoàn thành', icon: 'ri-check-double-line', variant: 'primary', disabled: false, onClick: () => this.markDone() });
+    }
+    if (order.orderType === 'RENT' && allowed.includes('DEPOSITED')) {
+      actions.push({ label: 'Nhận cọc', icon: 'ri-hand-coin-line', variant: 'secondary', disabled: false, onClick: () => this.markDeposited() });
+    }
+    if (allowed.includes('RENTING')) {
+      actions.push({ label: 'Bàn giao thuê', icon: 'ri-exchange-box-line', variant: 'secondary', disabled: false, onClick: () => this.markRenting() });
+    }
+    if (allowed.includes('OVERDUE')) {
+      actions.push({ label: 'Quá hạn', icon: 'ri-alarm-warning-line', variant: 'danger', disabled: false, onClick: () => this.markOverdue() });
+    }
+    if (allowed.includes('RETURNED')) {
+      actions.push({ label: 'Nhận trả hàng', icon: 'ri-arrow-go-back-line', variant: 'primary', disabled: false, onClick: () => this.markReturned() });
+    }
+    if (allowed.includes('CANCELLED')) {
+      actions.push({ label: 'Hủy', icon: 'ri-close-circle-line', variant: 'danger', disabled: false, onClick: () => this.cancelOrder() });
+    }
+
+    return actions;
+  }
+
+  protected getPaymentActionButtons(order: Order): DetailActionButton[] {
+    const actions: DetailActionButton[] = [];
+
+    if (this.canSetUnpaid(order)) {
+      actions.push({
+        label: 'Chưa thanh toán',
+        icon: 'ri-time-line',
+        variant: 'secondary',
+        disabled: false,
+        onClick: () => this.setPaymentStatus('UNPAID')
+      });
+    }
+
+    if (this.canSetDeposited(order)) {
+      actions.push({
+        label: 'Đã nhận cọc',
+        icon: 'ri-hand-coin-line',
+        variant: 'secondary',
+        disabled: false,
+        onClick: () => this.setPaymentStatus('DEPOSITED')
+      });
+    }
+
+    if (this.canSetPaid(order)) {
+      actions.push({
+        label: 'Đã thanh toán',
+        icon: 'ri-secure-payment-line',
+        variant: 'primary',
+        disabled: false,
+        onClick: () => this.setPaymentStatus('PAID')
+      });
+    }
+
+    return actions;
+  }
+
+  protected async confirmOrder(): Promise<void> {
+    await this.runStatusAction((id) => this.store.confirmOrder(id), 'Đã xác nhận đơn hàng');
+  }
+
+  protected async markPacking(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markPacking(id), 'Đã chuyển đơn sang đóng gói');
+  }
+
+  protected async markShipped(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markShipped(id), 'Đã chuyển đơn sang giao hàng');
+  }
+
+  protected async markDone(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markDone(id), 'Đã hoàn thành đơn hàng');
+  }
+
+  protected async markDeposited(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markDeposited(id), 'Đã cập nhật đơn thuê sang trạng thái đã cọc');
+  }
+
+  protected async markRenting(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markRenting(id), 'Đã cập nhật đơn thuê sang đang thuê');
+  }
+
+  protected async markOverdue(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markOverdue(id), 'Đã cập nhật đơn thuê sang quá hạn');
+  }
+
+  protected async markReturned(): Promise<void> {
+    await this.runStatusAction((id) => this.store.markReturned(id), 'Đã cập nhật đơn thuê sang đã trả hàng');
+  }
+
+  protected async cancelOrder(): Promise<void> {
+    await this.runStatusAction((id) => this.store.cancelOrder(id), 'Đã hủy đơn hàng');
   }
 
   protected getStatusVariant(status: string): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
@@ -99,6 +360,62 @@ export class OrderDetailPageComponent implements OnInit {
     }
   }
 
+  protected getOrderStatusVariant(order: Order): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    return this.hasOrderStatusMismatch(order) ? 'danger' : this.getStatusVariant(order.status);
+  }
+
+  protected getFulfillmentStatusVariant(order: Order): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    return this.hasOrderStatusMismatch(order) ? 'danger' : 'primary';
+  }
+
+  protected getWorkflowTitle(order: Order): string {
+    return order.orderType === 'SELL' ? 'Luồng xử lý đơn bán' : 'Luồng xử lý đơn thuê';
+  }
+
+  protected getWorkflowSubtitle(order: Order): string {
+    if (this.hasOrderStatusMismatch(order)) {
+      return 'Trạng thái hiện tại chỉ thuộc luồng đơn thuê.';
+    }
+
+    return order.orderType === 'SELL'
+      ? 'Xác nhận, đóng gói, giao hàng và hoàn thành.'
+      : 'Xác nhận, nhận cọc, bàn giao thuê và nhận trả.';
+  }
+
+  protected getPaymentSubtitle(order: Order): string {
+    return order.orderType === 'RENT'
+      ? 'Theo dõi cọc và thanh toán còn lại.'
+      : 'Theo dõi trạng thái thu tiền của đơn bán.';
+  }
+
+  protected getPaymentStatusDisplayLabel(order: Order): string {
+    if (this.hasPaymentStatusMismatch(order)) {
+      return 'Thanh toán không hợp lệ';
+    }
+
+    return this.getPaymentStatusLabel(this.getResolvedPaymentStatus(order));
+  }
+
+  protected getPaymentStatusDisplayVariant(order: Order): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    return this.hasPaymentStatusMismatch(order)
+      ? 'danger'
+      : this.getPaymentStatusVariant(this.getResolvedPaymentStatus(order));
+  }
+
+  protected getPaymentStatusDisplayTextClass(order: Order): string {
+    return this.hasPaymentStatusMismatch(order)
+      ? 'text-[var(--color-danger-text)]'
+      : this.getPaymentStatusTextClass(this.getResolvedPaymentStatus(order));
+  }
+
+  protected getOrderStatusLabel(order: Order): string {
+    if (this.hasOrderStatusMismatch(order)) {
+      return 'Trạng thái không hợp lệ';
+    }
+
+    return this.getStatusLabel(order.status);
+  }
+
   protected getStatusLabel(status: string): string {
     switch (status) {
       case 'PENDING': return 'Chờ duyệt';
@@ -117,6 +434,71 @@ export class OrderDetailPageComponent implements OnInit {
     }
   }
 
+  protected getFulfillmentStatusLabel(status?: string, order?: Order): string {
+    if (order?.orderType === 'SELL' && this.isRentalOnlyFulfillmentStatus(status)) {
+      return 'Không áp dụng';
+    }
+
+    switch (status) {
+      case 'PENDING_CONFIRMATION': return 'Chờ xác nhận';
+      case 'READY_TO_PACK': return 'Sẵn sàng đóng gói';
+      case 'READY_TO_RENT': return 'Sẵn sàng bàn giao';
+      case 'PACKING': return 'Đang đóng gói';
+      case 'SHIPPED': return 'Đang giao';
+      case 'DONE': return 'Hoàn thành';
+      case 'CANCELLED': return 'Đã hủy';
+      case 'DEPOSITED': return 'Đã cọc';
+      case 'RENTING': return 'Đang thuê';
+      case 'OVERDUE': return 'Quá hạn';
+      case 'RETURNED': return 'Đã trả';
+      case 'PAID': return 'Đã thanh toán';
+      default: return status || 'Chưa xác định';
+    }
+  }
+
+  protected getAllowedStatuses(order: Order): OrderStatus[] {
+    return this.orderStatusTransitions[order.orderType]?.[order.status] ?? [];
+  }
+
+  protected isAllowedTransition(order: Order, status: OrderStatus): boolean {
+    return this.getAllowedStatuses(order).includes(status) || order.status === status;
+  }
+
+  protected async runStatusAction(action: (id: string) => Promise<Order>, successMessage: string): Promise<void> {
+    const currentOrder = this.order();
+    if (!currentOrder) return;
+
+    if (!this.canUpdateOrderStatus()) {
+      this.notificationService.error('Bạn không có quyền cập nhật trạng thái đơn hàng.');
+      return;
+    }
+
+    try {
+      this.loading.set(true);
+      const updatedOrder = await action(currentOrder.id);
+      this.applyResolvedOrder(updatedOrder);
+      this.notificationService.success(successMessage);
+    } catch {
+      this.notificationService.error('Có lỗi xảy ra khi cập nhật trạng thái');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  protected getOrderTypeLabel(type: OrderType): string {
+    return type === 'RENT' ? 'Cho thuê' : 'Bán';
+  }
+
+  protected getSourceMethodLabel(method?: Order['sourceMethod']): string {
+    switch (method) {
+      case 'AI_PARSE': return 'AI Parse';
+      case 'PUBLIC_FORM': return 'Public Form';
+      case 'MESSENGER': return 'Messenger';
+      case 'MANUAL': return 'Thủ công';
+      default: return 'Thủ công';
+    }
+  }
+
   protected getPaymentMethodLabel(method?: string): string {
     switch (method) {
       case 'COD': return 'Thanh toán khi nhận hàng (COD)';
@@ -129,34 +511,85 @@ export class OrderDetailPageComponent implements OnInit {
   protected getPaymentStatusLabel(status?: string): string {
     switch (status) {
       case 'PAID': return 'Đã thanh toán';
-      case 'DEPOSITED': return 'Đã đặt cọc';
+      case 'DEPOSITED': return 'Đã nhận cọc';
       case 'UNPAID': return 'Chưa thanh toán';
       default: return 'Chưa thanh toán';
     }
   }
 
+  protected getPaymentStatusVariant(status?: string): 'primary' | 'warning' | 'info' | 'success' | 'danger' {
+    switch (status) {
+      case 'PAID': return 'success';
+      case 'DEPOSITED': return 'warning';
+      case 'UNPAID': return 'warning';
+      default: return 'warning';
+    }
+  }
+
+  protected getResolvedPaymentStatus(order: Order): PaymentStatus {
+    if (order.paymentStatus === 'PAID') {
+      return 'PAID';
+    }
+
+    if (order.paymentStatus === 'DEPOSITED') {
+      return order.orderType === 'RENT' ? 'DEPOSITED' : 'UNPAID';
+    }
+
+    if (order.paymentStatus === 'UNPAID') {
+      return 'UNPAID';
+    }
+
+    if (order.status === 'PAID' || order.fulfillmentStatus === 'PAID') {
+      return 'PAID';
+    }
+
+    if (order.orderType === 'RENT' && (order.status === 'DEPOSITED' || order.fulfillmentStatus === 'DEPOSITED')) {
+      return 'DEPOSITED';
+    }
+
+    return 'UNPAID';
+  }
+
   protected getPaymentStatusDotClass(status?: string): string {
     switch (status) {
-      case 'PAID': return 'bg-[var(--color-success)]';
-      case 'DEPOSITED': return 'bg-[var(--color-warning)]';
-      default: return 'bg-[var(--color-text-tertiary)]';
+      case 'PAID': return 'bg-[#059669]';
+      case 'DEPOSITED': return 'bg-[#f59e0b]';
+      default: return 'bg-[#f59e0b]';
     }
   }
 
   protected getPaymentStatusTextClass(status?: string): string {
     switch (status) {
-      case 'PAID': return 'text-[var(--color-success-text)]';
-      case 'DEPOSITED': return 'text-[var(--color-warning-text)]';
-      default: return 'text-[var(--color-text-secondary)]';
+      case 'PAID': return 'text-[#047857]';
+      case 'DEPOSITED': return 'text-[#92400e]';
+      default: return 'text-[#111827]';
     }
   }
 
+  protected getPaymentStatusOptions(order: Order): ReadonlyArray<{ label: string; value: PaymentStatus }> {
+    return order.orderType === 'RENT'
+      ? this.paymentStatusOptions
+      : this.paymentStatusOptions.filter((option) => option.value !== 'DEPOSITED');
+  }
+
+  protected hasOrderStatusMismatch(order: Order): boolean {
+    return order.orderType === 'SELL' && this.rentalOnlyStatuses.has(order.status);
+  }
+
+  protected hasPaymentStatusMismatch(order: Order): boolean {
+    return order.orderType === 'SELL' && order.paymentStatus === 'DEPOSITED';
+  }
+
+  protected getDepositAmount(order: Order): number {
+    return order.depositPaid ?? order.depositAmount ?? 0;
+  }
+
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value ?? 0);
+  }
+
+  protected formatCurrencyInput(value: number | undefined): string {
+    return formatVndCurrencyInput(value ?? 0);
   }
 
   protected formatPhone(phone: string | undefined): string {
@@ -167,9 +600,15 @@ export class OrderDetailPageComponent implements OnInit {
   protected formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '';
     try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return dateStr;
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
     } catch {
       return dateStr;
     }
@@ -183,31 +622,222 @@ export class OrderDetailPageComponent implements OnInit {
     return getOrderCustomFieldDisplayEntries(order);
   }
 
+  protected getSubtotal(order: Order): number {
+    return order.products.reduce((total, product) => total + this.getLineTotal(product), 0);
+  }
+
+  protected getShippingFee(order: Order): number {
+    return order.shippingFee ?? 0;
+  }
+
+  protected getDiscountAmount(): number {
+    return 0;
+  }
+
+  protected getLineTotal(product: OrderProduct): number {
+    return product.lineTotal && product.lineTotal > 0
+      ? product.lineTotal
+      : product.unitPrice * product.quantity;
+  }
+
+  protected getProductName(product: OrderProduct): string {
+    return product.productNameSnapshot || product.name || 'Sản phẩm';
+  }
+
+  protected getProductInitial(product: OrderProduct): string {
+    return this.getProductName(product).trim().charAt(0).toUpperCase() || 'P';
+  }
+
+  protected getCustomerInitial(order: Order): string {
+    return (order.customerName || 'Khách hàng').trim().charAt(0).toUpperCase() || 'K';
+  }
+
+  protected hasProductVariantMeta(product: OrderProduct): boolean {
+    return Boolean(
+      product.size ||
+      product.variantSizeSnapshot ||
+      product.variantColorSnapshot ||
+      product.skuSnapshot
+    );
+  }
+
+  protected getPrimaryProductImage(order: Order): string | undefined {
+    return order.products.find((product) => product.productImageSnapshot)?.productImageSnapshot;
+  }
+
+  protected getTimelineItems(
+    order: Order
+  ): Array<{ title: string; time?: string; actor: string; active: boolean }> {
+    const actor = order.createdByFullName || order.createdByUsername || 'Hệ thống';
+    const items: Array<{ title: string; time?: string; actor: string; active: boolean }> = [
+      {
+        title: 'Đơn hàng được tạo',
+        time: order.createdAt,
+        actor,
+        active: true
+      }
+    ];
+
+    if (order.updatedAt && order.updatedAt !== order.createdAt) {
+      items.push({
+        title: `Cập nhật trạng thái: ${this.getOrderStatusLabel(order)}`,
+        time: order.updatedAt,
+        actor: 'Hệ thống',
+        active: false
+      });
+    }
+
+    return items;
+  }
+
+  protected canUpdateOrderStatus(): boolean {
+    return this.permissionService.hasPermission('ORDER_UPDATE_STATUS');
+  }
+
+  protected canUpdateOrderDetails(): boolean {
+    return this.permissionService.hasPermission('ORDER_UPDATE_STATUS');
+  }
+
+  protected canEditPayment(order: Order): boolean {
+    return this.canUpdateOrderDetails() && order.status !== 'CANCELLED' && order.status !== 'DONE';
+  }
+
+  protected canSetUnpaid(order: Order): boolean {
+    return this.canEditPayment(order)
+      && (this.hasPaymentStatusMismatch(order) || this.getResolvedPaymentStatus(order) !== 'UNPAID');
+  }
+
+  protected canSetDeposited(order: Order): boolean {
+    return order.orderType === 'RENT'
+      && this.canEditPayment(order)
+      && this.getResolvedPaymentStatus(order) !== 'DEPOSITED';
+  }
+
+  protected canSetPaid(order: Order): boolean {
+    return this.canEditPayment(order) && this.getResolvedPaymentStatus(order) !== 'PAID';
+  }
+
+  protected async setPaymentStatus(paymentStatus: PaymentStatus): Promise<void> {
+    const currentOrder = this.order();
+    if (!currentOrder) return;
+
+    if (paymentStatus === 'DEPOSITED' && currentOrder.orderType !== 'RENT') {
+      this.notificationService.error('Trạng thái cọc chỉ áp dụng cho đơn thuê.');
+      return;
+    }
+
+    if (!this.canEditPayment(currentOrder)) {
+      this.notificationService.error('Bạn không có quyền cập nhật thanh toán.');
+      return;
+    }
+
+    try {
+      this.loading.set(true);
+      const updatedOrder = await this.store.updatePayment(currentOrder.id, {
+        paymentStatus,
+        paymentMethod: this.editForm().paymentMethod
+      });
+      this.applyResolvedOrder(updatedOrder);
+      this.notificationService.success('Đã cập nhật thanh toán');
+    } catch {
+      this.notificationService.error('Có lỗi xảy ra khi cập nhật thanh toán');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
   private resolveOrder(orderId: string): void {
     const cachedOrder = this.findOrderFromStore(orderId);
 
     if (cachedOrder) {
-      this.order.set(cachedOrder);
-      this.notFound.set(false);
-      this.store.selectOrder(cachedOrder);
+      this.applyResolvedOrder(cachedOrder);
+      this.refreshOrderFromApi(orderId, false);
       return;
     }
 
-    this.loading.set(true);
+    this.refreshOrderFromApi(orderId, true);
+  }
+
+  private refreshOrderFromApi(orderId: string, showLoading: boolean): void {
+    if (showLoading) {
+      this.loading.set(true);
+    }
 
     this.ordersApiService
       .getById(orderId)
-      .pipe(finalize(() => this.loading.set(false)))
+      .pipe(finalize(() => {
+        if (showLoading) {
+          this.loading.set(false);
+        }
+      }))
       .subscribe({
         next: (order) => {
-          this.order.set(order);
-          this.notFound.set(false);
-          this.store.selectOrder(order);
+          this.applyResolvedOrder(order);
         },
         error: () => {
-          this.notFound.set(true);
+          if (!this.order()) {
+            this.notFound.set(true);
+          }
         }
       });
+  }
+
+  private startPaymentAutoRefresh(orderId: string): void {
+    interval(this.paymentRefreshIntervalMs)
+      .pipe(
+        takeUntil(this.destroy$),
+        switchMap(() => {
+          if (!this.shouldRefreshPaymentStatus()) {
+            return EMPTY;
+          }
+
+          return this.ordersApiService.getById(orderId).pipe(catchError(() => EMPTY));
+        })
+      )
+      .subscribe((order) => {
+        this.applyResolvedOrder(order);
+      });
+  }
+
+  private shouldRefreshPaymentStatus(): boolean {
+    const currentOrder = this.order();
+    if (!currentOrder) {
+      return false;
+    }
+
+    if (currentOrder.status === 'CANCELLED' || currentOrder.status === 'RETURNED') {
+      return false;
+    }
+
+    return this.isAsyncPaymentMethod(currentOrder.paymentMethod)
+      && this.getResolvedPaymentStatus(currentOrder) !== 'PAID';
+  }
+
+  private isAsyncPaymentMethod(method: Order['paymentMethod']): boolean {
+    return method === 'BANK_TRANSFER' || method === 'VNPAY';
+  }
+
+  private applyResolvedOrder(order: Order): void {
+    this.order.set(order);
+    if (!this.editing()) {
+      this.syncEditForm(order);
+    }
+    this.notFound.set(false);
+    this.store.selectOrder(order);
+  }
+
+  private hasPaymentChanges(order: Order, form: UpdateOrderInput): boolean {
+    const currentPaymentStatus = order.paymentStatus ?? this.getResolvedPaymentStatus(order);
+
+    return form.paymentStatus !== currentPaymentStatus
+      || form.paymentMethod !== order.paymentMethod;
+  }
+
+  private isRentalOnlyFulfillmentStatus(status?: string): boolean {
+    return status === 'DEPOSITED'
+      || status === 'RENTING'
+      || status === 'OVERDUE'
+      || status === 'RETURNED';
   }
 
   private findOrderFromStore(orderId: string): Order | null {
@@ -236,5 +866,19 @@ export class OrderDetailPageComponent implements OnInit {
     }
 
     return 'all';
+  }
+
+  private syncEditForm(order: Order): void {
+    this.editForm.set({
+      customerName: order.customerName || '',
+      customerPhone: order.customerPhone || '',
+      customerAddress: order.customerAddress || '',
+      customerNote: order.customerNote || '',
+      sourceChannel: order.sourceChannel || '',
+      shippingMethod: order.shippingMethod || '',
+      shippingFee: order.shippingFee ?? 0,
+      paymentStatus: this.getResolvedPaymentStatus(order),
+      paymentMethod: order.paymentMethod
+    });
   }
 }

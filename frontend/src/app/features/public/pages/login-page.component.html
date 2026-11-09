@@ -1,6 +1,6 @@
 <section class="flex min-h-[80vh] items-center justify-center">
   <div class="w-full max-w-md">
-    <div class="border border-[#E5E5E5] bg-white p-6 md:p-8">
+    <div class="border border-[#E5E5E5] bg-white p-4 md:p-5">
       <div class="flex justify-center">
         <div class="inline-flex h-12 w-12 items-center justify-center rounded-[8px] bg-[#111111] text-white">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -47,7 +47,7 @@
             />
             <button
               type="button"
-              class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-[#707072] transition hover:bg-[#E5E5E5] hover:text-[#111111]"
+              class="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-[var(--radius-xs)] text-[#707072] transition hover:bg-[#E5E5E5] hover:text-[#111111]"
               [attr.aria-label]="showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
               [attr.title]="showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
               (click)="showPassword = !showPassword"

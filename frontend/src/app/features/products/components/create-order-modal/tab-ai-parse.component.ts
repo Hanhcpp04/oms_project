@@ -24,7 +24,7 @@ import { TabManualFormComponent } from './tab-manual-form.component';
           [value]="rawText()"
           (input)="rawText.set($any($event.target).value)"
           rows="6" 
-          class="w-full rounded-[var(--radius-md)] border border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-accent-soft)] transition-colors sm:text-sm resize-none shadow-[var(--shadow-sm)] text-[var(--color-input-text)] p-3 outline-none"
+          class="w-full rounded-[var(--radius-sm)] border border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-accent-soft)] transition-colors sm:text-sm resize-none shadow-[var(--shadow-sm)] text-[var(--color-input-text)] p-3 outline-none"
           placeholder="VD: Chào shop, cho mình đặt 1 cái đến Nguyễn Văn A, sđt 0901234567, đ/c 123 Đường 1, Quận 1 nhé."
         ></textarea>
 
@@ -45,7 +45,7 @@ import { TabManualFormComponent } from './tab-manual-form.component';
       </div>
     } @else {
       <div class="space-y-4 animate-fade-in-up">
-        <div class="bg-[var(--color-accent-soft)] p-4 rounded-[var(--radius-lg)] border border-[var(--color-border)]">
+        <div class="bg-[var(--color-accent-soft)] p-4 rounded-[var(--radius-sm)] border border-[var(--color-border)]">
           <p class="text-sm text-[var(--color-accent)] font-medium flex items-center gap-2">
             <i class="ri-magic-line text-lg"></i>
             AI đã phân tích dữ liệu. Vui lòng kiểm tra lại trước khi tạo đơn!

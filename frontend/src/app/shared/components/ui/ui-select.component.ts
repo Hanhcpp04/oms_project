@@ -15,13 +15,11 @@ let nextSelectId = 0;
   imports: [CommonModule],
   template: `
     <div class="grid gap-1">
-      <label
-        *ngIf="label"
-        [for]="resolvedId"
-        class="text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]"
-      >
-        {{ label }}
-      </label>
+      @if (label) {
+        <label [for]="resolvedId" class="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--color-text-tertiary)]">
+          {{ label }}
+        </label>
+      }
       <select
         [id]="resolvedId"
         [value]="value"
@@ -54,7 +52,7 @@ export class UiSelectComponent implements ControlValueAccessor {
   @Input() options: readonly SelectOption[] = [];
   @Input() disabled = false;
   @Input() errorText = '';
-  @Input() variant: 'default' | 'underlined' = 'default';
+  @Input() variant: 'default' | 'underlined' | 'filter' = 'default';
 
   @Output() valueChange = new EventEmitter<string>();
 
@@ -69,18 +67,24 @@ export class UiSelectComponent implements ControlValueAccessor {
   }
 
   protected get selectClasses(): string {
-    if (this.variant === 'underlined') {
-      const base = 'h-10 w-full border-b bg-transparent text-sm text-[var(--color-input-text)] outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50';
-      const state = this.hasError
-        ? 'border-[#D30005]'
-        : 'border-[var(--color-border)] focus:border-[var(--color-accent)]';
+    if (this.variant === 'filter') {
+      const base = 'h-8 w-full rounded-[var(--radius-xs)] border bg-[var(--color-surface)] px-3 text-sm text-[var(--color-input-text)] outline-none transition-none disabled:cursor-not-allowed disabled:opacity-50';
+      const state = this.hasError ? 'border-[var(--color-danger)]' : 'border-[var(--color-border)] focus-within:border-[var(--color-border-focus)] focus-within:ring-1 focus-within:ring-[var(--color-focus-ring)]';
       return `${base} ${state}`;
     }
 
-    const base = 'h-10 w-full rounded-[var(--radius-md)] border px-3 text-sm text-[var(--color-input-text)] outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50';
+    if (this.variant === 'underlined') {
+      const base = 'h-8 w-full border-b bg-transparent text-sm text-[var(--color-input-text)] outline-none transition-none disabled:cursor-not-allowed disabled:opacity-50';
+      const state = this.hasError
+        ? 'border-[var(--color-danger)]'
+        : 'border-[var(--color-border)] focus:border-[var(--color-border-focus)]';
+      return `${base} ${state}`;
+    }
+
+    const base = 'h-9 w-full rounded-[var(--radius-xs)] border px-3 text-sm text-[var(--color-input-text)] outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50';
     const state = this.hasError
-      ? 'border-[#D30005] bg-[#FEF2F2] focus:border-[#D30005] focus:ring-2 focus:ring-[#FFE5E5]'
-      : 'border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus:border-[var(--color-border-focus)] focus:ring-2 focus:ring-[var(--color-accent-soft)]';
+      ? 'border-[var(--color-danger)] bg-[#FEF2F2] focus:border-[var(--color-danger)] focus:ring-1 focus:ring-[rgba(220,38,38,0.12)]'
+      : 'border-[var(--color-input-border)] bg-[var(--color-input-bg)] focus:border-[var(--color-border-focus)] focus:ring-1 focus:ring-[var(--color-focus-ring)]';
     return `${base} ${state}`;
   }
 

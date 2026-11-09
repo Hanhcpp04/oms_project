@@ -92,14 +92,14 @@
       </div>
 
       @if (store.selectedUserLoading()) {
-      <span class="inline-flex items-center rounded-full bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
+      <span class="inline-flex items-center rounded-[var(--radius-xs)] bg-[var(--color-surface-secondary)] px-3 py-1 text-xs font-medium text-[var(--color-text-secondary)]">
         Đang tải chi tiết...
       </span>
       }
     </div>
 
     <div class="mt-4 grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+      <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
         <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin cá nhân</h4>
 
         <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -124,7 +124,7 @@
         </div>
       </div>
 
-      <div class="rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
+      <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-4">
         <h4 class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Thông tin tài khoản</h4>
 
         <div class="mt-3 grid gap-3 md:grid-cols-2">
@@ -157,11 +157,11 @@
     </div>
 
     <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-      <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+      <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-3">
         <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn hôm nay</p>
         <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersToday }}</p>
       </div>
-      <div class="rounded-[var(--radius-md)] border border-[var(--color-border)] px-4 py-3">
+      <div class="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-3">
         <p class="m-0 text-[11px] font-semibold uppercase tracking-wider text-[var(--color-text-tertiary)]">Đơn tháng này</p>
         <p class="m-0 mt-1 text-sm font-semibold text-[var(--color-text-primary)]">{{ selectedUser.ordersThisMonth }}</p>
       </div>
@@ -174,7 +174,7 @@
       @if ((selectedUser.handledOrders?.length ?? 0) > 0) {
       <div class="mt-2 grid gap-2">
         <div *ngFor="let order of selectedUser.handledOrders"
-          class="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
+          class="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 py-2">
           <div>
             <p class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{{ order.orderCode }}</p>
             <p class="m-0 text-xs text-[var(--color-text-tertiary)]">{{ order.customerName }}</p>

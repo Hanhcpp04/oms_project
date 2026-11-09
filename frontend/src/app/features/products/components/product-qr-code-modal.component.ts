@@ -4,6 +4,7 @@ import { finalize } from 'rxjs';
 import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
 import { UiInputComponent } from '../../../shared/components/ui/ui-input.component';
 import { UiModalComponent } from '../../../shared/components/ui/ui-modal.component';
+import { formatVndCurrency, parseVndCurrencyInput } from '../../../shared/utils/currency.util';
 import { Product } from '../data-access/models/product.model';
 import { ProductQrCode, ProductsApiService } from '../data-access/products-api.service';
 
@@ -24,7 +25,8 @@ import { ProductQrCode, ProductsApiService } from '../data-access/products-api.s
 
             <app-ui-input
               label="Số tiền (VND)"
-              type="number"
+              type="text"
+              format="currency"
               [value]="amount().toString()"
               (valueChange)="amount.set(toNumber($event))"
               placeholder="Nhập số tiền"
@@ -49,9 +51,9 @@ import { ProductQrCode, ProductsApiService } from '../data-access/products-api.s
 
           <!-- QR Display -->
           @if (currentQr()) {
-            <div class="p-4 bg-[var(--color-surface-secondary)] rounded-xl flex flex-col items-center border border-[var(--color-border)]">
+            <div class="p-4 bg-[var(--color-surface-secondary)] rounded-sm flex flex-col items-center border border-[var(--color-border)]">
               <p class="text-sm font-medium mb-3">Quét mã để thanh toán</p>
-              <img [src]="currentQr()?.qrUrl" alt="QR Code" class="w-64 h-64 bg-white p-2 rounded-lg shadow-sm mb-4" />
+              <img [src]="currentQr()?.qrUrl" alt="QR Code" class="w-64 h-64 bg-white p-2 rounded-sm shadow-sm mb-4" />
               <div class="text-center">
                 <p class="text-sm font-bold text-[var(--color-accent)]">{{ currency(currentQr()?.amount || 0) }}</p>
                 <p class="text-xs text-[var(--color-text-tertiary)] mt-1">{{ currentQr()?.note }}</p>
@@ -70,7 +72,7 @@ import { ProductQrCode, ProductsApiService } from '../data-access/products-api.s
               <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                 @for (item of history(); track item.id) {
                   <div 
-                    class="p-3 bg-white border border-[var(--color-border)] rounded-lg flex items-center justify-between cursor-pointer hover:border-[var(--color-accent-soft)] transition-colors"
+                    class="p-3 bg-white border border-[var(--color-border)] rounded-sm flex items-center justify-between cursor-pointer hover:border-[var(--color-accent-soft)] transition-colors"
                     (click)="currentQr.set(item)"
                   >
                     <div>
@@ -160,14 +162,10 @@ export class ProductQrCodeModalComponent implements OnInit {
   }
 
   protected currency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected toNumber(value: string): number {
-    return Number(value) || 0;
+    return parseVndCurrencyInput(value) ?? 0;
   }
 }

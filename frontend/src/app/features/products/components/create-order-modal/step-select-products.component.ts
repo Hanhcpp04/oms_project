@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Product } from '../../data-access/models/product.model';
 import { OrderType } from '../../../orders/data-access/models/order.model';
 import { UiButtonComponent } from '../../../../shared/components/ui/ui-button.component';
+import { AuthStore } from '../../../../core/auth/auth.store';
+import { formatVndCurrency } from '../../../../shared/utils/currency.util';
 
 export interface SelectedVariant {
   variantId: string | number;
@@ -18,11 +20,11 @@ export interface SelectedVariant {
   imports: [CommonModule, UiButtonComponent],
   template: `
     <div class="space-y-6">
-      <div class="flex items-center gap-4 p-4 bg-[var(--color-surface-secondary)] rounded-[var(--radius-lg)] border border-[var(--color-border)]">
+      <div class="flex items-center gap-4 p-4 bg-[var(--color-surface-secondary)] rounded-[var(--radius-sm)] border border-[var(--color-border)]">
         @if (product.images[0]?.url) {
-          <img [src]="product.images[0].url" alt="Product" class="w-16 h-16 object-cover rounded-[var(--radius-md)]">
+          <img [src]="product.images[0].url" alt="Product" class="w-16 h-16 object-cover rounded-[var(--radius-sm)]">
         } @else {
-          <div class="w-16 h-16 bg-[var(--color-surface-inset)] rounded-[var(--radius-md)] flex items-center justify-center text-2xl">🏷️</div>
+          <div class="w-16 h-16 bg-[var(--color-surface-inset)] rounded-[var(--radius-sm)] flex items-center justify-center text-2xl">🏷️</div>
         }
         <div>
           <h3 class="font-medium text-[var(--color-text-primary)]">{{ product.name }}</h3>
@@ -35,13 +37,13 @@ export interface SelectedVariant {
         </div>
       </div>
 
-      @if (product.productType === 'SELL_RENT') {
+      @if (product.productType === 'SELL_RENT' && canUseSell() && canUseRent()) {
         <div class="grid gap-2">
           <p class="m-0 text-sm font-medium text-[var(--color-text-primary)]">Chọn hình thức đơn</p>
-          <div class="grid grid-cols-2 gap-2 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-1">
+          <div class="grid grid-cols-2 gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface-secondary)] p-1">
             <button
               type="button"
-              class="rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors"
+              class="rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors"
               [class.bg-[var(--color-surface)]]="selectedOrderType === 'SELL'"
               [class.text-[var(--color-accent)]]="selectedOrderType === 'SELL'"
               [class.text-[var(--color-text-secondary)]]="selectedOrderType !== 'SELL'"
@@ -51,7 +53,7 @@ export interface SelectedVariant {
             </button>
             <button
               type="button"
-              class="rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition-colors"
+              class="rounded-[var(--radius-sm)] px-3 py-2 text-sm font-medium transition-colors"
               [class.bg-[var(--color-surface)]]="selectedOrderType === 'RENT'"
               [class.text-[var(--color-accent)]]="selectedOrderType === 'RENT'"
               [class.text-[var(--color-text-secondary)]]="selectedOrderType !== 'RENT'"
@@ -69,7 +71,7 @@ export interface SelectedVariant {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           @for (variant of product.variants; track variant.id) {
             <div 
-              class="border rounded-[var(--radius-lg)] p-4 transition-all duration-200 cursor-pointer"
+              class="border rounded-[var(--radius-sm)] p-4 transition-all duration-200 cursor-pointer"
               [class.border-[var(--color-accent)]]="isVariantSelected(variant.id!)"
               [class.bg-[var(--color-accent-soft)]]="isVariantSelected(variant.id!)"
               [class.border-[var(--color-border)]]="!isVariantSelected(variant.id!)"
@@ -155,6 +157,8 @@ export interface SelectedVariant {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class StepSelectProductsComponent {
+  private readonly authStore = inject(AuthStore);
+
   @Input({ required: true }) product!: Product;
   @Input() selectedVariants: SelectedVariant[] = [];
   @Input({ required: true }) selectedOrderType: OrderType = 'SELL';
@@ -183,6 +187,10 @@ export class StepSelectProductsComponent {
   }
 
   changeOrderType(orderType: OrderType): void {
+    if (!this.isOrderTypeAllowed(orderType)) {
+      return;
+    }
+
     if (this.selectedOrderType === orderType) {
       return;
     }
@@ -234,9 +242,20 @@ export class StepSelectProductsComponent {
   }
 
   formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND'
-    }).format(value);
+    return formatVndCurrency(value);
+  }
+
+  protected canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  protected canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
+  }
+
+  private isOrderTypeAllowed(orderType: OrderType): boolean {
+    return orderType === 'SELL' ? this.canUseSell() : this.canUseRent();
   }
 }

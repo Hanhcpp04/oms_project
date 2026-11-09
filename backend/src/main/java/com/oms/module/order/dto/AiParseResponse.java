@@ -41,8 +41,13 @@ public class AiParseResponse {
     @AllArgsConstructor
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class ProductDraft {
+        private Long productId;
+        private Long variantId;
+        private String productCode;
+        private String sku;
         private String name;
         private String size;
+        private String color;
         private Integer quantity;
         private BigDecimal unitPrice;
     }

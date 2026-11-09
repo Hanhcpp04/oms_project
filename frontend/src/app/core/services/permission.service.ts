@@ -12,6 +12,7 @@ export type PermissionCode =
   | 'PRODUCT_CREATE'
   | 'PRODUCT_EDIT'
   | 'PRODUCT_DELETE'
+  | 'PRODUCT_QR_CREATE'
   | 'ORDER_VIEW'
   | 'ORDER_CREATE'
   | 'ORDER_UPDATE_STATUS'

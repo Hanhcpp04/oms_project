@@ -43,7 +43,7 @@
           <span class="relative inline-flex h-5 w-5 shrink-0 items-center justify-center">
             <ng-container *ngTemplateOutlet="iconTpl; context: { $implicit: item.icon }" />
             @if (setupVisualState(item) === 'missing') {
-            <span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-[#FEDF35]"></span>
+            <span class="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-[var(--radius-xs)] border border-white bg-[#FEDF35]"></span>
             }
           </span>
 
@@ -159,7 +159,7 @@
         <a [routerLink]="card.route" (click)="onNavigate()"
           class="group block rounded-[8px] border border-[#E5E5E5] bg-[#FAFAFA] p-2.5 text-left no-underline transition-all duration-150 hover:border-[#D4D4D4] hover:bg-[#F5F5F5]">
           <div class="flex items-start gap-2">
-            <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FEDF35]"></span>
+            <span class="mt-1 h-2 w-2 shrink-0 rounded-[var(--radius-xs)] bg-[#FEDF35]"></span>
             <div class="min-w-0">
               <p class="m-0 text-xs font-semibold leading-4 text-[#111111]">{{ card.title }}</p>
               <p class="m-0 mt-1 text-[11px] leading-4 text-[#707072]">{{ card.description }}</p>
@@ -180,7 +180,7 @@
           <path d="M4 4h12l-1.5 4L16 12H4" />
         </svg>
         <span
-          class="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-white bg-[#FEDF35] px-1 text-[10px] font-bold leading-none text-[#111111]">
+          class="absolute -right-1 -top-1 inline-flex h-5 min-w-5 items-center justify-center rounded-[var(--radius-xs)] border border-white bg-[#FEDF35] px-1 text-[10px] font-bold leading-none text-[#111111]">
           {{ missingSetupCount() }}
         </span>
       </a>
@@ -192,7 +192,7 @@
   <!-- Bottom -->
   <div class="shrink-0 border-t border-[#E5E5E5] px-3 py-3" [ngClass]="{ 'lg:hidden': collapsed }">
     <div class="flex items-center gap-2 rounded-[8px] bg-[#F5F5F5] px-2.5 py-2">
-      <div class="h-2 w-2 rounded-full bg-[#007D48] animate-pulse-dot"></div>
+      <div class="h-2 w-2 rounded-[var(--radius-xs)] bg-[#007D48] animate-pulse-dot"></div>
       <span class="text-[11px] text-[#707072] font-medium">System Online</span>
     </div>
   </div>

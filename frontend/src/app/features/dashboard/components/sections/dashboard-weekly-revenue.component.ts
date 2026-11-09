@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DashboardStore } from '../../state/dashboard.store';
+import { formatVndCurrency } from '../../../../shared/utils/currency.util';
 
 @Component({
   selector: 'app-dashboard-weekly-revenue',
@@ -8,7 +9,7 @@ import { DashboardStore } from '../../state/dashboard.store';
   imports: [CommonModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="rounded-2xl border border-[var(--color-border)] bg-white">
+    <div class="rounded-sm border border-[var(--color-border)] bg-white">
       <div class="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
         <div>
           <h3 class="m-0 text-sm font-bold text-[var(--color-text-primary)]">Doanh thu tuần</h3>
@@ -44,6 +45,6 @@ export class DashboardWeeklyRevenueComponent {
   }
 
   formatCurrency(v: number): string {
-    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(v);
+    return formatVndCurrency(v);
   }
 }

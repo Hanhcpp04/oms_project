@@ -15,11 +15,14 @@ import java.util.List;
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface OrderMapper {
 
-    @Mapping(target = "rentalInfo", ignore = true)
+    @Mapping(target = "rentalInfo", expression = "java(toRentalInfo(order))")
     @Mapping(target = "customFieldValues", source = "customFieldValues")
     @Mapping(target = "items", source = "items")
     @Mapping(target = "createdByFullName", source = "createdBy.fullName")
     @Mapping(target = "createdByUsername", source = "createdBy.username")
+    @Mapping(target = "fulfillmentStatus", expression = "java(resolveFulfillmentStatus(order))")
+    @Mapping(target = "source", expression = "java(order.getSourceMethod() != null ? order.getSourceMethod().name() : order.getSourceChannel())")
+    @Mapping(target = "messenger", expression = "java(toMessengerInfo(order))")
     OrderResponse toResponse(Order order);
 
     List<OrderResponse> toResponseList(List<Order> orders);
@@ -52,4 +55,46 @@ public interface OrderMapper {
 
     @Mapping(target = "fieldId", source = "fieldId")
     OrderResponse.CustomFieldValueResponse toCustomFieldValueResponse(OrderCustomFieldValue cfv);
+
+    default OrderResponse.MessengerInfo toMessengerInfo(Order order) {
+        if (order == null || !org.springframework.util.StringUtils.hasText(order.getMessengerPageId())) {
+            return null;
+        }
+        return OrderResponse.MessengerInfo.builder()
+                .pageId(order.getMessengerPageId())
+                .customerPsid(order.getMessengerCustomerPsid())
+                .conversationId(order.getMessengerConversationId())
+                .draftId(order.getMessengerDraftId())
+                .build();
+    }
+
+    default String resolveFulfillmentStatus(Order order) {
+        if (order == null || order.getStatus() == null) {
+            return null;
+        }
+        return switch (order.getStatus()) {
+            case NEW, PENDING -> "PENDING_CONFIRMATION";
+            case CONFIRMED -> order.getOrderType() == Order.OrderType.RENT ? "READY_TO_RENT" : "READY_TO_PACK";
+            case PACKING -> "PACKING";
+            case SHIPPED -> "SHIPPED";
+            case DONE -> "DONE";
+            case CANCELLED -> "CANCELLED";
+            case DEPOSITED -> "DEPOSITED";
+            case RENTING -> "RENTING";
+            case OVERDUE -> "OVERDUE";
+            case RETURNED -> "RETURNED";
+            case PAID -> "PAID";
+        };
+    }
+
+    default OrderResponse.RentalInfo toRentalInfo(Order order) {
+        if (order == null || order.getOrderType() != Order.OrderType.RENT) {
+            return null;
+        }
+        return OrderResponse.RentalInfo.builder()
+                .rentFrom(order.getRentFrom())
+                .rentTo(order.getRentTo())
+                .depositPaid(order.getDepositAmount())
+                .build();
+    }
 }

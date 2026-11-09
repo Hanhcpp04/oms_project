@@ -5,14 +5,18 @@ import com.oms.common.dto.PageResponse;
 import com.oms.common.exception.BusinessException;
 import com.oms.common.exception.ErrorCode;
 import com.oms.common.exception.ResourceNotFoundException;
+import com.oms.module.messenger.service.MessengerOrderNotificationService;
+import com.oms.module.notification.service.NotificationService;
+import com.oms.module.order.dto.OrderPaymentUpdateRequest;
 import com.oms.module.order.dto.OrderRequest;
 import com.oms.module.order.dto.OrderResponse;
+import com.oms.module.order.dto.OrderUpdateRequest;
 import com.oms.module.order.entity.Order;
-import com.oms.module.order.entity.OrderCustomFieldValue;
 import com.oms.module.order.entity.OrderItem;
 import com.oms.module.order.entity.OrderStatusLog;
 import com.oms.module.order.mapper.OrderMapper;
 import com.oms.module.order.repository.OrderRepository;
+import com.oms.module.orderform.service.OrderFormValueValidator;
 import com.oms.module.product.entity.ProductType;
 import com.oms.module.product.entity.ProductVariant;
 import com.oms.module.product.repository.ProductVariantRepository;
@@ -21,6 +25,8 @@ import com.oms.module.rental.repository.RentalAvailabilityRepository;
 import com.oms.module.shop.entity.Shop;
 import com.oms.module.shop.entity.ShopShippingMethod;
 import com.oms.module.shop.entity.ShopOrderSource;
+import com.oms.module.shop.entity.ShopPaymentConfig;
+import com.oms.module.shop.repository.ShopPaymentConfigRepository;
 import com.oms.module.shop.repository.ShopRepository;
 import com.oms.module.shop.repository.ShopShippingMethodRepository;
 import com.oms.module.shop.repository.ShopOrderSourceRepository;
@@ -36,6 +42,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -59,8 +66,13 @@ public class OrderService {
     private final UserRepository userRepository;
     private final ShopShippingMethodRepository shippingMethodRepository;
     private final ShopOrderSourceRepository orderSourceRepository;
+    private final ShopPaymentConfigRepository paymentConfigRepository;
     private final OrderMapper orderMapper;
     private final ObjectMapper objectMapper;
+    private final OrderFormValueValidator orderFormValueValidator;
+    private final MessengerOrderNotificationService messengerOrderNotificationService;
+    private final OrderStatusTransitionService orderStatusTransitionService;
+    private final NotificationService notificationService;
 
     @Transactional(readOnly = true)
     public PageResponse<OrderResponse> getOrders(Long shopId, Order.OrderStatus status,
@@ -95,15 +107,19 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(Long shopId, OrderRequest request, Long creatorId) {
+        return orderMapper.toResponse(createOrderEntity(shopId, request, creatorId));
+    }
+
+    @Transactional
+    public Order createOrderEntity(Long shopId, OrderRequest request, Long creatorId) {
         log.info("Creating order for shopId: {}, creatorId: {}, sourceMethod: {}", shopId, creatorId, request.getSourceMethod());
 
         Shop shop = shopRepository.findById(shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Shop", shopId));
+        validateShopCanCreateOrder(shop, request);
 
-        // Determine initial status based on source method
-        Order.OrderStatus initialStatus = request.getSourceMethod() == Order.SourceMethod.PUBLIC_FORM
-                ? Order.OrderStatus.PENDING
-                : Order.OrderStatus.NEW;
+        Order.OrderStatus initialStatus = resolveInitialStatus(shop, request);
+        boolean commitInventoryOnCreate = shouldCommitInventoryOnCreate(initialStatus, request.getSourceMethod());
 
         com.oms.module.user.entity.User creator = null;
         if (creatorId != null) {
@@ -123,6 +139,9 @@ public class OrderService {
             if (!source.getShop().getId().equals(shopId)) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Invalid order source for this shop");
             }
+            if (!Boolean.TRUE.equals(source.getIsActive())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Order source is disabled for this shop");
+            }
             resolvedSourceChannel = source.getName();
         }
 
@@ -131,6 +150,9 @@ public class OrderService {
                     .orElseThrow(() -> new ResourceNotFoundException("ShopShippingMethod", resolvedShippingMethodId));
             if (!method.getShop().getId().equals(shopId)) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Invalid shipping method for this shop");
+            }
+            if (!Boolean.TRUE.equals(method.getIsActive())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Shipping method is disabled for this shop");
             }
             resolvedShippingMethod = method.getName();
             
@@ -142,12 +164,21 @@ public class OrderService {
             }
         }
 
+        validatePaymentMethod(shopId, request.getPaymentMethod());
+
         Map<Long, Integer> quantitiesByVariantId = collectItemQuantities(request);
         Map<Long, ProductVariant> variantsById = lockAndValidateVariants(shopId, quantitiesByVariantId);
         validateOrderTypeCompatibility(request.getOrderType(), variantsById);
         validateVariantPrices(request.getOrderType(), variantsById);
         validateStockAvailability(request.getOrderType(), variantsById, quantitiesByVariantId);
-        deductSellStockIfNeeded(request.getOrderType(), variantsById, quantitiesByVariantId);
+        int rentalDays = 1;
+        if (request.getOrderType() == Order.OrderType.RENT) {
+            validateRentalDates(request, variantsById, quantitiesByVariantId);
+            rentalDays = resolveRentalDays(request.getRentFrom(), request.getRentTo());
+        }
+        if (commitInventoryOnCreate) {
+            deductSellStockIfNeeded(request.getOrderType(), variantsById, quantitiesByVariantId);
+        }
 
         // Build order
         Order order = Order.builder()
@@ -165,6 +196,10 @@ public class OrderService {
                 .shippingMethodId(resolvedShippingMethodId)
                 .shippingMethod(resolvedShippingMethod)
                 .shippingFee(resolvedShippingFee)
+                .depositAmount(request.getDepositPaid() != null ? request.getDepositPaid() : BigDecimal.ZERO)
+                .rentFrom(request.getRentFrom())
+                .rentTo(request.getRentTo())
+                .inventoryCommitted(false)
                 .sourceMethod(request.getSourceMethod() != null ? request.getSourceMethod() : Order.SourceMethod.MANUAL)
                 .paymentMethod(request.getPaymentMethod())
                 .customFieldsJson(null)
@@ -181,7 +216,9 @@ public class OrderService {
                         : variant.getPriceRentPerDay();
                 if (unitPrice == null) unitPrice = BigDecimal.ZERO;
 
-                BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(qty));
+                BigDecimal lineTotal = unitPrice
+                        .multiply(BigDecimal.valueOf(qty))
+                        .multiply(BigDecimal.valueOf(rentalDays));
                 itemsTotal = itemsTotal.add(lineTotal);
 
                 String imageUrl = null;
@@ -211,44 +248,95 @@ public class OrderService {
             }
         }
         order.setTotalAmount(itemsTotal.add(order.getShippingFee()));
-        // Save custom field values with snapshots
-        if (request.getCustomFieldValues() != null) {
-            for (OrderRequest.CustomFieldValueRequest cfvReq : request.getCustomFieldValues()) {
-                OrderCustomFieldValue cfv = OrderCustomFieldValue.builder()
-                        .fieldId(cfvReq.getFieldId())
-                        .fieldKeySnapshot(cfvReq.getFieldKeySnapshot())
-                        .labelSnapshot(cfvReq.getLabelSnapshot())
-                        .formTypeSnapshot(cfvReq.getFormTypeSnapshot())
-                        .valueJson(cfvReq.getValueJson())
-                        .showInListSnapshot(Boolean.TRUE.equals(cfvReq.getShowInListSnapshot()))
-                        .showInDetailSnapshot(!Boolean.FALSE.equals(cfvReq.getShowInDetailSnapshot()))
-                        .sortOrderSnapshot(cfvReq.getSortOrderSnapshot() != null ? cfvReq.getSortOrderSnapshot() : 0)
-                        .build();
-                order.addCustomFieldValue(cfv);
-            }
-        }
+        orderFormValueValidator.buildValidatedValues(shopId, request.getOrderType(), request.getCustomFieldValues())
+                .forEach(order::addCustomFieldValue);
 
-        // Handle rental validation
         if (request.getOrderType() == Order.OrderType.RENT) {
-            validateRentalDates(request, variantsById, quantitiesByVariantId);
             validateRentalVerificationDocuments(shop, request);
         }
 
         order = orderRepository.save(order);
-        reserveRentalAvailabilityIfNeeded(order, request);
-        return orderMapper.toResponse(order);
+        if (commitInventoryOnCreate) {
+            reserveRentalAvailabilityIfNeeded(order);
+            order.setInventoryCommitted(true);
+        }
+        notificationService.notifyOrderCreated(order);
+        return order;
     }
 
     @Transactional
     public OrderResponse updateStatus(Long shopId, Long orderId, Order.OrderStatus newStatus, Long userId) {
+        return transitionOrderStatus(shopId, orderId, newStatus, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse confirmOrder(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.CONFIRMED, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markPacking(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.PACKING, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markShipped(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.SHIPPED, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markDone(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.DONE, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markDeposited(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.DEPOSITED, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markRenting(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.RENTING, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markOverdue(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.OVERDUE, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse markReturned(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.RETURNED, userId, true);
+    }
+
+    @Transactional
+    public OrderResponse cancelOrder(Long shopId, Long orderId, Long userId) {
+        return transitionOrderStatus(shopId, orderId, Order.OrderStatus.CANCELLED, userId, true);
+    }
+
+    private OrderResponse transitionOrderStatus(Long shopId, Long orderId, Order.OrderStatus newStatus, Long userId, boolean allowInventoryChange) {
         Order order = orderRepository.findByIdAndShopId(orderId, shopId)
                 .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
 
+        orderStatusTransitionService.assertCanTransition(order, newStatus);
+
         Order.OrderStatus previousStatus = order.getStatus();
+        boolean inventoryCommitted = isInventoryCommitted(order);
+        boolean shouldNotifyMessengerConfirmed = shouldNotifyMessengerConfirmed(order, newStatus, inventoryCommitted);
+
+        if (allowInventoryChange) {
+            if (newStatus == Order.OrderStatus.CANCELLED && inventoryCommitted) {
+                releaseRentalAvailability(order.getId());
+                restoreSellStock(order);
+                order.setInventoryCommitted(false);
+            } else if (shouldCommitInventoryOnStatus(newStatus) && !inventoryCommitted) {
+                commitInventory(shopId, order);
+            }
+        }
+
         String fromStatus = previousStatus.name();
         order.setStatus(newStatus);
 
-        // Log status change
         OrderStatusLog log = OrderStatusLog.builder()
                 .order(order)
                 .fromStatus(fromStatus)
@@ -257,12 +345,53 @@ public class OrderService {
                 .build();
         order.getStatusLogs().add(log);
 
-        order = orderRepository.save(order);
-        if (previousStatus != Order.OrderStatus.CANCELLED && newStatus == Order.OrderStatus.CANCELLED) {
-            releaseRentalAvailability(order.getId());
-            restoreSellStock(order);
+        Order savedOrder = orderRepository.save(order);
+        Order responseOrder = savedOrder != null ? savedOrder : order;
+        notifyMessengerConfirmedIfNeeded(responseOrder, shouldNotifyMessengerConfirmed);
+        return orderMapper.toResponse(responseOrder);
+    }
+
+    @Transactional
+    public OrderResponse updateOrder(Long shopId, Long orderId, OrderUpdateRequest request) {
+        Order order = orderRepository.findByIdAndShopId(orderId, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        order.setCustomerName(request.getCustomerName());
+        order.setCustomerPhone(request.getCustomerPhone());
+        order.setCustomerAddress(request.getCustomerAddress());
+        order.setCustomerNote(request.getCustomerNote());
+        order.setSourceChannel(request.getSourceChannel());
+        order.setShippingMethod(request.getShippingMethod());
+        order.setShippingFee(request.getShippingFee() != null ? request.getShippingFee() : BigDecimal.ZERO);
+
+        BigDecimal itemsTotal = order.getItems() == null
+                ? BigDecimal.ZERO
+                : order.getItems().stream()
+                        .map(item -> item.getLineTotal() != null ? item.getLineTotal() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+        order.setTotalAmount(itemsTotal.add(order.getShippingFee()));
+
+        return orderMapper.toResponse(orderRepository.save(order));
+    }
+
+    @Transactional
+    public OrderResponse updatePayment(Long shopId, Long orderId, OrderPaymentUpdateRequest request) {
+        Order order = orderRepository.findByIdAndShopId(orderId, shopId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order", orderId));
+
+        if (request.getPaymentStatus() == Order.PaymentStatus.DEPOSITED
+                && order.getOrderType() != Order.OrderType.RENT) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                    "Deposited payment status is only available for rental orders");
         }
-        return orderMapper.toResponse(order);
+
+        Order.PaymentStatus previousPaymentStatus = order.getPaymentStatus();
+        order.setPaymentStatus(request.getPaymentStatus());
+        order.setPaymentMethod(request.getPaymentMethod());
+
+        Order savedOrder = orderRepository.save(order);
+        notificationService.notifyOrderPaymentUpdated(savedOrder, previousPaymentStatus);
+        return orderMapper.toResponse(savedOrder);
     }
 
     // ==================== Private Helpers ====================
@@ -276,15 +405,92 @@ public class OrderService {
         return "ORD-" + datePart + "-" + randomPart;
     }
 
+    private boolean shouldCommitInventoryOnCreate(
+            Order.OrderStatus initialStatus,
+            Order.SourceMethod sourceMethod
+    ) {
+        if (sourceMethod == Order.SourceMethod.MESSENGER) {
+            return false;
+        }
+        return initialStatus != Order.OrderStatus.CANCELLED;
+    }
+
+    private boolean shouldCommitInventoryOnStatus(Order.OrderStatus status) {
+        return switch (status) {
+            case CONFIRMED, PACKING, SHIPPED, DONE, DEPOSITED, RENTING, OVERDUE, RETURNED -> true;
+            default -> false;
+        };
+    }
+
+    private boolean shouldNotifyMessengerConfirmed(
+            Order order,
+            Order.OrderStatus newStatus,
+            boolean inventoryCommittedBeforeUpdate
+    ) {
+        return order.getSourceMethod() == Order.SourceMethod.MESSENGER
+                && shouldCommitInventoryOnStatus(newStatus)
+                && !inventoryCommittedBeforeUpdate;
+    }
+
+    private void notifyMessengerConfirmedIfNeeded(Order order, boolean shouldNotify) {
+        if (!shouldNotify) {
+            return;
+        }
+
+        try {
+            messengerOrderNotificationService.notifyOrderConfirmed(order);
+        } catch (RuntimeException ex) {
+            log.warn("Failed to notify Messenger customer about confirmed order. orderId={}, reason={}",
+                    order.getId(), ex.getMessage());
+        }
+    }
+
+    private boolean isInventoryCommitted(Order order) {
+        return Boolean.TRUE.equals(order.getInventoryCommitted());
+    }
+
+    private void commitInventory(Long shopId, Order order) {
+        Map<Long, Integer> quantitiesByVariantId = collectItemQuantities(order);
+        Map<Long, ProductVariant> variantsById = lockAndValidateVariants(shopId, quantitiesByVariantId);
+        validateOrderTypeCompatibility(order.getOrderType(), variantsById);
+        validateVariantPrices(order.getOrderType(), variantsById);
+        validateStockAvailability(order.getOrderType(), variantsById, quantitiesByVariantId);
+
+        if (order.getOrderType() == Order.OrderType.RENT) {
+            validateRentalDates(order, variantsById, quantitiesByVariantId);
+        }
+
+        deductSellStockIfNeeded(order.getOrderType(), variantsById, quantitiesByVariantId);
+        reserveRentalAvailabilityIfNeeded(order);
+        order.setInventoryCommitted(true);
+    }
+
     private void validateRentalDates(
             OrderRequest request,
             Map<Long, ProductVariant> variantsById,
             Map<Long, Integer> quantitiesByVariantId
     ) {
-        if (request.getRentFrom() == null || request.getRentTo() == null) {
+        validateRentalDates(request.getRentFrom(), request.getRentTo(), variantsById, quantitiesByVariantId);
+    }
+
+    private void validateRentalDates(
+            Order order,
+            Map<Long, ProductVariant> variantsById,
+            Map<Long, Integer> quantitiesByVariantId
+    ) {
+        validateRentalDates(order.getRentFrom(), order.getRentTo(), variantsById, quantitiesByVariantId);
+    }
+
+    private void validateRentalDates(
+            LocalDate rentFrom,
+            LocalDate rentTo,
+            Map<Long, ProductVariant> variantsById,
+            Map<Long, Integer> quantitiesByVariantId
+    ) {
+        if (rentFrom == null || rentTo == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rent dates are required for rental orders");
         }
-        if (request.getRentFrom().isAfter(request.getRentTo())) {
+        if (rentFrom.isAfter(rentTo)) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rent from date must be before rent to date");
         }
 
@@ -294,12 +500,17 @@ public class OrderService {
             int requestedQty = entry.getValue();
             int stockQty = variant.getStockQty() != null ? variant.getStockQty() : 0;
             List<RentalAvailability> conflicts = availabilityRepository.findConflicts(
-                    variantId, request.getRentFrom(), request.getRentTo());
-            int reservedQty = maxConcurrentRentalBlocks(conflicts, request.getRentFrom(), request.getRentTo());
+                    variantId, rentFrom, rentTo);
+            int reservedQty = maxConcurrentRentalBlocks(conflicts, rentFrom, rentTo);
             if (reservedQty + requestedQty > stockQty) {
                 throw new BusinessException(ErrorCode.RENTAL_DATE_CONFLICT);
             }
         }
+    }
+
+    private int resolveRentalDays(LocalDate rentFrom, LocalDate rentTo) {
+        long days = ChronoUnit.DAYS.between(rentFrom, rentTo) + 1;
+        return days > 0 && days <= Integer.MAX_VALUE ? (int) days : 1;
     }
 
     private Map<Long, Integer> collectItemQuantities(OrderRequest request) {
@@ -314,6 +525,25 @@ public class OrderService {
             }
             int qty = resolveQuantity(itemReq);
             quantitiesByVariantId.merge(itemReq.getVariantId(), qty, Integer::sum);
+        }
+        return quantitiesByVariantId;
+    }
+
+    private Map<Long, Integer> collectItemQuantities(Order order) {
+        if (order.getItems() == null || order.getItems().isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "At least one item is required");
+        }
+
+        Map<Long, Integer> quantitiesByVariantId = new LinkedHashMap<>();
+        for (OrderItem item : order.getItems()) {
+            if (item.getVariant() == null || item.getVariant().getId() == null) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Variant ID must not be null");
+            }
+            int qty = item.getQuantity() != null ? item.getQuantity() : 1;
+            if (qty <= 0) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Quantity must be greater than 0");
+            }
+            quantitiesByVariantId.merge(item.getVariant().getId(), qty, Integer::sum);
         }
         return quantitiesByVariantId;
     }
@@ -425,7 +655,7 @@ public class OrderService {
         }
     }
 
-    private void reserveRentalAvailabilityIfNeeded(Order order, OrderRequest request) {
+    private void reserveRentalAvailabilityIfNeeded(Order order) {
         if (order.getOrderType() != Order.OrderType.RENT) {
             return;
         }
@@ -437,8 +667,8 @@ public class OrderService {
                 reservations.add(RentalAvailability.builder()
                         .variant(item.getVariant())
                         .order(order)
-                        .startDate(request.getRentFrom())
-                        .endDate(request.getRentTo())
+                        .startDate(order.getRentFrom())
+                        .endDate(order.getRentTo())
                         .blockType(RentalAvailability.BlockType.CONFIRMED)
                         .reason("Order " + order.getOrderCode())
                         .isActive(true)
@@ -565,5 +795,62 @@ public class OrderService {
         } catch (Exception ignored) {
             return fieldValue.getValueJson().replace("\"", "").trim();
         }
+    }
+
+    private void validatePaymentMethod(Long shopId, Order.PaymentMethod paymentMethod) {
+        if (paymentMethod == null) {
+            return;
+        }
+
+        ShopPaymentConfig config = paymentConfigRepository.findByShopId(shopId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.VALIDATION_ERROR,
+                        "Payment method is not configured for this shop"
+                ));
+
+        boolean enabled = switch (paymentMethod) {
+            case COD -> Boolean.TRUE.equals(config.getCodEnabled());
+            case BANK_TRANSFER -> Boolean.TRUE.equals(config.getBankTransferEnabled());
+            case VNPAY -> Boolean.TRUE.equals(config.getVnpayEnabled());
+        };
+
+        if (!enabled) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Payment method is disabled for this shop");
+        }
+    }
+
+    private void validateShopCanCreateOrder(Shop shop, OrderRequest request) {
+        if (request.getSourceMethod() == Order.SourceMethod.PUBLIC_FORM
+                && Boolean.TRUE.equals(shop.getMaintenanceMode())) {
+            throw new BusinessException(ErrorCode.SHOP_MAINTENANCE, "Shop is currently in maintenance mode");
+        }
+
+        if (request.getOrderType() == Order.OrderType.SELL && !Boolean.TRUE.equals(shop.getEnableSell())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Sell orders are disabled for this shop");
+        }
+
+        if (request.getOrderType() == Order.OrderType.RENT && !Boolean.TRUE.equals(shop.getEnableRent())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Rent orders are disabled for this shop");
+        }
+    }
+
+    private Order.OrderStatus resolveInitialStatus(Shop shop, OrderRequest request) {
+        if (request.getSourceMethod() == Order.SourceMethod.MESSENGER) {
+            return Order.OrderStatus.PENDING;
+        }
+
+        if (request.getSourceMethod() == Order.SourceMethod.MANUAL || 
+            request.getSourceMethod() == Order.SourceMethod.AI_PARSE) {
+            return Order.OrderStatus.CONFIRMED;
+        }
+
+        if (request.getSourceMethod() == Order.SourceMethod.PUBLIC_FORM &&
+            request.getPaymentMethod() == Order.PaymentMethod.BANK_TRANSFER) {
+            return Order.OrderStatus.PENDING;
+        }
+
+        return Boolean.TRUE.equals(shop.getAutoAcceptOrders())
+                ? Order.OrderStatus.CONFIRMED
+                : Order.OrderStatus.PENDING;
     }
 }

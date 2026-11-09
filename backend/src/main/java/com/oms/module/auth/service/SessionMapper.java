@@ -79,7 +79,7 @@ public class SessionMapper {
                 .phone(shop.getPhone())
                 .supportEmail(shop.getSupportEmail())
                 .supportPhone(shop.getSupportPhone())
-                .businessMode(shop.getBusinessMode())
+                .businessMode(resolveBusinessMode(shop))
                 .status(shop.getStatus().name())
                 .enableSell(shop.getEnableSell())
                 .enableRent(shop.getEnableRent())
@@ -103,6 +103,17 @@ public class SessionMapper {
                                 .build())
                         .toList())
                 .build();
+    }
+
+    private String resolveBusinessMode(Shop shop) {
+        boolean enableSell = Boolean.TRUE.equals(shop.getEnableSell());
+        boolean enableRent = Boolean.TRUE.equals(shop.getEnableRent());
+
+        if (enableSell && enableRent) {
+            return "BOTH";
+        }
+
+        return enableSell ? "SELL" : "RENT";
     }
 
     private AuthOnboardingDto mapOnboarding(ShopOnboardingState state) {

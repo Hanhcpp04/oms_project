@@ -8,6 +8,7 @@ import com.oms.module.auth.service.SessionMapper;
 import com.oms.module.auth.service.TokenService;
 import com.oms.module.orderform.repository.OrderFormConfigRepository;
 import com.oms.module.product.entity.ProductType;
+import com.oms.module.product.repository.ProductRepository;
 import com.oms.module.shop.dto.CreateShopAddressRequest;
 import com.oms.module.shop.dto.ShopBusinessTypeRequest;
 import com.oms.module.shop.dto.ShopCategoriesRequest;
@@ -46,6 +47,7 @@ public class ShopService {
     private final UserRepository userRepository;
     private final TokenService tokenService;
     private final SessionMapper sessionMapper;
+    private final ProductRepository productRepository;
 
     private static final String DEFAULT_ONBOARDING_STEP = "SHOP_PROFILE";
 
@@ -76,6 +78,7 @@ public class ShopService {
                 .email(email)
                 .phone(phone)
                 .logoUrl(logoUrl)
+                .businessMode("BOTH")
                 .status(Shop.ShopStatus.ACTIVE)
                 .build();
 
@@ -106,8 +109,15 @@ public class ShopService {
             throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
         }
 
-        shop.setEnableSell(request.getEnableSell());
-        shop.setEnableRent(request.getEnableRent());
+        boolean enableSell = Boolean.TRUE.equals(request.getEnableSell());
+        boolean enableRent = Boolean.TRUE.equals(request.getEnableRent());
+        if (!enableSell && !enableRent) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Shop must enable at least sell or rent mode");
+        }
+
+        shop.setEnableSell(enableSell);
+        shop.setEnableRent(enableRent);
+        shop.setBusinessMode(resolveBusinessMode(enableSell, enableRent));
         shopRepository.save(shop);
 
         ShopOnboardingState state = onboardingStateRepository.findFirstByShopOrderByIdDesc(shop)
@@ -128,20 +138,7 @@ public class ShopService {
             throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
         }
 
-        // Clear existing categories for this shop
-        shopCategoryRepository.deleteAllByShopId(shop.getId());
-
-        // Add new categories
-        List<ShopCategory> categories = request.getCategories().stream()
-                .map(name -> ShopCategory.builder()
-                        .shop(shop)
-                        .name(name)
-                        .slug(SlugUtils.toSlug(name))
-                        .isActive(true)
-                        .build())
-                .toList();
-
-        shopCategoryRepository.saveAll(categories);
+        updateCategoriesInternal(shop, request.getCategories());
 
         return issueSessionForUser(user);
     }
@@ -175,20 +172,7 @@ public class ShopService {
             throw new BusinessException(ErrorCode.SHOP_NOT_FOUND);
         }
 
-        // Clear existing categories for this shop
-        shopCategoryRepository.deleteAllByShopId(shop.getId());
-
-        // Add new categories
-        List<ShopCategory> categories = request.getCategories().stream()
-                .map(name -> ShopCategory.builder()
-                        .shop(shop)
-                        .name(name)
-                        .slug(SlugUtils.toSlug(name))
-                        .isActive(true)
-                        .build())
-                .toList();
-
-        shopCategoryRepository.saveAll(categories);
+        updateCategoriesInternal(shop, request.getCategories());
 
         return issueSessionForUser(user);
     }
@@ -468,6 +452,65 @@ public class ShopService {
 
     // ==================== Private Helpers ====================
 
+    private void updateCategoriesInternal(Shop shop, List<String> requestedNames) {
+        List<ShopCategory> existingCategories = shopCategoryRepository.findAllByShopId(shop.getId());
+        List<String> remainingRequestedNames = new ArrayList<>(requestedNames);
+        List<ShopCategory> toSave = new ArrayList<>();
+        List<ShopCategory> unmatchedExisting = new ArrayList<>();
+
+        for (ShopCategory existing : existingCategories) {
+            if (remainingRequestedNames.contains(existing.getName())) {
+                toSave.add(existing);
+                remainingRequestedNames.remove(existing.getName());
+            } else {
+                unmatchedExisting.add(existing);
+            }
+        }
+
+        // Prioritize renaming categories that have products so we don't try to delete them
+        unmatchedExisting.sort((cat1, cat2) -> {
+            boolean hasProducts1 = productRepository.existsByCategoryId(cat1.getId());
+            boolean hasProducts2 = productRepository.existsByCategoryId(cat2.getId());
+            if (hasProducts1 && !hasProducts2) return -1;
+            if (!hasProducts1 && hasProducts2) return 1;
+            return 0;
+        });
+
+        int renameCount = Math.min(unmatchedExisting.size(), remainingRequestedNames.size());
+        for (int i = 0; i < renameCount; i++) {
+            ShopCategory existingToRename = unmatchedExisting.get(i);
+            String newName = remainingRequestedNames.get(i);
+            
+            existingToRename.setName(newName);
+            existingToRename.setSlug(SlugUtils.toSlug(newName));
+            toSave.add(existingToRename);
+        }
+
+        if (renameCount > 0) {
+            unmatchedExisting.subList(0, renameCount).clear();
+            remainingRequestedNames.subList(0, renameCount).clear();
+        }
+
+        for (ShopCategory existing : unmatchedExisting) {
+            if (productRepository.existsByCategoryId(existing.getId())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                        "Không thể xóa danh mục '" + existing.getName() + "' vì đang có sản phẩm thuộc danh mục này.");
+            }
+            shopCategoryRepository.delete(existing);
+        }
+
+        for (String name : remainingRequestedNames) {
+            toSave.add(ShopCategory.builder()
+                    .shop(shop)
+                    .name(name)
+                    .slug(SlugUtils.toSlug(name))
+                    .isActive(true)
+                    .build());
+        }
+
+        shopCategoryRepository.saveAll(toSave);
+    }
+
     /**
      * Issues a fresh session (new tokens + full session DTO) for the user.
      * Used after shop data changes that affect the session response.
@@ -515,6 +558,14 @@ public class ShopService {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String resolveBusinessMode(boolean enableSell, boolean enableRent) {
+        if (enableSell && enableRent) {
+            return "BOTH";
+        }
+
+        return enableSell ? "SELL" : "RENT";
     }
 
     private String generateUniqueSlug(String shopName) {

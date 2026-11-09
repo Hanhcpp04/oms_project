@@ -27,6 +27,7 @@ public class ProductResponse {
     @Builder
     public static class VariantResponse {
         private Long id;
+        private String sku;
         private String size;
         private String color;
         private Integer stockQty;

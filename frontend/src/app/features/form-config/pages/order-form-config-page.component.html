@@ -1,163 +1,134 @@
-
-<!-- Main Card -->
-<app-ui-card>
-    <!-- Header -->
-    <div class="bg-white border-b border-[var(--color-border)] px-6 py-4 flex flex-wrap items-center justify-between gap-4">
-      <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-lg bg-[var(--color-accent-soft)] flex items-center justify-center text-[var(--color-accent)]">
-          <i class="i-lucide-clipboard-list text-2xl"></i>
-        </div>
-        <div>
-          <h2 class="text-lg font-extrabold text-[var(--color-text-primary)]">Cấu hình mẫu đơn hàng</h2>
-          <p class="text-[10px] font-bold text-[var(--color-text-tertiary)] uppercase tracking-widest">Thiết lập các trường dữ liệu cho đơn hàng</p>
-        </div>
-      </div>
-      
-      <div class="flex items-center gap-4">
-        <!-- Tab Selector -->
-        <div class="flex bg-[var(--color-surface-secondary)] p-1 rounded-md border border-[var(--color-border)]">
-          @if (businessMode() === 'SELL' || businessMode() === 'BOTH') {
-            <button
-              type="button"
-              class="px-4 py-1.5 text-[10px] font-extrabold rounded-sm transition-all flex items-center gap-1.5"
-              [class.bg-white]="activeTab() === 'SELL'"
-              [class.shadow-sm]="activeTab() === 'SELL'"
-              [class.text-[var(--color-accent)]]="activeTab() === 'SELL'"
-              [class.text-[var(--color-text-tertiary)]]="activeTab() !== 'SELL'"
-              (click)="setTab('SELL')"
-            >
-              <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-accent)]" *ngIf="activeTab() === 'SELL'"></span>
-              ĐƠN BÁN HÀNG
-            </button>
-          }
-          @if (businessMode() === 'RENT' || businessMode() === 'BOTH') {
-            <button
-              type="button"
-              class="px-4 py-1.5 text-[10px] font-extrabold rounded-sm transition-all flex items-center gap-1.5"
-              [class.bg-white]="activeTab() === 'RENT'"
-              [class.shadow-sm]="activeTab() === 'RENT'"
-              [class.text-[var(--color-info)]]="activeTab() === 'RENT'"
-              [class.text-[var(--color-text-tertiary)]]="activeTab() !== 'RENT'"
-              (click)="setTab('RENT')"
-            >
-              <span class="h-1.5 w-1.5 rounded-full bg-[var(--color-info)]" *ngIf="activeTab() === 'RENT'"></span>
-              ĐƠN CHO THUÊ
-            </button>
-          }
-        </div>
-      </div>
-    </div>
-
-    <!-- Body -->
-    <div class="p-6 flex flex-col gap-8 bg-[#f8f9fa]">
-      
-      <!-- Section 1: System Fields -->
-      <div class="grid gap-4">
-        <div class="flex items-center gap-2">
-          <span class="h-1 w-3 bg-gray-400 rounded-full"></span>
-          <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">Thông tin khách hàng (Mặc định)</h3>
-          <span class="rounded bg-gray-100 border border-gray-200 px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-widest text-gray-400">Cố định</span>
-        </div>
-        
-        <div class="bg-white rounded-xl border border-[var(--color-border)] p-5 shadow-sm">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div class="space-y-4">
-              <div>
-                <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Tên khách hàng</label>
-                <div class="relative">
-                   <input type="text" class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-xs text-gray-400 outline-none cursor-not-allowed" placeholder="Nguyễn Văn A..." readonly>
-                   <i class="i-lucide-lock absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-300"></i>
-                </div>
-              </div>
-              <div>
-                <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Số điện thoại</label>
-                <div class="relative">
-                  <input type="text" class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-xs text-gray-400 outline-none cursor-not-allowed" placeholder="090..." readonly>
-                  <i class="i-lucide-lock absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-300"></i>
-                </div>
-              </div>
-              <div>
-                <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Ghi chú đơn hàng</label>
-                <div class="relative">
-                  <textarea class="h-16 w-full bg-gray-50 border border-gray-100 rounded px-3 py-2 text-xs text-gray-400 outline-none cursor-not-allowed resize-none" placeholder="Ghi chú thêm..." readonly></textarea>
-                  <i class="i-lucide-lock absolute right-3 top-3 text-[10px] text-gray-300"></i>
-                </div>
-              </div>
-            </div>
-
-            <div class="space-y-4">
-              <div class="grid grid-cols-2 gap-3">
-                <div>
-                  <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Nguồn đơn hàng</label>
-                  <select class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-[10px] text-gray-400 outline-none cursor-default" disabled>
-                    <option>Facebook, Shopee, Zalo...</option>
-                  </select>
-                </div>
-                <div>
-                  <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">PT Vận chuyển</label>
-                  <select class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-[10px] text-gray-400 outline-none cursor-default" disabled>
-                    <option>GHTK, Hoả tốc, Viettel...</option>
-                  </select>
-                </div>
-              </div>
-
-              @if (activeTab() === 'SELL') {
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Phí VC</label>
-                    <div class="relative">
-                      <input type="text" class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-xs text-gray-400 outline-none" value="30.000" readonly>
-                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-gray-300">Đ</span>
-                    </div>
-                  </div>
-                </div>
-              } @else {
-                <div class="grid grid-cols-2 gap-3">
-                  <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Tiền cọc</label>
-                    <div class="relative">
-                      <input type="text" class="h-9 w-full bg-blue-50/30 border border-blue-50 rounded px-3 text-xs font-bold text-blue-600 outline-none" value="500.000" readonly>
-                      <span class="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold opacity-60">Đ</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Thời gian thuê</label>
-                    <div class="flex h-9 items-center gap-2 bg-blue-50/30 border border-blue-50 rounded px-3 text-[10px] font-bold text-blue-600">
-                      <i class="i-lucide-calendar text-xs"></i> 15/05 — 17/05
-                    </div>
-                  </div>
-                </div>
-              }
-              <div>
-                <label class="text-[8px] font-bold text-[var(--color-text-tertiary)] uppercase ml-1 block mb-1.5">Địa chỉ giao hàng</label>
-                <div class="relative">
-                  <input type="text" class="h-9 w-full bg-gray-50 border border-gray-100 rounded px-3 text-xs text-gray-400 outline-none cursor-not-allowed" placeholder="Địa chỉ giao hàng..." readonly>
-                  <i class="i-lucide-lock absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-gray-300"></i>
-                </div>
-              </div>
-              <div class="p-3 bg-amber-50 rounded-lg border border-amber-100 flex gap-3">
-                 <i class="i-lucide-info text-amber-500 text-lg shrink-0"></i>
-                 <p class="text-[9px] text-amber-700 leading-relaxed font-medium">Các trường thông tin trên là mặc định của hệ thống. Bạn có thể thêm các trường tùy chỉnh bên dưới để thu thập thêm dữ liệu mong muốn.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 2: Custom Fields -->
-      <app-dynamic-form-field-manager
-        [fields]="localFields()"
-        [isOrderForm]="true"
+<div class="form-config-page">
+  <div class="form-config-page__shell">
+    <main class="form-config-page__main">
+      <app-form-header-editor
+        [title]="currentTemplate().name"
+        [description]="formDescription()"
+        [formType]="activeTab()"
+        [status]="currentTemplate().status"
+        [fieldCount]="fieldCount()"
+        [mode]="mode()"
+        [hasUnsavedChanges]="hasUnsavedChanges()"
         [isSaving]="isSaving()"
-        title="Trường dữ liệu tùy chỉnh (Bổ sung)"
-        addButtonLabel="Thêm trường mới"
-        emptyStateLabel="Chưa có trường tùy chỉnh nào"
-        emptyStateHint="Nhấn để thêm trường mới cho mẫu đơn hàng"
-        (fieldsChanged)="onFieldsChanged($event)"
-        (saveField)="onSaveField($event)"
-        (deleteField)="onDeleteField($event)"
-      ></app-dynamic-form-field-manager>
+        [isInvalid]="isInvalid()"
+        (modeChange)="setMode($event)"
+        (save)="saveConfiguration()"
+      />
 
-      <!-- Section Removed: Global Footer Action -->
-    </div>
-</app-ui-card>
+
+
+      @if (loading() && localFields().length === 0) {
+        <section class="form-config-skeleton" aria-label="Đang tải cấu hình">
+          <div></div>
+          <div></div>
+          <div></div>
+        </section>
+      } @else if (mode() === 'preview') {
+        <app-form-preview
+          [title]="currentTemplate().name"
+          [description]="formDescription()"
+          [formType]="activeTab()"
+          [fields]="localFields()"
+        />
+      } @else {
+        <section class="form-config-system-card">
+          <div class="form-config-section-title">
+            <div>
+              <span></span>
+              <h2>Trường hệ thống</h2>
+            </div>
+            <strong>Cố định</strong>
+          </div>
+
+          <div class="form-config-system-grid">
+            <label>
+              <span>Tên khách hàng</span>
+              <input type="text" placeholder="Nguyễn Văn A" readonly />
+            </label>
+            <label>
+              <span>Số điện thoại</span>
+              <input type="text" placeholder="090..." readonly />
+            </label>
+            <label>
+              <span>Nguồn đơn hàng</span>
+              <select disabled>
+                <option>Facebook, Shopee, Zalo...</option>
+              </select>
+            </label>
+            <label>
+              <span>Phương thức vận chuyển</span>
+              <select disabled>
+                <option>GHTK, Hỏa tốc, Viettel...</option>
+              </select>
+            </label>
+            @if (activeTab() === 'RENT') {
+              <label>
+                <span>Thời gian thuê</span>
+                <input type="text" placeholder="Ngày bắt đầu - ngày kết thúc" readonly />
+              </label>
+              <label>
+                <span>Tiền cọc</span>
+                <input type="text" placeholder="500.000đ" readonly />
+              </label>
+            }
+            <label class="form-config-system-grid__wide">
+              <span>Địa chỉ giao hàng</span>
+              <input type="text" placeholder="Địa chỉ giao hàng" readonly />
+            </label>
+          </div>
+        </section>
+
+        <section class="form-config-fields">
+          <div class="form-config-section-title">
+            <div>
+              <span></span>
+              <h2>Field tùy chỉnh</h2>
+            </div>
+            @if (hasUnsavedChanges()) {
+              <strong class="form-config-section-title__dirty">Chưa lưu</strong>
+            }
+          </div>
+
+          <div class="form-config-fields__list">
+            @for (field of localFields(); track field.id; let index = $index; let first = $first; let last = $last) {
+              <app-form-field-card
+                [field]="field"
+                [isActive]="activeFieldId() === field.id"
+                [isFirst]="first"
+                [isLast]="last"
+                [fieldErrors]="getFieldErrors(field.id)"
+                [formTypeLabel]="formTypeLabel()"
+                [fieldTypeOptions]="fieldTypeOptions"
+                (activated)="activeFieldId.set($event)"
+                (fieldChange)="updateField($event)"
+                (duplicate)="duplicateField($event)"
+                (delete)="deleteField($event)"
+                (moveUp)="moveField($event, 'up')"
+                (moveDown)="moveField($event, 'down')"
+              />
+            } @empty {
+              <div class="form-config-empty" (click)="addField('text')">
+                <div>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                </div>
+                <h3>Chưa có trường nào trong form</h3>
+                <p>Bấm thêm trường để bắt đầu cấu hình form</p>
+              </div>
+            }
+          </div>
+        </section>
+      }
+    </main>
+
+    @if (mode() === 'edit') {
+      <aside class="form-config-page__toolbar">
+        <app-form-config-toolbar
+          (addField)="addField($event)"
+          (preview)="setMode('preview')"
+        />
+      </aside>
+    }
+  </div>
+</div>

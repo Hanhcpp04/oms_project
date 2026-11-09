@@ -1,147 +1,196 @@
-<div class="max-w-[1200px] mx-auto p-4 md:p-6 pb-24">
-    <!-- Header -->
-    <div class="mb-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-            <div class="flex items-center gap-3 mb-1">
-                <button 
-                    (click)="goBack()"
-                    class="h-8 w-8 rounded-full flex items-center justify-center text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-secondary)] transition-colors"
-                    title="Quay lại"
-                >
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                </button>
-                <h1 class="text-2xl font-bold text-[var(--color-text-primary)]">
-                    {{ mode() === 'view' ? 'Chi Tiết Sản Phẩm' : 'Cập Nhật Sản Phẩm' }}
-                </h1>
-            </div>
-            <p class="text-sm text-[var(--color-text-secondary)] ml-11">
-                {{ product()?.name || 'Đang tải...' }}
-            </p>
-        </div>
+<div class="min-h-full bg-[var(--color-bg)] pb-8">
+  <div class="mx-auto grid max-w-[1320px] gap-4">
+    <header
+      class="flex flex-col gap-4 border-b border-[var(--color-border)] pb-4 lg:flex-row lg:items-end lg:justify-between">
+      <div class="min-w-0">
+        <nav
+          class="mb-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap text-xs font-semibold text-[var(--color-text-tertiary)] scrollbar-hide">
+          <button type="button" class="transition-colors hover:text-[var(--color-text-primary)]" (click)="goBack()">Sản
+            phẩm</button>
+          <i class="ri-arrow-right-s-line text-[var(--color-text-muted)]"></i>
+          @if (product()?.category; as category) {
+          <span>{{ category }}</span>
+          <i class="ri-arrow-right-s-line text-[var(--color-text-muted)]"></i>
+          }
+          <span class="truncate text-[var(--color-text-primary)]">{{ product()?.name || 'Đang tải...' }}</span>
+        </nav>
 
-        @if (product() && !notFound()) {
-            <div class="flex items-center gap-2 sm:self-start ml-11 sm:ml-0">
-                @if (mode() === 'view') {
-                    <app-ui-button variant="primary" (clicked)="isCreateOrderModalOpen.set(true)">
-                        <div class="flex items-center gap-2">
-                            <i class="ri-add-line text-lg leading-none"></i>
-                            Tạo đơn
-                        </div>
-                    </app-ui-button>
+        <h1 class="m-0 text-lg font-bold leading-tight tracking-tight text-[var(--color-text-primary)]">
+          {{ mode() === 'edit' ? 'Cập nhật sản phẩm' : 'Chi tiết sản phẩm' }}
+        </h1>
+        <p class="m-0 mt-1 text-[11px] font-medium leading-5 text-[var(--color-text-secondary)]">
+          {{ mode() === 'edit' ? 'Chỉnh sửa thông tin, giá cả và thuộc tính sản phẩm.' : 'Theo dõi thông tin bán, thuê, tồn kho, biến thể và lịch thuê.' }}
+        </p>
+      </div>
 
-                    <app-ui-button variant="soft" (clicked)="isQrModalOpen.set(true)">
-                        <div class="flex items-center gap-2">
-                            <i class="ri-qr-code-line text-lg leading-none"></i>
-                            Tạo QR
-                        </div>
-                    </app-ui-button>
+      <!-- Edit Actions -->
+      @if (mode() === 'edit') {
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button"
+          class="inline-flex h-8 items-center justify-center rounded-[var(--radius-none)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-[11px] font-bold uppercase tracking-widest text-[var(--color-text-primary)] transition-all hover:border-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)]"
+          [disabled]="store.creating()" (click)="onCanceled()">
+          Hủy bỏ
+        </button>
+        <button type="button"
+          class="inline-flex h-8 items-center justify-center rounded-[var(--radius-none)] bg-[var(--color-text-primary)] px-6 text-[11px] font-bold uppercase tracking-widest text-[var(--color-surface)] transition-all hover:bg-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+          [disabled]="store.creating() || productForm?.uploading?.()" (click)="productForm?.submit?.()">
+          @if (store.creating()) {
+          <span class="mr-2 h-3 w-3 border-2 border-white/70 border-t-transparent animate-spin"></span>
+          }
+          Lưu
+        </button>
+      </div>
+      }
+    </header>
 
-                    <app-ui-button variant="secondary" (clicked)="toggleEditMode()">
-                        <div class="flex items-center gap-2">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                            </svg>
-                            Sửa thông tin
-                        </div>
-                    </app-ui-button>
-                } @else {
-                    <app-ui-button variant="soft" (clicked)="onCanceled()">
-                        Hủy chỉnh sửa
-                    </app-ui-button>
-                }
-            </div>
-        }
-    </div>
-
-    <!-- Content -->
     @if (loading()) {
-        <div class="flex flex-col items-center justify-center py-20 text-[var(--color-text-tertiary)]">
-            <div class="h-8 w-8 border-4 border-[var(--color-accent)] border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="text-sm font-medium">Đang tải thông tin sản phẩm...</p>
-        </div>
+    <app-product-detail-skeleton />
     } @else if (notFound()) {
-        <div class="flex flex-col items-center justify-center py-20 text-[var(--color-text-tertiary)] bg-white rounded-xl border border-[var(--color-border)] shadow-sm">
-            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mb-4 text-gray-300">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-            <h2 class="text-lg font-bold text-[var(--color-text-primary)] mb-1">Không tìm thấy sản phẩm</h2>
-            <p class="text-sm mb-6">Sản phẩm này có thể đã bị xóa hoặc bạn không có quyền truy cập.</p>
-            <app-ui-button variant="primary" (clicked)="goBack()">Quay lại danh sách</app-ui-button>
+    <section
+      class="grid min-h-[320px] place-items-center rounded-[var(--radius-sm)] border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10 text-center">
+      <div class="grid max-w-sm place-items-center gap-3">
+        <div
+          class="grid h-12 w-12 place-items-center rounded-[var(--radius-sm)] bg-[var(--color-surface-secondary)] text-[var(--color-text-muted)]">
+          <i class="ri-error-warning-line text-xl"></i>
         </div>
-    } @else if (product()) {
-        <app-product-form
-            [mode]="mode()"
-            [initialData]="product()"
-            [loading]="store.creating()"
-            (saved)="onSaved($event)"
-            (canceled)="onCanceled()"
-        ></app-product-form>
+        <div>
+          <h2 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Không tìm thấy sản phẩm</h2>
+          <p class="m-0 mt-1.5 text-[13px] leading-5 text-[var(--color-text-secondary)]">
+            Sản phẩm này có thể đã bị xóa hoặc bạn không có quyền truy cập.
+          </p>
+        </div>
+        <button type="button"
+          class="inline-flex h-8 items-center justify-center rounded-[var(--radius-xs)] bg-[var(--color-accent)] px-4 text-[12px] font-medium text-[var(--color-text-inverse)] transition-colors hover:bg-[var(--color-accent-hover)]"
+          (click)="goBack()">
+          Quay lại danh sách
+        </button>
+      </div>
+    </section>
+    } @else if (product(); as currentProduct) {
+    @if (mode() === 'edit') {
+    <div class="mt-3">
+      <app-product-form #productForm [mode]="mode()" [initialData]="currentProduct" [loading]="store.creating()"
+        (saved)="onSaved($event)" (canceled)="onCanceled()" />
+    </div>
+    } @else {
+    <section class="grid items-start gap-4 xl:grid-cols-[400px_minmax(0,1fr)]">
+      <app-product-detail-gallery class="min-w-0" [product]="currentProduct" />
 
-        @if (mode() === 'view' && isRentalProduct(product())) {
-            <section class="mt-6 rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-sm">
-                <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 class="m-0 text-base font-bold text-[var(--color-text-primary)]">Lịch thuê còn trống</h2>
-                        <p class="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
-                            Xem nhanh 60 ngày tới theo từng biến thể. Ngày đỏ là đã có đơn hoặc đã bị giữ lịch.
-                        </p>
-                    </div>
+      <app-product-detail-info class="min-w-0" [product]="currentProduct" [canEdit]="canEditProduct()"
+        [canCreateOrder]="canCreateOrder(currentProduct)" [canGenerateQr]="canGenerateQr()" (edit)="toggleEditMode()"
+        (createOrder)="isCreateOrderModalOpen.set(true)" (generateQr)="isQrModalOpen.set(true)"
+        (hideProduct)="hideProduct()" (restoreProduct)="restoreProduct()" />
+    </section>
 
-                    <select
-                        class="h-10 min-w-[220px] rounded-md border border-[var(--color-border)] bg-white px-3 text-sm text-[var(--color-text-primary)]"
-                        [value]="selectedAvailabilityVariantId() || ''"
-                        (change)="setAvailabilityVariant($any($event.target).value)"
-                    >
-                        @for (variant of product()!.variants; track variant.id) {
-                            <option [value]="variant.id">
-                                {{ formatVariantLabel(variant) }}
-                            </option>
-                        }
-                    </select>
-                </div>
+    <section class="mt-6">
+      <div class="flex gap-0.5 overflow-x-auto border-b border-[var(--color-border)] scrollbar-hide">
+        @for (tab of tabs(); track tab.value) {
+        <button type="button"
+          class="relative inline-flex h-8 shrink-0 items-center px-3 text-[12px] font-medium transition-colors"
+          [ngClass]="activeTab() === tab.value ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'"
+          (click)="setActiveTab(tab.value)">
+          {{ tab.label }}
+          @if (activeTab() === tab.value) {
+          <span class="absolute inset-x-3 bottom-0 h-[2px] rounded-t-sm bg-[var(--color-accent)]"></span>
+          }
+        </button>
+        }
+      </div>
 
-                <div class="mb-3 flex flex-wrap items-center gap-3 text-xs text-[var(--color-text-secondary)]">
-                    <span class="inline-flex items-center gap-1.5">
-                        <span class="h-3 w-3 rounded border border-[#BBF7D0] bg-[#F0FDF4]"></span>
-                        Còn trống
-                    </span>
-                    <span class="inline-flex items-center gap-1.5">
-                        <span class="h-3 w-3 rounded border border-[#FCA5A5] bg-[#FEF2F2]"></span>
-                        Đã giữ lịch
-                    </span>
-                    @if (availabilityLoading()) {
-                        <span class="text-[var(--color-text-tertiary)]">Đang tải lịch...</span>
-                    }
-                </div>
+      <div class="py-6">
+        @switch (activeTab()) {
+        @case ('overview') {
+        <div class="grid gap-4 lg:grid-cols-2">
+          <section class="min-w-0">
+            <h2 class="m-0 mb-2 text-sm font-semibold text-[var(--color-text-primary)]">Mô tả sản phẩm</h2>
+            @if (currentProduct.description) {
+            <div
+              class="min-h-[144px] whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--color-text-secondary)]">
+              {{ currentProduct.description }}
+            </div>
+            } @else {
+            <p class="m-0 text-[13px] text-[var(--color-text-muted)]">Chưa cập nhật mô tả.</p>
+            }
+          </section>
 
-                <div class="grid grid-cols-5 gap-2 sm:grid-cols-7 md:grid-cols-10 lg:grid-cols-12">
-                    @for (day of availabilityDays(); track day.date) {
-                        <div
-                            class="flex min-h-14 flex-col items-center justify-center rounded-md border px-1 text-center transition"
-                            [ngClass]="getAvailabilityDayClass(day.date)"
-                            [title]="isAvailabilityDayBlocked(day.date) ? 'Đã giữ lịch' : 'Còn trống'"
-                        >
-                            <span class="text-[10px] font-semibold uppercase">{{ day.weekday }}</span>
-                            <span class="text-xs font-bold">{{ formatDayLabel(day.date) }}</span>
-                        </div>
-                    }
-                </div>
-            </section>
+          <section class="min-w-0">
+            <h2 class="m-0 mb-2 text-sm font-semibold text-[var(--color-text-primary)]">Thông tin bổ sung</h2>
+            @if (customAttributeEntries().length > 0) {
+            <dl class="m-0 divide-y divide-[var(--color-border)]">
+              @for (entry of customAttributeEntries(); track entry.label) {
+              <div class="grid grid-cols-[96px_minmax(0,1fr)] gap-3 py-2 first:pt-0">
+                <dt class="text-[12px] font-medium text-[var(--color-text-muted)]">{{ entry.label }}</dt>
+                <dd class="m-0 min-w-0 break-words text-[13px] font-semibold text-[var(--color-text-primary)]">
+                  @for (item of entry.items; track item.value) {
+                  @if (item.isImage) {
+                  <button type="button"
+                    class="mb-1.5 block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus-ring)]"
+                    (click)="openViewer(item.value)">
+                    <img [src]="item.value" [alt]="entry.label"
+                      class="max-h-24 max-w-full rounded-none border border-[var(--color-border)] object-contain transition-opacity hover:opacity-80" />
+                  </button>
+                  } @else {
+                  <div class="mb-0.5 last:mb-0">{{ item.value }}</div>
+                  }
+                  }
+                </dd>
+              </div>
+              }
+            </dl>
+            } @else {
+            <p class="m-0 text-[13px] text-[var(--color-text-muted)]">Không có thông tin bổ sung.</p>
+            }
+          </section>
+        </div>
+
+        <div class="mt-4 grid gap-4 border-t border-[var(--color-border)] pt-4">
+          <app-product-detail-inventory [product]="currentProduct" />
+          <app-product-detail-variants [product]="currentProduct" [canEdit]="canEditProduct()"
+            (edit)="toggleEditMode()" />
+        </div>
         }
 
-        <app-create-order-modal
-            [isOpen]="isCreateOrderModalOpen()"
-            [product]="product()!"
-            (close)="isCreateOrderModalOpen.set(false)"
-            (created)="onOrderCreated($event)"
-        />
+        @case ('variants') {
+        <app-product-detail-variants [product]="currentProduct" [canEdit]="canEditProduct()"
+          (edit)="toggleEditMode()" />
+        }
 
-        <app-product-qr-code-modal
-            [isOpen]="isQrModalOpen()"
-            [product]="product()!"
-            (close)="isQrModalOpen.set(false)"
-        />
+        @case ('inventory') {
+        <app-product-detail-inventory [product]="currentProduct" />
+        }
+
+        @case ('rental') {
+        @if (isRentalProduct(currentProduct)) {
+        <app-product-detail-rental-info [product]="currentProduct" [days]="availabilityDays()"
+          [blocks]="availabilityBlocks()" [selectedVariantId]="selectedAvailabilityVariantId()"
+          [loading]="availabilityLoading()" (variantChange)="setAvailabilityVariant($event)" />
+        }
+        }
+        }
+      </div>
+    </section>
     }
+
+    <app-create-order-modal [isOpen]="isCreateOrderModalOpen()" [product]="currentProduct"
+      (close)="isCreateOrderModalOpen.set(false)" (created)="onOrderCreated($event)" />
+
+    <app-product-qr-code-modal [isOpen]="isQrModalOpen()" [product]="currentProduct"
+      (close)="isQrModalOpen.set(false)" />
+    }
+
+    @if (viewerOpen()) {
+    <div class="fixed inset-0 z-[80] grid place-items-center bg-black/85 p-4" role="dialog" aria-modal="true"
+      (click)="closeViewer()">
+      <button type="button"
+        class="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-sm bg-white/10 text-white transition-colors hover:bg-white/20"
+        (click)="closeViewer(); $event.stopPropagation()" aria-label="Đóng ảnh">
+        <i class="ri-close-line text-xl"></i>
+      </button>
+      @if (selectedViewerImage(); as imageUrl) {
+      <img [src]="imageUrl" alt="Ảnh phóng to" class="max-h-[92vh] max-w-[94vw] rounded-none object-contain shadow-sm"
+        (click)="$event.stopPropagation()" />
+      }
+    </div>
+    }
+  </div>
 </div>

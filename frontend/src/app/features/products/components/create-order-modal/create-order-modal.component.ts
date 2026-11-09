@@ -1,10 +1,11 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { UiModalComponent } from '../../../../shared/components/ui/ui-modal.component';
 import { Product } from '../../data-access/models/product.model';
 import { OrderType } from '../../../orders/data-access/models/order.model';
 import { StepSelectProductsComponent } from './step-select-products.component';
 import { StepChooseMethodComponent } from './step-choose-method.component';
+import { AuthStore } from '../../../../core/auth/auth.store';
 
 export type CreateOrderStep = 'SELECT_PRODUCTS' | 'CHOOSE_METHOD';
 
@@ -24,7 +25,7 @@ export type CreateOrderStep = 'SELECT_PRODUCTS' | 'CHOOSE_METHOD';
         maxWidthClass="max-w-4xl"
         (closed)="close.emit()"
       >
-        <div class="p-6">
+        <div class="p-4">
           @if (step() === 'SELECT_PRODUCTS') {
           <app-step-select-products
             [product]="product"
@@ -50,6 +51,8 @@ export type CreateOrderStep = 'SELECT_PRODUCTS' | 'CHOOSE_METHOD';
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CreateOrderModalComponent implements OnChanges {
+  private readonly authStore = inject(AuthStore);
+
   @Input({ required: true }) isOpen = false;
   @Input({ required: true }) product!: Product;
   @Output() close = new EventEmitter<void>();
@@ -79,10 +82,36 @@ export class CreateOrderModalComponent implements OnChanges {
   }
 
   onOrderTypeChange(orderType: OrderType): void {
+    if (!this.isOrderTypeAllowed(orderType)) {
+      return;
+    }
+
     this.selectedOrderType.set(orderType);
   }
 
   private getDefaultOrderType(): OrderType {
-    return this.product?.productType === 'RENT' ? 'RENT' : 'SELL';
+    if (this.product?.productType === 'RENT' && this.canUseRent()) {
+      return 'RENT';
+    }
+
+    if (this.product?.productType === 'SELL_RENT' && !this.canUseSell() && this.canUseRent()) {
+      return 'RENT';
+    }
+
+    return 'SELL';
+  }
+
+  private canUseSell(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableSell) : true;
+  }
+
+  private canUseRent(): boolean {
+    const shop = this.authStore.currentShop();
+    return shop ? Boolean(shop.enableRent) : true;
+  }
+
+  private isOrderTypeAllowed(orderType: OrderType): boolean {
+    return orderType === 'SELL' ? this.canUseSell() : this.canUseRent();
   }
 }

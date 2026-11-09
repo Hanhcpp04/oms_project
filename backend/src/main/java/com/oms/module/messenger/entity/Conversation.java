@@ -33,7 +33,7 @@ import java.time.LocalDateTime;
 public class Conversation extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "platform", nullable = false, length = 30)
+    @Column(name = "platform", nullable = false, length = 30, columnDefinition = "enum('FACEBOOK')")
     @Builder.Default
     private ConversationPlatform platform = ConversationPlatform.FACEBOOK;
 
@@ -47,7 +47,7 @@ public class Conversation extends BaseEntity {
     private String conversationKey;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = "status", nullable = false, length = 20, columnDefinition = "enum('CLOSED','OPEN')")
     @Builder.Default
     private ConversationStatus status = ConversationStatus.OPEN;
 

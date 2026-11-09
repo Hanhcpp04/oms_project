@@ -1,0 +1,51 @@
+<ng-container *ngIf="!loading; else loadingState">
+  <app-ui-table minWidthClass="min-w-[760px]">
+    <thead>
+      <tr>
+        <th>Mã đơn</th>
+        <th>Khách hàng</th>
+        <th>Trạng thái</th>
+        <th>Kênh</th>
+        <th>Tổng tiền</th>
+        <th>Ngày tạo</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr
+        *ngFor="let order of orders"
+        class="cursor-pointer transition-colors hover:bg-[var(--color-surface-secondary)]"
+        [ngClass]="{ 'bg-[var(--color-accent-soft)]': selectedOrderId === order.id }"
+        (click)="select.emit(order)"
+      >
+        <td class="font-medium text-[var(--color-text-primary)]">{{ order.orderNumber }}</td>
+        <td class="text-[var(--color-text-secondary)]">{{ order.customerName }}</td>
+        <td>
+          <app-ui-badge [variant]="statusVariant(order.status)">{{ statusLabel(order.status) }}</app-ui-badge>
+        </td>
+        <td class="text-[var(--color-text-secondary)]">{{ order.sourceChannel }}</td>
+        <td class="text-[var(--color-text-secondary)]">
+          {{ formatCurrency(order.totalAmount) }}
+        </td>
+        <td class="text-[var(--color-text-tertiary)]">
+          {{ order.createdAt | date: 'dd/MM/yyyy HH:mm' }}
+        </td>
+      </tr>
+
+      <tr *ngIf="orders.length === 0">
+        <td colspan="6" class="py-10 text-center text-sm text-[var(--color-text-tertiary)]">
+          Không tìm thấy đơn hàng nào.
+        </td>
+      </tr>
+    </tbody>
+  </app-ui-table>
+</ng-container>
+
+<ng-template #loadingState>
+  <div class="grid gap-3 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
+    <div class="h-4 w-40 rounded bg-[var(--color-surface-secondary)]"></div>
+    <div class="h-4 w-full rounded bg-[var(--color-surface-secondary)]"></div>
+    <div class="h-4 w-5/6 rounded bg-[var(--color-surface-secondary)]"></div>
+    <p class="m-0 pt-2 text-center text-sm text-[var(--color-text-tertiary)]">Đang tải đơn hàng...</p>
+  </div>
+</ng-template>

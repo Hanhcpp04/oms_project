@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from 
 import { UiBadgeComponent } from '../../../shared/components/ui/ui-badge.component';
 import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
 import { UiTableComponent } from '../../../shared/components/ui/ui-table.component';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { Order, OrderStatus } from '../data-access/models/order.model';
 
 @Component({
@@ -53,5 +54,9 @@ export class OrderTableComponent {
       case 'RETURNED': return 'Đã trả hàng';
       default: return status;
     }
+  }
+
+  formatCurrency(value: number): string {
+    return formatVndCurrency(value);
   }
 }

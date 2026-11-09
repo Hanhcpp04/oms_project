@@ -54,7 +54,8 @@ export const ENTRY_ROUTES: Routes = [
           },
           {
             path: 'form-config',
-            data: { breadcrumb: 'Cấu hình form đơn hàng' },
+            canActivate: [roleGuard],
+            data: { breadcrumb: 'Cấu hình form đơn hàng', allowedRoles: ['SHOP_OWNER'] },
             loadChildren: () =>
               import('../features/form-config/form-config.routes').then((m) => m.FORM_CONFIG_ROUTES)
           },

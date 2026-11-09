@@ -13,7 +13,7 @@ import { finalize } from 'rxjs';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, UiButtonComponent, UiInputComponent, UiCardComponent],
   template: `
-    <div class="p-6">
+    <div class="p-4">
       <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 class="text-2xl font-bold text-[var(--color-text-primary)]">Quản lý Nguồn đơn hàng</h1>
@@ -30,7 +30,7 @@ import { finalize } from 'rxjs';
           <div class="h-8 w-8 animate-spin rounded-full border-4 border-[var(--color-accent)] border-t-transparent"></div>
         </div>
       } @else {
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           @for (source of sources(); track source.id) {
             <app-ui-card tone="default" padding="none" class="relative overflow-hidden">
               <div class="p-5">
@@ -76,7 +76,7 @@ import { finalize } from 'rxjs';
       @if (showModal()) {
         <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div class="w-full max-w-md animate-in fade-in zoom-in duration-200">
-            <app-ui-card tone="default" padding="lg" class="shadow-2xl">
+            <app-ui-card tone="default" padding="lg" class="shadow-sm">
               <h2 class="mb-6 text-xl font-bold text-[var(--color-text-primary)]">
                 {{ editingId() ? 'Cập nhật nguồn' : 'Thêm nguồn đơn hàng' }}
               </h2>

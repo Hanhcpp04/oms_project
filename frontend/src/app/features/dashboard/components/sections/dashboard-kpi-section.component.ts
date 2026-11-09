@@ -10,11 +10,11 @@ import { DashboardStore } from '../../state/dashboard.store';
   template: `
     <section class="grid grid-cols-2 gap-5 sm:grid-cols-4">
       @for (metric of store.metrics(); track metric.label; let i = $index) {
-      <div class="relative rounded-2xl border border-[var(--color-border)] bg-white p-4 transition-all duration-200 hover:border-[var(--color-border-hover)]">
+      <div class="relative rounded-sm border border-[var(--color-border)] bg-white p-4 transition-all duration-200 hover:border-[var(--color-border-hover)]">
         <div class="mb-2 flex items-center justify-between">
           <span class="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--color-text-tertiary)]">{{ metric.label }}</span>
           @if (metric.icon) {
-            <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-bg)] text-xs">{{ metric.icon }}</span>
+            <span class="flex h-7 w-7 items-center justify-center rounded-sm bg-[var(--color-bg)] text-xs">{{ metric.icon }}</span>
           }
         </div>
         <p class="m-0 text-2xl font-black tracking-tight text-[var(--color-text-primary)]">{{ metric.value }}</p>

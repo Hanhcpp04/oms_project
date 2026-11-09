@@ -22,6 +22,12 @@ export class OrderSourceService {
     );
   }
 
+  getActiveSources() {
+    return this.http.get<ApiEnvelope<OrderSourceDto[]>>(`${this.BASE_URL}/active`).pipe(
+      map(unwrapApiResponse)
+    );
+  }
+
   createSource(data: Partial<OrderSourceDto>) {
     return this.http.post<any, any>(this.BASE_URL, data).pipe(
       map(unwrapApiResponse)

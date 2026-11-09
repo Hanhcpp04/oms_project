@@ -23,8 +23,6 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    public static Throwable lastException;
-
     // ==================== Business Exceptions ====================
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -38,7 +36,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleBusiness(BusinessException ex,
                                                          HttpServletRequest request) {
         log.warn("Business error [{}]: {}", ex.getErrorCode().getCode(), ex.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, ex.getErrorCode(), ex.getMessage(), request);
+        HttpStatus status = ex.getErrorCode() == ErrorCode.SHOP_MAINTENANCE
+                ? HttpStatus.SERVICE_UNAVAILABLE
+                : HttpStatus.BAD_REQUEST;
+        return buildResponse(status, ex.getErrorCode(), ex.getMessage(), request);
     }
 
     // ==================== Validation Exceptions ====================
@@ -83,7 +84,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex,
                                                         HttpServletRequest request) {
-        lastException = ex;
         log.error("Unexpected error: ", ex);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INTERNAL_ERROR,
                 "An unexpected error occurred", request);

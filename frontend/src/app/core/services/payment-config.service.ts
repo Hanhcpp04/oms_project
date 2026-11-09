@@ -38,6 +38,12 @@ export class PaymentConfigService {
     );
   }
 
+  getAvailableConfig(): Observable<PublicPaymentConfig> {
+    return this.http.get<any>(`${this.BASE_URL}/available`).pipe(
+      map(response => unwrapApiResponse(response))
+    );
+  }
+
   saveConfig(data: PaymentConfigDto): Observable<PaymentConfigDto> {
     return this.http.put<any, any>(this.BASE_URL, data).pipe(
       map(response => unwrapApiResponse(response))

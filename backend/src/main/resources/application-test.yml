@@ -1,0 +1,22 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_TEST_NAME:oms_test}?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=Asia/Ho_Chi_Minh&allowPublicKeyRetrieval=true
+    username: ${DB_TEST_USERNAME:${DB_USERNAME:root}}
+    password: ${DB_TEST_PASSWORD:${DB_PASSWORD:}}
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+app:
+  scheduling:
+    enabled: false
+  jwt:
+    secret: ${JWT_SECRET:MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=}
+
+logging:
+  level:
+    com.oms: INFO
+    org.hibernate.SQL: WARN

@@ -1,7 +1,7 @@
 <div class="grid gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
   <div class="flex items-center justify-between">
     <div class="flex items-center gap-2">
-      <span class="h-1 w-3 bg-gray-900 rounded-full"></span>
+      <span class="h-1 w-3 bg-gray-900 rounded-[var(--radius-xs)]"></span>
       <h3 class="text-[10px] font-black text-[var(--color-text-primary)] uppercase tracking-wider">{{ title }}</h3>
     </div>
     <button
@@ -14,7 +14,7 @@
   </div>
 
   @if (fields.length > 0) {
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 bg-white p-6 rounded-xl border border-[var(--color-border)] shadow-sm">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 bg-white p-4 rounded-sm border border-[var(--color-border)] shadow-sm">
       @for (field of fields; track field.id) {
         <div class="group flex flex-col gap-2 pb-4 border-b border-gray-50 last:border-0 last:pb-0">
           <div class="flex items-center justify-between">
@@ -48,10 +48,10 @@
           <div class="relative">
             @switch (field.type) {
               @case ('textarea') {
-                <textarea class="w-full bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all resize-none" [placeholder]="field.placeholder" rows="2"></textarea>
+                <textarea class="w-full bg-gray-50 border border-gray-100 rounded-sm px-3 py-2 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all resize-none" [placeholder]="field.placeholder" rows="2"></textarea>
               }
               @case ('dropdown') {
-                <select class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 cursor-pointer transition-all">
+                <select class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 cursor-pointer transition-all">
                   <option value="" disabled selected>{{ field.placeholder || 'Chọn một tùy chọn...' }}</option>
                   @for (opt of field.options; track opt.id) {
                     <option [value]="opt.value">{{ opt.label }}</option>
@@ -59,7 +59,7 @@
                 </select>
               }
               @case ('single_choice') {
-                <div class="flex flex-col gap-2.5 py-2 px-3 bg-gray-50/50 rounded-lg border border-dashed border-gray-100">
+                <div class="flex flex-col gap-2.5 py-2 px-3 bg-gray-50/50 rounded-sm border border-dashed border-gray-100">
                   @for (opt of field.options; track opt.id) {
                     <label class="flex items-center gap-3 cursor-pointer group/radio">
                       <input type="radio" [name]="field.id" class="w-3.5 h-3.5 accent-gray-900">
@@ -72,25 +72,25 @@
                 </div>
               }
               @case ('date') {
-                <input type="date" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all">
+                <input type="date" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all">
               }
               @case ('number') {
-                <input type="number" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
+                <input type="number" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
               }
               @case ('email') {
-                <input type="email" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
+                <input type="email" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
               }
               @case ('phone') {
-                <input type="tel" inputmode="numeric" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder" (input)="onPhoneInput($event)">
+                <input type="tel" inputmode="numeric" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder" (input)="onPhoneInput($event)">
               }
               @case ('image') {
-                  <div class="w-full h-20 bg-gray-50 border-2 border-dashed border-gray-100 rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-gray-100 transition-all">
+                  <div class="w-full h-20 bg-gray-50 border-2 border-dashed border-gray-100 rounded-sm flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-gray-100 transition-all">
                       <i class="i-lucide-upload-cloud text-gray-300 text-lg"></i>
                       <span class="text-[8px] font-black uppercase tracking-widest text-gray-400">{{ field.placeholder || 'Tải ảnh lên' }}</span>
                   </div>
               }
               @default {
-                <input type="text" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-lg px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
+                <input type="text" class="w-full h-10 bg-gray-50 border border-gray-100 rounded-sm px-3 text-xs outline-none focus:bg-white focus:border-gray-900 transition-all" [placeholder]="field.placeholder">
               }
             }
           </div>
@@ -99,10 +99,10 @@
     </div>
   } @else {
     <div 
-      class="py-10 border-2 border-dashed border-[var(--color-border)] rounded-lg flex flex-col items-center justify-center gap-3 text-[var(--color-text-tertiary)] hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer group"
+      class="py-10 border-2 border-dashed border-[var(--color-border)] rounded-sm flex flex-col items-center justify-center gap-3 text-[var(--color-text-tertiary)] hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer group"
       (click)="addField()"
     >
-        <div class="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 group-hover:text-gray-900 transition-colors">
+        <div class="h-10 w-10 rounded-[var(--radius-xs)] bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 group-hover:text-gray-900 transition-colors">
           <i class="i-lucide-plus text-xl"></i>
         </div>
         <div class="text-center">
@@ -122,14 +122,14 @@
   >
     @for (field of fields; track field.id) {
       @if (activeFieldId() === field.id) {
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-4">
           <!-- Row 1: Label & Type -->
           <div class="flex flex-col md:flex-row gap-4">
             <div class="flex-1">
               <label class="text-[10px] font-black text-gray-900 uppercase mb-1.5 block">Tiêu đề trường</label>
               <input
                 type="text"
-                class="w-full text-sm font-bold border border-[var(--color-border)] rounded-lg focus:border-gray-900 outline-none px-3 py-2 bg-[var(--color-surface-secondary)] transition-colors"
+                class="w-full text-sm font-bold border border-[var(--color-border)] rounded-sm focus:border-gray-900 outline-none px-3 py-2 bg-[var(--color-surface-secondary)] transition-colors"
                 [value]="field.label"
                 placeholder="Ví dụ: Chất liệu, Xuất xứ..."
                 autoFocus
@@ -140,7 +140,7 @@
             <div class="w-full md:w-56">
               <label class="text-[10px] font-black text-gray-900 uppercase mb-1.5 block">Loại hiển thị</label>
               <select
-                class="w-full h-10 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 text-xs font-bold outline-none cursor-pointer focus:border-gray-900"
+                class="w-full h-10 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface-secondary)] px-3 text-xs font-bold outline-none cursor-pointer focus:border-gray-900"
                 [value]="field.type"
                 (change)="patchField(field, { type: $any($event.target).value })"
               >
@@ -153,11 +153,11 @@
 
           <!-- Options/Placeholders/Validation -->
           @if (isChoiceField(field.type)) {
-            <div class="bg-[var(--color-surface-secondary)] rounded-xl p-4 border border-[var(--color-border)]">
+            <div class="bg-[var(--color-surface-secondary)] rounded-sm p-4 border border-[var(--color-border)]">
               <label class="text-[10px] font-black text-[var(--color-text-tertiary)] uppercase mb-3 block">Danh sách tùy chọn</label>
               <div class="space-y-2">
                 @for (option of field.options; track option.id) {
-                  <div class="flex items-center gap-3 group/opt bg-white p-2 rounded-lg border border-[var(--color-border)]">
+                  <div class="flex items-center gap-3 group/opt bg-white p-2 rounded-sm border border-[var(--color-border)]">
                     <i class="text-[var(--color-text-tertiary)] text-xs" [ngClass]="field.type === 'single_choice' ? 'i-lucide-circle' : 'i-lucide-square'"></i>
                     <input
                       type="text"
@@ -171,7 +171,7 @@
                     </button>
                   </div>
                 }
-                <button type="button" class="w-full py-2 rounded-lg border border-dashed border-gray-400 text-[10px] font-black text-gray-900 uppercase hover:bg-gray-100 transition-all flex items-center justify-center gap-2 mt-2" (click)="addOption(field.id)">
+                <button type="button" class="w-full py-2 rounded-sm border border-dashed border-gray-400 text-[10px] font-black text-gray-900 uppercase hover:bg-gray-100 transition-all flex items-center justify-center gap-2 mt-2" (click)="addOption(field.id)">
                   <i class="i-lucide-plus"></i> Thêm tùy chọn mới
                 </button>
               </div>
@@ -180,17 +180,17 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="text-[10px] font-black text-[var(--color-text-tertiary)] uppercase mb-1.5 block">Gợi ý (Placeholder)</label>
-                <input type="text" class="w-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-xs outline-none focus:border-gray-200" [value]="field.placeholder" (blur)="patchField(field, { placeholder: $any($event.target).value })" />
+                <input type="text" class="w-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 text-xs outline-none focus:border-gray-200" [value]="field.placeholder" (blur)="patchField(field, { placeholder: $any($event.target).value })" />
               </div>
               <div>
                 <label class="text-[10px] font-black text-[var(--color-text-tertiary)] uppercase mb-1.5 block">Mô tả thêm (Helper)</label>
-                <input type="text" class="w-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-xs outline-none focus:border-gray-200" [value]="field.helperText" (blur)="patchField(field, { helperText: $any($event.target).value })" />
+                <input type="text" class="w-full bg-[var(--color-surface-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 text-xs outline-none focus:border-gray-200" [value]="field.helperText" (blur)="patchField(field, { helperText: $any($event.target).value })" />
               </div>
             </div>
 
             <!-- Validation Rules for specific types -->
              @if (field.type === 'number' || field.type === 'phone') {
-                <div class="p-4 bg-orange-50/50 rounded-xl border border-orange-100 flex flex-col gap-3">
+                <div class="p-4 bg-orange-50/50 rounded-sm border border-orange-100 flex flex-col gap-3">
                     <label class="text-[10px] font-black text-orange-800 uppercase flex items-center gap-2">
                         <i class="i-lucide-shield-check text-xs"></i> Quy tắc kiểm soát dữ liệu
                     </label>
@@ -249,7 +249,7 @@
             <div class="flex items-center gap-3">
               <button 
                 type="button" 
-                class="px-4 py-2 rounded-xl border border-[var(--color-border)] text-[10px] font-black uppercase hover:bg-gray-50 transition-all"
+                class="px-4 py-2 rounded-sm border border-[var(--color-border)] text-[10px] font-black uppercase hover:bg-gray-50 transition-all"
                 (click)="clearActiveField()"
                 [disabled]="isSaving"
               >
@@ -257,7 +257,7 @@
               </button>
               <button 
                 type="button" 
-                class="px-6 py-2 rounded-xl bg-gray-900 text-white text-[11px] font-black uppercase shadow-md hover:bg-black hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-50"
+                class="px-6 py-2 rounded-sm bg-gray-900 text-white text-[11px] font-black uppercase shadow-sm hover:bg-black hover:-translate-y-0.5 transition-all flex items-center gap-2 disabled:opacity-50"
                 (click)="triggerSave(field)"
                 [disabled]="isSaving"
               >

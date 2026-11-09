@@ -46,7 +46,7 @@ import java.util.stream.Collectors;
 public class OrderAiParseService {
 
     private static final ZoneId DEFAULT_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final Pattern PHONE_PATTERN = Pattern.compile("(?:\\+84|84|0)(?:[\\s.-]*\\d){8,10}");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("(?<!\\d)(?:0(?:[\\s.-]*\\d){9}|\\+?84(?:[\\s.-]*\\d){9})(?!\\d)");
     private static final Pattern DATE_ISO_PATTERN = Pattern.compile("\\b\\d{4}-\\d{2}-\\d{2}\\b");
     private static final Pattern DATE_DDMMYYYY_PATTERN = Pattern.compile("\\b(\\d{1,2})/(\\d{1,2})/(\\d{4})\\b");
     private static final Pattern NUMBER_PATTERN = Pattern.compile("(-?\\d[\\d.,]*)");
@@ -232,12 +232,27 @@ public class OrderAiParseService {
         productSchema.put("type", "object");
         productSchema.put("additionalProperties", false);
         productSchema.put("properties", Map.of(
+                "productId", Map.of("type", List.of("integer", "null")),
+                "variantId", Map.of("type", List.of("integer", "null")),
+                "productCode", Map.of("type", List.of("string", "null")),
+                "sku", Map.of("type", List.of("string", "null")),
                 "name", Map.of("type", "string"),
+                "color", Map.of("type", List.of("string", "null")),
                 "size", Map.of("type", List.of("string", "null")),
                 "quantity", Map.of("type", List.of("integer", "null")),
                 "unitPrice", Map.of("type", List.of("number", "null"))
         ));
-        productSchema.put("required", List.of("name", "size", "quantity", "unitPrice"));
+        productSchema.put("required", List.of(
+                "productId",
+                "variantId",
+                "productCode",
+                "sku",
+                "name",
+                "color",
+                "size",
+                "quantity",
+                "unitPrice"
+        ));
 
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("orderType", Map.of(
@@ -313,6 +328,9 @@ public class OrderAiParseService {
                 - If shippingMethod matches one of the configured shipping methods, return the exact configured name. Otherwise return null.
                 - If customFields are present, use fieldKey as the object key. For multi choice values, return an array of strings.
                 - Keep customerNote concise and only include meaningful information not already captured elsewhere.
+                - Product blocks copied from OMS are authoritative. Preserve Product ID, Variant ID and SKU exactly when present.
+                - If there are multiple OMS product blocks in the text, use the latest/last OMS product block for product data.
+                - For rental product blocks, use "Ngay nhan"/"Ngay thue tu" as rentFrom and "Ngay tra"/"Ngay thue den" as rentTo.
 
                 orderTypeHint: %s
                 configuredOrderSources: %s
@@ -357,8 +375,18 @@ public class OrderAiParseService {
                 .sourceChannel(matchConfiguredValue(rawText, context.orderSources()))
                 .shippingMethod(matchShippingMethod(rawText, context.shippingMethods()))
                 .shippingFee(findAmount(lines, List.of("phi ship", "ship", "shipping fee")))
-                .rentFrom(normalizeDateCandidate(findByPrefixes(lines, List.of("ngay nhan", "rent from", "tu ngay"))))
-                .rentTo(normalizeDateCandidate(findByPrefixes(lines, List.of("ngay tra", "rent to", "den ngay"))))
+                .rentFrom(normalizeDateCandidate(findByPrefixes(lines, List.of(
+                        "ngay nhan",
+                        "ngay thue tu",
+                        "rent from",
+                        "tu ngay"
+                ))))
+                .rentTo(normalizeDateCandidate(findByPrefixes(lines, List.of(
+                        "ngay tra",
+                        "ngay thue den",
+                        "rent to",
+                        "den ngay"
+                ))))
                 .depositPaid(findAmount(lines, List.of("tien coc", "dat coc", "deposit")))
                 .products(parseProductsFromLines(lines))
                 .customFields(parseCustomFields(lines, context.customFields()))
@@ -690,7 +718,12 @@ public class OrderAiParseService {
         return products.stream()
                 .filter(Objects::nonNull)
                 .map(product -> AiParseResponse.ProductDraft.builder()
+                        .productId(product.getProductId())
+                        .variantId(product.getVariantId())
+                        .productCode(trimToNull(product.getProductCode()))
+                        .sku(trimToNull(product.getSku()))
                         .name(trimToNull(product.getName()))
+                        .color(trimToNull(product.getColor()))
                         .size(firstNonBlank(product.getSize(), "Free"))
                         .quantity(product.getQuantity() == null ? 1 : Math.max(1, product.getQuantity()))
                         .unitPrice(toNonNegative(product.getUnitPrice()))
@@ -791,8 +824,8 @@ public class OrderAiParseService {
             digits = "0" + digits.substring(2);
         }
 
-        if (digits.length() > 11 && digits.startsWith("0")) {
-            digits = digits.substring(0, 11);
+        if (digits.length() > 10 && digits.startsWith("0")) {
+            digits = digits.substring(0, 10);
         }
 
         return digits;

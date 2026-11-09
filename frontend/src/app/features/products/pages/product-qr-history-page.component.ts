@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { UiButtonComponent } from '../../../shared/components/ui/ui-button.component';
 import { UiCardComponent } from '../../../shared/components/ui/ui-card.component';
+import { formatVndCurrency } from '../../../shared/utils/currency.util';
 import { ProductsApiService, ProductQrCode } from '../data-access/products-api.service';
 import { ProductQrCodeModalComponent } from '../components/product-qr-code-modal.component';
 
@@ -12,7 +13,7 @@ import { ProductQrCodeModalComponent } from '../components/product-qr-code-modal
   standalone: true,
   imports: [CommonModule, UiButtonComponent, UiCardComponent, ProductQrCodeModalComponent],
   template: `
-    <div class="flex flex-col gap-6">
+    <div class="flex flex-col gap-4">
       <div class="flex items-center justify-between">
         <div>
           <h1 class="m-0 text-2xl font-bold text-[var(--color-text-primary)]">Lịch sử QR Thanh toán</h1>
@@ -41,15 +42,15 @@ import { ProductQrCodeModalComponent } from '../components/product-qr-code-modal
           <p>Chưa có mã QR nào được tạo cho sản phẩm này.</p>
         </app-ui-card>
       } @else {
-        <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           @for (item of history(); track item.id) {
-            <app-ui-card className="group relative overflow-hidden transition-all hover:shadow-lg">
+            <app-ui-card className="group relative overflow-hidden transition-all hover:shadow-sm">
               <div class="flex flex-col items-center">
                 <div class="relative group/qr">
                   <img [src]="item.qrUrl" [alt]="item.note" 
-                    class="h-48 w-48 rounded-xl border border-[var(--color-border)] bg-white p-2 shadow-sm transition-transform group-hover/qr:scale-105" />
-                  <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/qr:opacity-100 transition-opacity rounded-xl">
-                    <button (click)="downloadQr(item)" class="p-3 bg-white rounded-full text-black hover:bg-gray-100 transition-colors shadow-lg">
+                    class="h-48 w-48 rounded-sm border border-[var(--color-border)] bg-white p-2 shadow-sm transition-transform group-hover/qr:scale-105" />
+                  <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/qr:opacity-100 transition-opacity rounded-sm">
+                    <button (click)="downloadQr(item)" class="p-3 bg-white rounded-full text-black hover:bg-gray-100 transition-colors shadow-sm">
                       <i class="ri-download-2-line text-xl"></i>
                     </button>
                   </div>
@@ -131,11 +132,7 @@ export class ProductQrHistoryPageComponent implements OnInit {
   }
 
   protected formatCurrency(value: number): string {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatVndCurrency(value);
   }
 
   protected async downloadQr(item: ProductQrCode): Promise<void> {

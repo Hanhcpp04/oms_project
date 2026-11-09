@@ -13,7 +13,7 @@
           <h3 class="m-0 text-sm font-semibold text-[var(--color-text-primary)]">Vận hành hôm nay</h3>
           <p class="m-0 mt-0.5 text-xs text-[var(--color-text-tertiary)]">Theo dõi nhịp xử lý trong ngày</p>
         </div>
-        <div class="rounded-lg bg-[var(--color-surface-secondary)] px-3 py-2 text-right">
+        <div class="rounded-sm bg-[var(--color-surface-secondary)] px-3 py-2 text-right">
           <p class="m-0 text-[10px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]">Doanh thu
             ngày</p>
           <p class="m-0 text-base font-semibold text-[var(--color-text-primary)]">{{
@@ -24,7 +24,7 @@
       <div class="flex flex-col gap-3">
         @for (day of store.revenue(); track day.label) {
         <div
-          class="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
+          class="rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:border-[var(--color-text-primary)]">
           <div class="mb-2 flex items-center justify-between">
             <span class="text-sm font-bold text-[var(--color-text-primary)]">Ca {{ day.label }}</span>
             <span class="text-xs font-semibold text-[var(--color-text-primary)]">{{ formatCurrency(day.revenue)
@@ -35,8 +35,8 @@
             <span class="font-medium text-[var(--color-text-primary)]">{{ getBarHeight(day.revenue) | number:'1.0-0'
               }}%</span>
           </div>
-          <div class="mt-2.5 h-1.5 w-full rounded-full bg-[var(--color-bg)]">
-            <div class="h-full rounded-full bg-[var(--color-text-primary)] transition-all duration-500"
+          <div class="mt-2.5 h-1.5 w-full rounded-[var(--radius-xs)] bg-[var(--color-bg)]">
+            <div class="h-full rounded-[var(--radius-xs)] bg-[var(--color-text-primary)] transition-all duration-500"
               [style.width.%]="getBarHeight(day.revenue)"></div>
           </div>
         </div>
@@ -55,10 +55,10 @@
       <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         @for (order of store.recentOrders(); track order.orderNumber) {
         <div
-          class="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:bg-[var(--color-surface-hover)]">
+          class="flex items-center justify-between gap-3 rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] p-3 transition-colors hover:bg-[var(--color-surface-hover)]">
           <div class="flex min-w-0 items-center gap-3">
             <div
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--color-bg)] text-xs font-semibold text-[var(--color-text-primary)]">
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-xs)] bg-[var(--color-bg)] text-xs font-semibold text-[var(--color-text-primary)]">
               {{ order.orderNumber.slice(-2) }}
             </div>
             <div class="min-w-0">

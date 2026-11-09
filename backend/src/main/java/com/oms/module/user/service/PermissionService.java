@@ -50,8 +50,11 @@ public class PermissionService {
             return true;
         }
 
-        // STAFF_SCHEDULE_VIEW_OWN is always granted to staff (cannot be revoked)
-        if (permissionCode == PermissionCode.STAFF_SCHEDULE_VIEW_OWN) {
+        if (!permissionCode.isStaffAssignable()) {
+            return false;
+        }
+
+        if (permissionCode.isAlwaysGrantedToStaff()) {
             return true;
         }
 
@@ -63,12 +66,16 @@ public class PermissionService {
      */
     @Transactional(readOnly = true)
     public List<String> getStaffPermissionCodes(Long staffId) {
-        List<String> codes = staffPermissionRepository.findPermissionCodesByUserId(staffId);
-        // Always include STAFF_SCHEDULE_VIEW_OWN
-        if (!codes.contains(PermissionCode.STAFF_SCHEDULE_VIEW_OWN.name())) {
-            codes = new ArrayList<>(codes);
-            codes.add(PermissionCode.STAFF_SCHEDULE_VIEW_OWN.name());
+        List<String> codes = staffPermissionRepository.findPermissionCodesByUserId(staffId).stream()
+                .filter(PermissionCode::isStaffAssignableCode)
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        for (PermissionCode code : PermissionCode.values()) {
+            if (code.isAlwaysGrantedToStaff() && !codes.contains(code.name())) {
+                codes.add(code.name());
+            }
         }
+
         return codes;
     }
 
@@ -77,7 +84,9 @@ public class PermissionService {
      */
     @Transactional(readOnly = true)
     public List<Permission> getAllPermissions() {
-        return permissionRepository.findAll();
+        return permissionRepository.findAll().stream()
+                .filter(permission -> PermissionCode.isStaffAssignableCode(permission.getCode()))
+                .toList();
     }
 
     /**
@@ -85,7 +94,9 @@ public class PermissionService {
      */
     @Transactional(readOnly = true)
     public List<StaffPermission> getStaffPermissions(Long staffId) {
-        return staffPermissionRepository.findByUserId(staffId);
+        return staffPermissionRepository.findByUserId(staffId).stream()
+                .filter(permission -> PermissionCode.isStaffAssignableCode(permission.getPermission().getCode()))
+                .toList();
     }
 
     /**
@@ -120,9 +131,10 @@ public class PermissionService {
 
         List<String> requestedCodes = permissionCodes == null ? List.of() : permissionCodes;
 
-        // Remove STAFF_SCHEDULE_VIEW_OWN from input (it's always granted)
         Set<String> codesToGrant = requestedCodes.stream()
-                .filter(code -> !PermissionCode.STAFF_SCHEDULE_VIEW_OWN.name().equals(code))
+                .map(this::resolveStaffAssignablePermission)
+                .filter(code -> !code.isAlwaysGrantedToStaff())
+                .map(PermissionCode::name)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         List<StaffPermission> existingPermissions = staffPermissionRepository.findByUserId(staffId);
@@ -159,6 +171,24 @@ public class PermissionService {
         log.info("Owner {} updated permissions for staff {}: {}", ownerId, staffId, codesToGrant);
 
         return getStaffPermissionCodes(staffId);
+    }
+
+    private PermissionCode resolveStaffAssignablePermission(String rawCode) {
+        final PermissionCode permissionCode;
+        try {
+            permissionCode = PermissionCode.fromCode(rawCode);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Invalid permission code: " + rawCode);
+        }
+
+        if (!permissionCode.isStaffAssignable()) {
+            throw new BusinessException(
+                    ErrorCode.VALIDATION_ERROR,
+                    "Permission cannot be granted to staff: " + permissionCode.name()
+            );
+        }
+
+        return permissionCode;
     }
 
     /**

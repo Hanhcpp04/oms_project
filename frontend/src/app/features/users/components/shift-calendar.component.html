@@ -6,11 +6,11 @@
 </div>
 
 <ng-container *ngIf="!loading; else loadingState">
-  <div *ngIf="shifts.length === 0" class="rounded-lg border border-[var(--color-border)] border-dashed p-8 text-center text-sm text-[var(--color-text-tertiary)]">
+  <div *ngIf="shifts.length === 0" class="rounded-sm border border-[var(--color-border)] border-dashed p-5 text-center text-sm text-[var(--color-text-tertiary)]">
     Chưa có ca làm việc nào. Hãy tạo khung giờ làm việc mới.
   </div>
 
-  <div class="grid gap-6">
+  <div class="grid gap-4">
     <div *ngFor="let group of shiftsByDate">
       <div class="mb-3 flex items-center gap-2">
         <h3 class="text-base font-semibold text-[var(--color-text-primary)]">

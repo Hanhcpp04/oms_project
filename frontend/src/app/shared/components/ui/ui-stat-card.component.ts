@@ -43,7 +43,7 @@ export class UiStatCardComponent {
 
   protected get cardClasses(): string {
     return [
-      'group rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] transition-colors duration-200 hover:border-[var(--color-text-primary)]',
+      'group rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-surface)] transition-colors duration-200 hover:border-[var(--color-border-hover)]',
       this.density === 'compact' ? 'p-3' : 'p-4'
     ]
       .filter(Boolean)
@@ -52,20 +52,20 @@ export class UiStatCardComponent {
 
   protected get labelClasses(): string {
     return this.density === 'compact'
-      ? 'm-0 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--color-text-tertiary)]'
-      : 'm-0 text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-tertiary)]';
+      ? 'm-0 text-[10px] font-medium uppercase tracking-[0.18em] text-[var(--color-text-muted)]'
+      : 'm-0 text-[11px] font-medium uppercase tracking-wider text-[var(--color-text-muted)]';
   }
 
   protected get valueClasses(): string {
     return this.density === 'compact'
-      ? 'm-0 mt-1 text-xl font-bold text-[var(--color-text-primary)]'
-      : 'm-0 mt-2 text-2xl font-bold text-[var(--color-text-primary)]';
+      ? 'm-0 mt-1 text-xl font-semibold text-[var(--color-text-primary)]'
+      : 'm-0 mt-2 text-2xl font-semibold text-[var(--color-text-primary)]';
   }
 
   protected get iconClasses(): string {
     return this.density === 'compact'
-      ? 'inline-flex h-7 w-7 items-center justify-center rounded-[8px] bg-[#F5F5F5] text-xs'
-      : 'inline-flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#F5F5F5] text-sm';
+      ? 'inline-flex h-7 w-7 items-center justify-center rounded-none bg-[#F5F5F5] text-xs'
+      : 'inline-flex h-8 w-8 items-center justify-center rounded-none bg-[#F5F5F5] text-sm';
   }
 
   protected get trendWrapClasses(): string {
@@ -85,7 +85,7 @@ export class UiStatCardComponent {
 
   protected get trendBadgeClass(): string {
     if (this.density === 'compact') {
-      return 'inline-flex h-5 items-center rounded-full bg-[var(--color-bg)] px-1.5 text-[10px] font-medium text-[var(--color-text-primary)]';
+      return 'inline-flex h-5 items-center rounded-none bg-[var(--color-bg)] px-1.5 text-[10px] font-medium text-[var(--color-text-primary)]';
     }
 
     switch (this.trend) {

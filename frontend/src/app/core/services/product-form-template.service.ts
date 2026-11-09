@@ -1,5 +1,5 @@
 import { inject, Injectable, signal } from '@angular/core';
-import { map, Observable, tap, of } from 'rxjs';
+import { finalize, map, Observable, tap } from 'rxjs';
 import { API_ENDPOINTS } from '../constants/app.constants';
 import { HttpService } from '../http/http.service';
 import {
@@ -59,20 +59,28 @@ export class ProductFormTemplateService {
 
   loadTemplates(): void {
     this.loadingState.set(true);
-    // Load both SELL and RENT configs
-    this.loadConfig('SELL');
-    this.loadConfig('RENT');
-    // We don't have a bulk API yet, so we just set loading false after a while or when both complete
-    // For simplicity, we just set it false here as the individual loads will update state
-    this.loadingState.set(false);
+    let pending = 2;
+    const markDone = () => {
+      pending -= 1;
+      if (pending === 0) {
+        this.loadingState.set(false);
+      }
+    };
+
+    this.loadConfig('SELL', markDone);
+    this.loadConfig('RENT', markDone);
   }
 
-  loadConfig(type: ProductFormTemplateType): void {
+  loadConfig(type: ProductFormTemplateType, onDone?: () => void): void {
     this.httpService
       .get<ProductFormConfigApi | ApiEnvelope<ProductFormConfigApi>>(`${this.endpoint}/${type}`)
-      .pipe(map((response) => normalizeConfig(unwrapApiResponse(response))))
+      .pipe(
+        map((response) => normalizeConfig(unwrapApiResponse(response))),
+        finalize(() => onDone?.())
+      )
       .subscribe({
-        next: (template) => this.replaceTemplate(template)
+        next: (template) => this.replaceTemplate(template),
+        error: (error) => console.error('Failed to load product form config', type, error)
       });
   }
 
