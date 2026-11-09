@@ -4,6 +4,8 @@ import com.oms.common.exception.BusinessException;
 import com.oms.common.exception.ErrorCode;
 import com.oms.common.exception.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.http.MediaType;
@@ -19,6 +21,12 @@ import java.nio.file.StandardCopyOption;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Service
 public class FileService {
@@ -34,12 +42,26 @@ public class FileService {
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
 
+    @Value("${app.upload.storage:local}")
+    private String storageType = "local";
+
+    @Value("${app.upload.s3.bucket:}")
+    private String s3Bucket;
+
+    @Autowired(required = false)
+    private S3Client s3Client;
+
     public String uploadFile(MultipartFile file) {
         validateUpload(file);
 
         String extension = getExtension(file.getOriginalFilename());
-        Path uploadRoot = getUploadRoot();
         String fileName = UUID.randomUUID() + "." + extension;
+        if (isS3Storage()) {
+            storeInS3(file, fileName, ALLOWED_IMAGE_TYPES.get(extension));
+            return "/api/files/display/" + fileName;
+        }
+
+        Path uploadRoot = getUploadRoot();
         Path filePath = uploadRoot.resolve(fileName).normalize();
         ensureInsideUploadRoot(uploadRoot, filePath);
 
@@ -66,6 +88,10 @@ public class FileService {
         MediaType mediaType = ALLOWED_IMAGE_TYPES.get(extension);
         if (mediaType == null) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "Unsupported file type");
+        }
+
+        if (isS3Storage()) {
+            return loadFromS3(fileName, mediaType);
         }
 
         Path uploadRoot = getUploadRoot();
@@ -146,6 +172,50 @@ public class FileService {
 
     private Path getUploadRoot() {
         return Paths.get(uploadDir).toAbsolutePath().normalize();
+    }
+
+    private boolean isS3Storage() {
+        return "s3".equalsIgnoreCase(storageType);
+    }
+
+    private void storeInS3(MultipartFile file, String fileName, MediaType mediaType) {
+        validateS3Configuration();
+        try {
+            byte[] content = file.getBytes();
+            s3Client.putObject(PutObjectRequest.builder()
+                            .bucket(s3Bucket)
+                            .key(fileName)
+                            .contentType(mediaType.toString())
+                            .build(),
+                    RequestBody.fromBytes(content));
+        } catch (IOException | S3Exception ex) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Could not store uploaded file");
+        }
+    }
+
+    private StoredFile loadFromS3(String fileName, MediaType mediaType) {
+        validateS3Configuration();
+        try {
+            byte[] content = s3Client.getObjectAsBytes(GetObjectRequest.builder()
+                            .bucket(s3Bucket)
+                            .key(fileName)
+                            .build())
+                    .asByteArray();
+            return new StoredFile(new ByteArrayResource(content), mediaType, content.length);
+        } catch (NoSuchKeyException ex) {
+            throw new ResourceNotFoundException("File", "name", fileName);
+        } catch (S3Exception ex) {
+            if (ex.statusCode() == 404) {
+                throw new ResourceNotFoundException("File", "name", fileName);
+            }
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "Could not read stored file");
+        }
+    }
+
+    private void validateS3Configuration() {
+        if (s3Client == null || !StringUtils.hasText(s3Bucket)) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "S3 storage is not configured");
+        }
     }
 
     private void ensureInsideUploadRoot(Path uploadRoot, Path filePath) {

@@ -12,7 +12,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 @Slf4j
 @RestController
@@ -49,11 +55,39 @@ public class MessengerWebhookController {
     }
 
     @PostMapping(value = "/webhook", produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> receiveEvent(@RequestBody String body) {
-        log.info("Messenger webhook event received. Raw body: {}", body);
+    public ResponseEntity<String> receiveEvent(
+            @RequestBody byte[] rawBody,
+            @RequestHeader(value = "X-Hub-Signature-256", required = false) String signature) {
+        if (!hasValidSignature(rawBody, signature)) {
+            log.warn("Rejected Messenger webhook with invalid signature");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("INVALID_SIGNATURE");
+        }
+        String body = new String(rawBody, StandardCharsets.UTF_8);
+        log.info("Messenger webhook event received. payloadBytes={}", rawBody.length);
         messengerWebhookService.handleWebhook(body);
         return ResponseEntity.ok()
                 .contentType(MediaType.TEXT_PLAIN)
                 .body("EVENT_RECEIVED");
+    }
+
+    private boolean hasValidSignature(byte[] body, String signature) {
+        String appSecret = messengerProperties.getAppSecret();
+        if (!StringUtils.hasText(appSecret)) {
+            return true;
+        }
+        if (!StringUtils.hasText(signature) || !signature.startsWith("sha256=")) {
+            return false;
+        }
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(appSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            String expected = "sha256=" + HexFormat.of().formatHex(mac.doFinal(body));
+            return MessageDigest.isEqual(
+                    expected.getBytes(StandardCharsets.US_ASCII),
+                    signature.getBytes(StandardCharsets.US_ASCII));
+        } catch (Exception ex) {
+            log.error("Could not validate Messenger webhook signature", ex);
+            return false;
+        }
     }
 }

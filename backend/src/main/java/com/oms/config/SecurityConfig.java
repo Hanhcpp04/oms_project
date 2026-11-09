@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.oms.common.dto.ErrorResponse;
 import com.oms.common.exception.ErrorCode;
 import com.oms.security.jwt.JwtAuthFilter;
+import com.oms.security.AuditLogFilter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -29,6 +30,7 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,7 @@ import java.nio.charset.StandardCharsets;
 public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
+    private final AuditLogFilter auditLogFilter;
     private final UserDetailsService userDetailsService;
     private final ObjectMapper objectMapper;
 
@@ -54,6 +57,7 @@ public class SecurityConfig {
                 .exceptionHandling(this::configureExceptionHandlers)
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(auditLogFilter, JwtAuthFilter.class)
                 .build();
     }
 
@@ -126,5 +130,19 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public FilterRegistrationBean<JwtAuthFilter> disableJwtFilterAutoRegistration() {
+        FilterRegistrationBean<JwtAuthFilter> registration = new FilterRegistrationBean<>(jwtAuthFilter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public FilterRegistrationBean<AuditLogFilter> disableAuditFilterAutoRegistration() {
+        FilterRegistrationBean<AuditLogFilter> registration = new FilterRegistrationBean<>(auditLogFilter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

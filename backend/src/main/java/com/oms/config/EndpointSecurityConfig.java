@@ -12,7 +12,7 @@ public final class EndpointSecurityConfig {
     public static final String[] PUBLIC_GET_ENDPOINTS = {
             "/swagger-ui/**",
             "/v3/api-docs/**",
-            "/actuator/health",
+            "/actuator/health/**",
             "/api/public/**",
             "/api/files/display/**",
             "/public/**",

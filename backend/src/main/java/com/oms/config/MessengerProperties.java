@@ -15,6 +15,7 @@ import java.util.Map;
 public class MessengerProperties {
 
     private String verifyToken;
+    private String appSecret;
     private String graphApiBaseUrl = "https://graph.facebook.com/v20.0";
     private String systemPrefix = "[OMS]";
     private String defaultPageId;

@@ -11,7 +11,9 @@ import java.time.LocalDateTime;
  * User entity - represents Owner, Staff, or Admin users.
  */
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_users_shop_role_active", columnList = "shop_id,role,is_active")
+})
 @Getter
 @Setter
 @NoArgsConstructor

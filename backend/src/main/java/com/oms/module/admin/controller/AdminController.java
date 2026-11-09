@@ -3,6 +3,8 @@ package com.oms.module.admin.controller;
 import com.oms.common.dto.ApiResponse;
 import com.oms.common.dto.PageResponse;
 import com.oms.module.shop.entity.Shop;
+import com.oms.module.admin.entity.AuditEvent;
+import com.oms.module.admin.repository.AuditEventRepository;
 import com.oms.module.shop.repository.ShopRepository;
 import com.oms.module.user.entity.User;
 import com.oms.module.user.repository.UserRepository;
@@ -27,6 +29,15 @@ public class AdminController {
 
     private final ShopRepository shopRepository;
     private final UserRepository userRepository;
+    private final AuditEventRepository auditEventRepository;
+
+    @GetMapping("/audit-events")
+    @Operation(summary = "List recent authenticated mutation audit events")
+    public ResponseEntity<ApiResponse<PageResponse<AuditEvent>>> listAuditEvents(
+            @PageableDefault(size = 50) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.ok("Audit events",
+                PageResponse.of(auditEventRepository.findAllByOrderByOccurredAtDesc(pageable))));
+    }
 
     @GetMapping("/shops")
     @Operation(summary = "List all shops on the platform")

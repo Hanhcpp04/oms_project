@@ -15,7 +15,12 @@ import java.util.List;
  * Order entity - supports both sell and rent order types.
  */
 @Entity
-@Table(name = "orders")
+@Table(name = "orders", indexes = {
+        @Index(name = "idx_orders_shop_status_created", columnList = "shop_id,status,created_at"),
+        @Index(name = "idx_orders_shop_type_created", columnList = "shop_id,order_type,created_at"),
+        @Index(name = "idx_orders_created_by_created", columnList = "created_by_id,created_at"),
+        @Index(name = "idx_orders_payment_timeout", columnList = "status,payment_status,payment_method,created_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor

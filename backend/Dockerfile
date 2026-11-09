@@ -18,4 +18,7 @@ COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 
+HEALTHCHECK --interval=30s --timeout=5s --retries=5 \
+  CMD wget --spider -q http://localhost:8080/actuator/health/readiness || exit 1
+
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -12,6 +12,11 @@ spring:
       hibernate:
         format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+
   # ==================== Jackson ====================
   jackson:
     default-property-inclusion: non_null
@@ -30,3 +35,28 @@ springdoc:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+app:
+  security:
+    rate-limit:
+      enabled: true
+      window-seconds: 60
+      auth-max-requests: 20
+      public-max-requests: 120
+  upload:
+    storage: local
+    dir: uploads

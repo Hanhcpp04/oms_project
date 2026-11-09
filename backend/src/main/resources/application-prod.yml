@@ -16,6 +16,12 @@ spring:
 
 # ==================== JWT ====================
 app:
+  security:
+    rate-limit:
+      enabled: ${RATE_LIMIT_ENABLED:true}
+      window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+      auth-max-requests: ${RATE_LIMIT_AUTH_MAX_REQUESTS:20}
+      public-max-requests: ${RATE_LIMIT_PUBLIC_MAX_REQUESTS:120}
   scheduling:
     enabled: true
   jwt:
@@ -30,9 +36,11 @@ app:
     client-id: ${GOOGLE_CLIENT_ID:}
   messenger:
     verify-token: ${MESSENGER_VERIFY_TOKEN:}
+    app-secret: ${MESSENGER_APP_SECRET:}
     default-page-id: ${MESSENGER_PAGE_ID:}
     default-shop-id: ${MESSENGER_DEFAULT_SHOP_ID:0}
     default-page-access-token: ${MESSENGER_PAGE_ACCESS_TOKEN:}
+    outbound-retry-interval-ms: ${MESSENGER_OUTBOUND_RETRY_INTERVAL_MS:30000}
   public:
     frontend-base-url: ${PUBLIC_FRONTEND_BASE_URL:https://yourdomain.com}
     tracking-secret: ${PUBLIC_ORDER_TRACKING_SECRET:}
@@ -50,6 +58,16 @@ app:
       cancel-url: ${PAYOS_CANCEL_URL:${app.public.frontend-base-url}/payment/payos/cancel}
   cors:
     allowed-origins: ${CORS_ORIGINS:https://yourdomain.com}
+  upload:
+    storage: ${UPLOAD_STORAGE:local}
+    dir: ${UPLOAD_DIR:uploads}
+    s3:
+      bucket: ${S3_BUCKET:}
+      region: ${S3_REGION:ap-southeast-1}
+      endpoint: ${S3_ENDPOINT:}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      path-style-access: ${S3_PATH_STYLE_ACCESS:false}
 
 springdoc:
   api-docs:

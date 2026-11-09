@@ -39,7 +39,7 @@ Mở tệp `.env` vừa tạo và điền các thông tin bảo mật:
 3. **CORS & Domain:** Đổi `PUBLIC_FRONTEND_BASE_URL` và `CORS_ORIGINS` thành địa chỉ tên miền chính thức của bạn (VD: `https://oms.yourdomain.com`).
 4. **API Keys:** Nhập API Key của Gemini AI, Google Client ID, PayOS, và các token của Facebook Messenger Page.
 
-Trong lần khởi tạo database đầu tiên, giữ `HIBERNATE_DDL_AUTO=update` để Hibernate tạo schema. Sau khi schema đã ổn định, đổi giá trị thành `validate` và quản lý các thay đổi schema bằng migration trước mỗi lần triển khai.
+Schema được quản lý bằng Flyway trong `backend/src/main/resources/db/migration`. Giữ `HIBERNATE_DDL_AUTO=validate`; không chuyển về `update` trên production. Với database đã tồn tại, Flyway tự baseline version 1 rồi chạy các migration mới.
 
 ---
 
@@ -78,7 +78,7 @@ docker compose ps
 Nếu tất cả dịch vụ ở trạng thái `running` (và `mysql` ở trạng thái `healthy`), kiểm tra thêm backend và frontend:
 
 ```bash
-curl --fail http://127.0.0.1:8080/v3/api-docs > /dev/null
+curl --fail http://127.0.0.1:8080/actuator/health/readiness > /dev/null
 curl --fail http://127.0.0.1:4200/ > /dev/null
 ```
 
@@ -149,6 +149,8 @@ docker volume inspect "$(docker volume ls --filter name=oms_uploads -q | head -n
 
 Bạn nên lập lịch sao lưu (backup) định kỳ thư mục này.
 
+Trên production có thể đặt `UPLOAD_STORAGE=s3` để dùng AWS S3 hoặc dịch vụ S3-compatible như MinIO/R2. Khi đó cấu hình thêm `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` và `S3_PATH_STYLE_ACCESS`. Local storage vẫn là fallback mặc định.
+
 ### 6.2 Quản lý Nhật Ký Hoạt Động (Logs)
 Chúng tôi đã tích hợp cơ chế tự động xoay vòng logs (Log Rotation) vào ứng dụng backend. Tệp logs sẽ tự động được chia nhỏ khi đạt kích thước `10MB` và chỉ lưu trữ tối đa trong `30 ngày`.
 * Xem logs trực tiếp từ Docker:
@@ -164,3 +166,20 @@ Chúng tôi đã tích hợp cơ chế tự động xoay vòng logs (Log Rotatio
 docker compose exec -T mysql mysqldump -u root -p'MAT_KHAU_CUA_BAN' oms_db > backup_db_$(date +%F).sql
 ```
 Lập lịch chạy lệnh này mỗi ngày một lần vào lúc 0:00 sáng để đảm bảo an toàn dữ liệu.
+
+Kiểm tra file backup bằng cách restore định kỳ vào một database tách biệt:
+
+```bash
+docker compose exec -T mysql mysql -u root -p'MAT_KHAU_CUA_BAN' -e "CREATE DATABASE IF NOT EXISTS oms_restore_test"
+docker compose exec -T mysql mysql -u root -p'MAT_KHAU_CUA_BAN' oms_restore_test < backup_db_YYYY-MM-DD.sql
+```
+
+### 6.4 Monitoring và audit
+
+- Liveness: `/actuator/health/liveness`
+- Readiness: `/actuator/health/readiness`
+- Prometheus metrics: `/actuator/prometheus` (yêu cầu JWT)
+- Audit thao tác thay đổi dữ liệu: `/api/admin/audit-events` (chỉ `ADMIN`)
+- Mọi response có `X-Request-ID` để đối chiếu với log backend.
+
+Webhook Messenger nên cấu hình cả `MESSENGER_VERIFY_TOKEN` và `MESSENGER_APP_SECRET`; chữ ký `X-Hub-Signature-256` chỉ được bắt buộc khi app secret đã cấu hình. Tin gửi thất bại được retry từ persistent queue và chuyển sang trạng thái `DEAD` sau 5 lần để điều tra, thay vì bị mất im lặng.

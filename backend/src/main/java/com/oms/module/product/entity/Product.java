@@ -12,7 +12,10 @@ import java.util.List;
  * Product entity - supports both selling and renting.
  */
 @Entity
-@Table(name = "products")
+@Table(name = "products", indexes = {
+        @Index(name = "idx_products_shop_active", columnList = "shop_id,is_active"),
+        @Index(name = "idx_products_shop_type", columnList = "shop_id,product_type")
+})
 @Getter
 @Setter
 @NoArgsConstructor

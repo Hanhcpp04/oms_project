@@ -18,7 +18,7 @@ Hệ thống quản lý đơn hàng đa kênh dành cho shop bán và cho thuê 
 
 | Layer | Technology |
 | --- | --- |
-| Backend | Java 17, Spring Boot 3.4, Spring Security, JPA/Hibernate, Blaze-Persistence |
+| Backend | Java 17, Spring Boot 3.4, Spring Security, JPA/Hibernate, Flyway, Actuator/Micrometer, Blaze-Persistence |
 | Frontend | Angular 20.3, TypeScript 5.9, Signals, Tailwind CSS 4 |
 | Database | MySQL 8.0 |
 | Authentication | JWT access/refresh token, Google Sign-In |
@@ -108,7 +108,7 @@ docker compose up -d --build
 - Backend: `http://localhost:8080`
 - MySQL: `localhost:3306`
 
-Lần khởi tạo database đầu tiên, `.env.example` đặt `HIBERNATE_DDL_AUTO=update`. Sau khi schema đã được tạo và ổn định, nên đổi thành `validate`.
+Flyway tự tạo hoặc nâng cấp schema; Hibernate chạy ở chế độ `validate`. Không dùng `ddl-auto=update` trên production.
 
 ## Biến môi trường tích hợp
 
@@ -118,9 +118,11 @@ Lần khởi tạo database đầu tiên, `.env.example` đặt `HIBERNATE_DDL_A
 | Security | `JWT_SECRET`, `JWT_ACCESS_EXPIRATION`, `JWT_REFRESH_EXPIRATION` |
 | Google | `GOOGLE_CLIENT_ID` |
 | Gemini | `GEMINI_API_KEY` |
-| Messenger | `MESSENGER_VERIFY_TOKEN`, `MESSENGER_PAGE_ID`, `MESSENGER_PAGE_ACCESS_TOKEN`, `MESSENGER_DEFAULT_SHOP_ID` |
+| Messenger | `MESSENGER_VERIFY_TOKEN`, `MESSENGER_APP_SECRET`, `MESSENGER_PAGE_ID`, `MESSENGER_PAGE_ACCESS_TOKEN`, `MESSENGER_DEFAULT_SHOP_ID` |
 | payOS | `PAYOS_ENABLED`, `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` |
 | Public URL | `PUBLIC_FRONTEND_BASE_URL`, `PUBLIC_ORDER_TRACKING_SECRET`, `CORS_ORIGINS` |
+| Upload | `UPLOAD_STORAGE`, `UPLOAD_DIR`, `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` |
+| Rate limit | `RATE_LIMIT_ENABLED`, `RATE_LIMIT_WINDOW_SECONDS`, `RATE_LIMIT_AUTH_MAX_REQUESTS`, `RATE_LIMIT_PUBLIC_MAX_REQUESTS` |
 
 Xem đầy đủ tại [.env.example](.env.example).
 
@@ -136,6 +138,10 @@ npm run build
 
 # Frontend unit test
 npm test -- --watch=false
+
+# Frontend E2E
+npx playwright install chromium
+npm run e2e
 ```
 
 ## API chính
@@ -158,7 +164,7 @@ Chi tiết triển khai production nằm trong [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## CI
 
-Workflow `.github/workflows/ci.yml` chạy backend tests với MySQL riêng, frontend unit tests và production build cho mỗi pull request. Backend context test dùng database `oms_test`, không dùng database development.
+Workflow `.github/workflows/ci.yml` chạy backend tests + JaCoCo với MySQL riêng, frontend coverage/build/E2E, production dependency audit, dependency review và Docker image smoke build. Backend context test dùng database `oms_test`, không dùng database development.
 
 ## License
 
