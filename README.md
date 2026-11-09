@@ -156,6 +156,10 @@ npm test -- --watch=false
 
 Chi tiết triển khai production nằm trong [DEPLOYMENT.md](DEPLOYMENT.md).
 
+## CI
+
+Workflow `.github/workflows/ci.yml` chạy backend tests với MySQL riêng, frontend unit tests và production build cho mỗi pull request. Backend context test dùng database `oms_test`, không dùng database development.
+
 ## License
 
 Private — Internal use only.

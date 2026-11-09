@@ -24,6 +24,8 @@ spring:
 
 # ==================== JWT ====================
 app:
+  scheduling:
+    enabled: true
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiration: ${JWT_ACCESS_EXPIRATION:86400000}
@@ -56,6 +58,12 @@ app:
       cancel-url: ${PAYOS_CANCEL_URL:${app.public.frontend-base-url}/payment/payos/cancel}
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:4200}
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
 
 # ==================== Logging ====================
 logging:

@@ -9,6 +9,7 @@ import com.oms.module.user.dto.StaffResponse;
 import com.oms.module.user.dto.StaffListResponse;
 import com.oms.module.user.entity.User;
 import com.oms.module.user.repository.UserRepository;
+import com.oms.module.order.repository.OrderRepository;
 import com.oms.common.dto.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -19,6 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,6 +34,9 @@ public class StaffService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final PermissionService permissionService;
+    private final OrderRepository orderRepository;
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Transactional
     public StaffResponse createStaff(Long ownerId, CreateStaffRequest request) {
@@ -122,8 +130,14 @@ public class StaffService {
 
         log.debug("Found {} staff members in database for shop {}", staffPage.getTotalElements(), shopId);
 
+        List<Long> staffIds = staffPage.getContent().stream().map(User::getId).toList();
+        OrderCounts orderCounts = getOrderCounts(shopId, staffIds);
         List<StaffListResponse> content = staffPage.getContent().stream()
-                .map(this::toStaffListResponse)
+                .map(user -> toStaffListResponse(
+                        user,
+                        orderCounts.today().getOrDefault(user.getId(), 0L),
+                        orderCounts.thisMonth().getOrDefault(user.getId(), 0L)
+                ))
                 .collect(Collectors.toList());
 
         return PageResponse.of(staffPage, content);
@@ -143,7 +157,12 @@ public class StaffService {
 
         validateStaffBelongsToOwnerShop(owner, staff);
 
-        return toStaffDetailResponse(staff);
+        OrderCounts orderCounts = getOrderCounts(owner.getShop().getId(), List.of(staff.getId()));
+        return toStaffDetailResponse(
+                staff,
+                orderCounts.today().getOrDefault(staff.getId(), 0L),
+                orderCounts.thisMonth().getOrDefault(staff.getId(), 0L)
+        );
     }
 
     private void validateStaffBelongsToOwnerShop(User owner, User staff) {
@@ -154,7 +173,7 @@ public class StaffService {
         }
     }
 
-    private StaffListResponse toStaffListResponse(User user) {
+    private StaffListResponse toStaffListResponse(User user, long ordersToday, long ordersThisMonth) {
         return StaffListResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -166,12 +185,12 @@ public class StaffService {
                 .forceChangePassword(user.getForceChangePassword())
                 .createdAt(user.getCreatedAt())
                 .lastLogin(user.getLastLogin())
-                .ordersToday(generateOrdersToday(user))
-                .ordersThisMonth(generateOrdersThisMonth(user))
+                .ordersToday(Math.toIntExact(ordersToday))
+                .ordersThisMonth(Math.toIntExact(ordersThisMonth))
                 .build();
     }
 
-    private StaffDetailResponse toStaffDetailResponse(User user) {
+    private StaffDetailResponse toStaffDetailResponse(User user, long ordersToday, long ordersThisMonth) {
         return StaffDetailResponse.builder()
                 .id(user.getId())
                 .fullName(user.getFullName())
@@ -183,8 +202,8 @@ public class StaffService {
                 .forceChangePassword(user.getForceChangePassword())
                 .createdAt(user.getCreatedAt())
                 .lastLogin(user.getLastLogin())
-                .ordersToday(generateOrdersToday(user))
-                .ordersThisMonth(generateOrdersThisMonth(user))
+                .ordersToday(Math.toIntExact(ordersToday))
+                .ordersThisMonth(Math.toIntExact(ordersThisMonth))
                 .build();
     }
 
@@ -197,11 +216,32 @@ public class StaffService {
         return normalized.isEmpty() ? null : normalized;
     }
 
-    private int generateOrdersToday(User user) {
-        return Math.toIntExact(user.getId() % 7);
+    private OrderCounts getOrderCounts(Long shopId, List<Long> staffIds) {
+        if (staffIds.isEmpty()) {
+            return new OrderCounts(Map.of(), Map.of());
+        }
+
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime tomorrowStart = today.plusDays(1).atStartOfDay();
+        LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+        LocalDateTime nextMonthStart = today.plusMonths(1).withDayOfMonth(1).atStartOfDay();
+
+        return new OrderCounts(
+                toOrderCountMap(orderRepository.countOrdersByStaff(
+                        shopId, staffIds, todayStart, tomorrowStart)),
+                toOrderCountMap(orderRepository.countOrdersByStaff(
+                        shopId, staffIds, monthStart, nextMonthStart))
+        );
     }
 
-    private int generateOrdersThisMonth(User user) {
-        return 15 + Math.toIntExact(user.getId() % 31);
+    private Map<Long, Long> toOrderCountMap(List<OrderRepository.StaffOrderCount> counts) {
+        return counts.stream().collect(Collectors.toMap(
+                OrderRepository.StaffOrderCount::getUserId,
+                OrderRepository.StaffOrderCount::getOrderCount
+        ));
+    }
+
+    private record OrderCounts(Map<Long, Long> today, Map<Long, Long> thisMonth) {
     }
 }
