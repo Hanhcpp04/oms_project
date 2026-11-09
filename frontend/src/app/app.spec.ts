@@ -1,10 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
+import { AuthStore } from './core/auth/auth.store';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [App],
+      providers: [
+        {
+          provide: AuthStore,
+          useValue: jasmine.createSpyObj<AuthStore>('AuthStore', ['loadCurrentUser']),
+        },
+      ],
     }).compileComponents();
   });
 
