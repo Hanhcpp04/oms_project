@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mysql:
     image: mysql:8.0
@@ -8,6 +6,8 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
       MYSQL_DATABASE: ${DB_NAME:-oms_db}
+      MYSQL_USER: ${DB_USERNAME:?DB_USERNAME is required}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       MYSQL_CHARACTER_SET: utf8mb4
       MYSQL_COLLATION: utf8mb4_unicode_ci
     ports:
@@ -39,15 +39,27 @@ services:
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      HIBERNATE_DDL_AUTO: ${HIBERNATE_DDL_AUTO:-update}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       MESSENGER_VERIFY_TOKEN: ${MESSENGER_VERIFY_TOKEN:-}
       MESSENGER_PAGE_ID: ${MESSENGER_PAGE_ID:-}
       MESSENGER_DEFAULT_SHOP_ID: ${MESSENGER_DEFAULT_SHOP_ID:-0}
       MESSENGER_PAGE_ACCESS_TOKEN: ${MESSENGER_PAGE_ACCESS_TOKEN:-}
+      PUBLIC_FRONTEND_BASE_URL: ${PUBLIC_FRONTEND_BASE_URL:-http://localhost:4200}
+      PUBLIC_ORDER_TRACKING_SECRET: ${PUBLIC_ORDER_TRACKING_SECRET:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:4200}
+      PAYOS_ENABLED: ${PAYOS_ENABLED:-false}
+      PAYOS_CLIENT_ID: ${PAYOS_CLIENT_ID:-}
+      PAYOS_API_KEY: ${PAYOS_API_KEY:-}
+      PAYOS_CHECKSUM_KEY: ${PAYOS_CHECKSUM_KEY:-}
+      PAYMENT_CANCEL_MINUTES: ${PAYMENT_CANCEL_MINUTES:-30}
+      PAYMENT_REMINDER_MINUTES: ${PAYMENT_REMINDER_MINUTES:-25}
     ports:
       - "8080:8080"
+    volumes:
+      - oms_uploads:/app/uploads
+      - oms_logs:/app/logs
     networks:
       - oms-network
 
@@ -59,6 +71,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    environment:
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
     ports:
       - "4200:80"
     networks:
@@ -66,6 +80,10 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  oms_uploads:
+    driver: local
+  oms_logs:
     driver: local
 
 networks:

@@ -143,7 +143,6 @@ public class AuthService {
 
         user.setPassword(passwordEncoder.encode(newPassword));
         user.setForceChangePassword(false);
-        user.setTemporaryPassword(null);
         userRepository.save(user);
     }
 

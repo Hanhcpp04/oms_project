@@ -49,9 +49,6 @@ public class User extends BaseEntity {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
-    @Column(name = "temporary_password")
-    private String temporaryPassword;
-
     @Column(name = "force_change_password", nullable = false)
     @Builder.Default
     private Boolean forceChangePassword = false;

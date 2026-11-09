@@ -16,8 +16,7 @@ public final class EndpointSecurityConfig {
             "/api/public/**",
             "/api/files/display/**",
             "/public/**",
-            "/webhook",
-            "/api/test-error"
+            "/webhook"
     };
 
     public static final String[] PUBLIC_POST_ENDPOINTS = {
